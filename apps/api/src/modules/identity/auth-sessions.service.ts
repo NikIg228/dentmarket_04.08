@@ -1,0 +1,320 @@
+import { BadRequestException, ConflictException, Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
+import type { SocialExchangeInput } from "@marketplace/schemas";
+import { createHash, randomBytes, randomUUID, scryptSync, timingSafeEqual } from "node:crypto";
+import jwt from "jsonwebtoken";
+import { Prisma } from "@prisma/client";
+import { environment } from "../../platform/config/environment";
+import { PrismaService } from "../../platform/prisma/prisma.service";
+import { OidcVerifierService } from "./oidc-verifier.service";
+import { OnboardingService } from "../onboarding/onboarding.service";
+
+type RequestMetadata = { ipAddress?: string; userAgent?: string; correlationId?: string };
+const hash = (value: string) => createHash("sha256").update(value).digest("hex");
+const secureEqual = (left: string, right: string) => {
+  const a = Buffer.from(left); const b = Buffer.from(right);
+  return a.length === b.length && timingSafeEqual(a, b);
+};
+const passwordHash = (password: string) => {
+  const salt = randomBytes(16).toString("hex");
+  return `scrypt$${salt}$${scryptSync(password, salt, 64).toString("hex")}`;
+};
+const passwordMatches = (password: string, encoded: string | null) => {
+  if (!encoded?.startsWith("scrypt$")) return false;
+  const [, salt, expected] = encoded.split("$");
+  if (!salt || !expected) return false;
+  const actual = scryptSync(password, salt, 64).toString("hex");
+  return secureEqual(actual, expected);
+};
+
+@Injectable()
+export class AuthSessionsService {
+  constructor(private readonly prisma: PrismaService, private readonly oidc: OidcVerifierService, private readonly onboarding: OnboardingService) {}
+
+  private signingKey() {
+    const config = environment();
+    const key = (config.JWT_PRIVATE_KEY ?? config.JWT_SECRET)?.replaceAll("\\n", "\n");
+    if (!key) throw new Error("JWT signing key is not configured");
+    return { key, algorithm: config.JWT_PRIVATE_KEY ? "RS256" as const : "HS256" as const };
+  }
+
+  private issueAccessToken(userId: string, organizationIds: string[], activeOrganizationId: string | null, authMethods: string[], sessionId: string) {
+    const config = environment();
+    const signing = this.signingKey();
+    return jwt.sign({ organization_ids: organizationIds, organization_id: activeOrganizationId ?? undefined, amr: authMethods }, signing.key, {
+      algorithm: signing.algorithm,
+      subject: userId,
+      issuer: config.JWT_ISSUER ?? "dentmarket-kz",
+      audience: config.JWT_AUDIENCE ?? "dentmarket-web",
+      expiresIn: config.AUTH_ACCESS_TOKEN_TTL_SECONDS,
+      jwtid: sessionId,
+    });
+  }
+
+  private async memberships(userId: string) {
+    return this.prisma.organizationMembership.findMany({ where: { userId, status: "ACTIVE", organization: { status: "ACTIVE" } }, select: { organizationId: true, isPrimary: true }, orderBy: { acceptedAt: "asc" } });
+  }
+
+  private async createSession(userId: string, organizationIds: string[], activeOrganizationId: string | null, authMethods: string[], metadata: RequestMetadata) {
+    const refreshToken = randomBytes(48).toString("base64url");
+    const config = environment();
+    const session = await this.prisma.authSession.create({ data: { userId, familyId: randomUUID(), refreshTokenHash: hash(refreshToken), organizationIds, activeOrganizationId, authMethods, ipAddress: metadata.ipAddress, userAgent: metadata.userAgent, lastUsedAt: new Date(), expiresAt: new Date(Date.now() + config.AUTH_REFRESH_TOKEN_TTL_DAYS * 86_400_000) } });
+    return { ...this.sessionPayload(session, refreshToken), refreshToken };
+  }
+
+  private async email(to: string, subject: string, text: string) {
+    const config = environment();
+    if (!config.EMAIL_PROVIDER_URL || !config.EMAIL_PROVIDER_TOKEN) {
+      if (config.NODE_ENV === "production") throw new UnauthorizedException("Email delivery is not configured");
+      console.info(`[auth-email:${to}] ${subject}\n${text}`);
+      return;
+    }
+    const response = await fetch(config.EMAIL_PROVIDER_URL, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${config.EMAIL_PROVIDER_TOKEN}` }, body: JSON.stringify({ to, subject, text }), signal: AbortSignal.timeout(10_000) });
+    if (!response.ok) throw new UnauthorizedException("Email delivery is temporarily unavailable");
+  }
+
+  private async issueEmailToken(userId: string, type: "EMAIL_VERIFICATION" | "PASSWORD_RESET", metadata?: Record<string, unknown>) {
+    const config = environment();
+    const raw = randomBytes(48).toString("base64url");
+    const expiresAt = new Date(Date.now() + (type === "EMAIL_VERIFICATION" ? config.AUTH_EMAIL_VERIFICATION_TTL_HOURS * 3_600_000 : config.AUTH_PASSWORD_RESET_TTL_MINUTES * 60_000));
+    await this.prisma.emailAuthToken.deleteMany({ where: { userId, type, consumedAt: null } });
+    await this.prisma.emailAuthToken.create({ data: { userId, type, tokenHash: hash(raw), expiresAt, metadata: metadata as Prisma.InputJsonValue | undefined } });
+    return { raw, expiresAt };
+  }
+
+  async registerEmail(input: { email: string; displayName: string; password: string; registrationToken?: string }, metadata: RequestMetadata) {
+    const existing = await this.prisma.user.findUnique({ where: { email: input.email } });
+    if (existing) throw new ConflictException("Аккаунт с таким email уже существует. Войдите или восстановите пароль.");
+    const user = await this.prisma.user.create({ data: { email: input.email, displayName: input.displayName, passwordHash: passwordHash(input.password) } });
+    try {
+      const token = await this.issueEmailToken(user.id, "EMAIL_VERIFICATION", input.registrationToken ? { registrationToken: input.registrationToken } : undefined);
+      const link = `${environment().AUTH_EMAIL_BASE_URL}/verify-email?token=${encodeURIComponent(token.raw)}`;
+      await this.email(user.email, "Подтвердите email в DentMarket", `Здравствуйте, ${user.displayName}!\n\nПодтвердите email по ссылке:\n${link}\n\nСсылка действует до ${token.expiresAt.toISOString()}.`);
+      await this.prisma.securityEvent.create({ data: { type: "auth.email.registered", severity: "INFO", actorId: user.id, ipAddress: metadata.ipAddress, userAgent: metadata.userAgent } });
+      return { ok: true, verificationRequired: true, email: user.email };
+    } catch (error) {
+      // Do not leave an unusable account behind when delivery is unavailable.
+      // The user can retry registration immediately after the provider recovers.
+      await this.prisma.$transaction([
+        this.prisma.emailAuthToken.deleteMany({ where: { userId: user.id } }),
+        this.prisma.user.delete({ where: { id: user.id } }),
+      ]);
+      throw error;
+    }
+  }
+
+  async verifyEmail(rawToken: string, metadata: RequestMetadata) {
+    const token = await this.prisma.emailAuthToken.findUnique({ where: { tokenHash: hash(rawToken) }, include: { user: true } });
+    if (!token || token.type !== "EMAIL_VERIFICATION" || token.consumedAt || token.expiresAt <= new Date()) throw new UnauthorizedException("Ссылка подтверждения недействительна или истекла");
+    const registrationToken = token.metadata && typeof token.metadata === "object" && !Array.isArray(token.metadata) && typeof (token.metadata as { registrationToken?: unknown }).registrationToken === "string" ? (token.metadata as { registrationToken: string }).registrationToken : undefined;
+    let onboarding: { organizationId?: string; capability?: string; organizationDisplayName?: string } | null = null;
+    await this.prisma.$transaction(async (tx) => {
+      await tx.emailAuthToken.update({ where: { id: token.id }, data: { consumedAt: new Date() } });
+      await tx.user.update({ where: { id: token.userId }, data: { emailVerifiedAt: new Date(), failedLoginAttempts: 0, lockedUntil: null } });
+    });
+    if (registrationToken) onboarding = await this.onboarding.claim(registrationToken, { id: token.user.id, email: token.user.email, displayName: token.user.displayName });
+    const result = await this.passwordSession(token.user, metadata);
+    return { ...result, ...(onboarding ?? {}), verified: true };
+  }
+
+  private async passwordSession(user: { id: string; email: string; displayName: string }, metadata: RequestMetadata) {
+    const memberships = await this.memberships(user.id);
+    const organizationIds = memberships.map(({ organizationId }) => organizationId);
+    const activeOrganizationId = memberships.find(({ isPrimary }) => isPrimary)?.organizationId ?? organizationIds[0] ?? null;
+    const session = await this.createSession(user.id, organizationIds, activeOrganizationId, ["password"], metadata);
+    await this.prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
+    return { user: { id: user.id, email: user.email, displayName: user.displayName }, ...session };
+  }
+
+  async loginEmail(input: { email: string; password: string }, metadata: RequestMetadata) {
+    const user = await this.prisma.user.findUnique({ where: { email: input.email } });
+    if (user?.lockedUntil && user.lockedUntil > new Date()) throw new UnauthorizedException("Слишком много попыток. Попробуйте позже");
+    if (!user || !passwordMatches(input.password, user.passwordHash)) {
+      if (user) await this.prisma.user.update({ where: { id: user.id }, data: { failedLoginAttempts: { increment: 1 }, lockedUntil: user.failedLoginAttempts >= 4 ? new Date(Date.now() + 15 * 60_000) : user.lockedUntil } });
+      throw new UnauthorizedException("Email или пароль указаны неверно");
+    }
+    if (!user.emailVerifiedAt) throw new UnauthorizedException("Сначала подтвердите email");
+    await this.prisma.user.update({ where: { id: user.id }, data: { failedLoginAttempts: 0, lockedUntil: null } });
+    return this.passwordSession(user, metadata);
+  }
+
+  async forgotPassword(email: string) {
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    if (user) {
+      const token = await this.issueEmailToken(user.id, "PASSWORD_RESET");
+      const link = `${environment().AUTH_EMAIL_BASE_URL}/reset-password?token=${encodeURIComponent(token.raw)}`;
+      await this.email(user.email, "Восстановление пароля DentMarket", `Сбросить пароль: ${link}\nСсылка действует 30 минут.`);
+    }
+    return { ok: true, message: "Если аккаунт существует, письмо отправлено" };
+  }
+
+  async resetPassword(rawToken: string, password: string) {
+    const token = await this.prisma.emailAuthToken.findUnique({ where: { tokenHash: hash(rawToken) }, include: { user: true } });
+    if (!token || token.type !== "PASSWORD_RESET" || token.consumedAt || token.expiresAt <= new Date()) throw new UnauthorizedException("Ссылка восстановления недействительна или истекла");
+    await this.prisma.$transaction([this.prisma.emailAuthToken.update({ where: { id: token.id }, data: { consumedAt: new Date() } }), this.prisma.user.update({ where: { id: token.userId }, data: { passwordHash: passwordHash(password), failedLoginAttempts: 0, lockedUntil: null } }), this.prisma.authSession.updateMany({ where: { userId: token.userId, status: "ACTIVE" }, data: { status: "REVOKED", revokedAt: new Date(), revokeReason: "password_reset" } })]);
+    return { ok: true };
+  }
+
+  async demo(capability: "BUYER" | "SUPPLIER", metadata: RequestMetadata) {
+    const email = capability === "BUYER" ? "buyer@marketplace.local" : "supplier@marketplace.local";
+    const user = await this.prisma.user.findUnique({ where: { email }, include: { memberships: { where: { status: "ACTIVE", organization: { status: "ACTIVE", capabilities: { some: { capability } } } }, include: { organization: true }, orderBy: { acceptedAt: "asc" } } } });
+    const membership = user?.memberships[0];
+    if (!user || !membership) throw new NotFoundException("Демонстрационный аккаунт не подготовлен");
+    const organizationIds = user.memberships.map(({ organizationId }) => organizationId);
+    const session = await this.createSession(user.id, organizationIds, membership.organizationId, ["demo"], metadata);
+    await this.prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
+    return { user: { id: user.id, email: user.email, displayName: user.displayName }, capability, organizationId: membership.organizationId, organizationDisplayName: membership.organization.displayName, ...session };
+  }
+
+  private sessionPayload(session: { id: string; userId: string; organizationIds: string[]; activeOrganizationId: string | null; authMethods: string[]; expiresAt: Date }, refreshToken: string) {
+    const config = environment();
+    return {
+      accessToken: this.issueAccessToken(session.userId, session.organizationIds, session.activeOrganizationId, session.authMethods, session.id),
+      accessTokenExpiresIn: config.AUTH_ACCESS_TOKEN_TTL_SECONDS,
+      refreshToken,
+      refreshTokenExpiresAt: session.expiresAt,
+      sessionId: session.id,
+      activeOrganizationId: session.activeOrganizationId,
+      organizationIds: session.organizationIds,
+    };
+  }
+
+  private async acceptInvitation(token: string, userId: string, email: string) {
+    const invitation = await this.prisma.membershipInvitation.findUnique({ where: { tokenHash: hash(token) }, include: { roles: true } });
+    if (!invitation || invitation.email.toLowerCase() !== email || invitation.status !== "PENDING") throw new BadRequestException("Invitation is invalid for this account");
+    if (invitation.expiresAt <= new Date()) throw new BadRequestException("Invitation has expired");
+    await this.prisma.$transaction(async (tx) => {
+      const membership = await tx.organizationMembership.upsert({
+        where: { userId_organizationId: { userId, organizationId: invitation.organizationId } },
+        update: { status: "ACTIVE", acceptedAt: new Date(), roles: { createMany: { data: invitation.roles.map(({ roleId }) => ({ roleId })), skipDuplicates: true } } },
+        create: { userId, organizationId: invitation.organizationId, status: "ACTIVE", acceptedAt: new Date(), roles: { create: invitation.roles.map(({ roleId }) => ({ roleId })) } },
+      });
+      await tx.membershipInvitation.update({ where: { id: invitation.id }, data: { status: "ACCEPTED", acceptedAt: new Date() } });
+      await tx.auditLog.create({ data: { actorId: userId, organizationId: invitation.organizationId, action: "membership.social.accepted", entityType: "OrganizationMembership", entityId: membership.id } });
+    });
+  }
+
+  async exchange(input: SocialExchangeInput, metadata: RequestMetadata) {
+    const verified = await this.oidc.verify(input.provider, input.idToken);
+    const identity = await this.prisma.externalIdentity.findUnique({ where: { provider_subject: { provider: input.provider, subject: verified.subject } }, include: { user: true } });
+    let user = identity?.user;
+    if (!user) {
+      user = await this.prisma.$transaction(async (tx) => {
+        const existing = await tx.user.findUnique({ where: { email: verified.email } });
+        const resolved = existing ?? await tx.user.create({ data: { email: verified.email, displayName: verified.displayName, emailVerifiedAt: new Date() } });
+        try {
+          await tx.externalIdentity.create({ data: { userId: resolved.id, provider: input.provider, subject: verified.subject, email: verified.email, emailVerified: true, profile: verified.profile as Prisma.InputJsonValue, lastLoginAt: new Date() } });
+        } catch (error) {
+          if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") throw new ConflictException("This social account is already linked");
+          throw error;
+        }
+        await tx.auditLog.create({ data: { actorId: resolved.id, action: existing ? "identity.social.linked" : "identity.social.registered", entityType: "User", entityId: resolved.id, after: { provider: input.provider, email: verified.email } } });
+        return resolved;
+      });
+    } else if (identity?.email.toLowerCase() !== verified.email) {
+      throw new UnauthorizedException("Social account email changed; relinking is required");
+    }
+    if (input.invitationToken) await this.acceptInvitation(input.invitationToken, user.id, verified.email);
+    const onboarding = input.registrationToken ? await this.onboarding.claim(input.registrationToken, { id: user.id, email: user.email, displayName: user.displayName }) : null;
+    const memberships = await this.memberships(user.id);
+    const organizationIds = memberships.map(({ organizationId }) => organizationId);
+    const requested = input.organizationId;
+    if (requested && !organizationIds.includes(requested)) throw new UnauthorizedException("Requested organization is not available to this account");
+    const activeOrganizationId = requested ?? memberships.find(({ isPrimary }) => isPrimary)?.organizationId ?? organizationIds[0] ?? null;
+    const refreshToken = randomBytes(48).toString("base64url");
+    const config = environment();
+    const session = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.authSession.create({ data: { userId: user!.id, familyId: randomUUID(), refreshTokenHash: hash(refreshToken), organizationIds, activeOrganizationId, authMethods: [input.provider.toLowerCase()], ipAddress: metadata.ipAddress, userAgent: metadata.userAgent, lastUsedAt: new Date(), expiresAt: new Date(Date.now() + config.AUTH_REFRESH_TOKEN_TTL_DAYS * 86_400_000) } });
+      await tx.user.update({ where: { id: user!.id }, data: { lastLoginAt: new Date(), emailVerifiedAt: user!.emailVerifiedAt ?? new Date() } });
+      await tx.externalIdentity.update({ where: { provider_subject: { provider: input.provider, subject: verified.subject } }, data: { lastLoginAt: new Date(), profile: verified.profile as Prisma.InputJsonValue } });
+      return created;
+    });
+    return { user: { id: user.id, email: user.email, displayName: user.displayName }, ...(onboarding ? { capability: onboarding.capability, organizationId: onboarding.organizationId, organizationDisplayName: onboarding.organizationDisplayName } : {}), ...this.sessionPayload(session, refreshToken) };
+  }
+
+  async rotate(refreshToken: string, metadata: RequestMetadata) {
+    const tokenHash = hash(refreshToken);
+    const session = await this.prisma.authSession.findFirst({ where: { OR: [{ refreshTokenHash: tokenHash }, { previousTokenHash: tokenHash }] } });
+    if (!session) throw new UnauthorizedException("Refresh session is invalid");
+    if (session.previousTokenHash && secureEqual(session.previousTokenHash, tokenHash)) {
+      await this.prisma.$transaction([this.prisma.authSession.updateMany({ where: { familyId: session.familyId, status: "ACTIVE" }, data: { status: "REVOKED", revokedAt: new Date(), revokeReason: "refresh_replay" } }), this.prisma.securityEvent.create({ data: { severity: "CRITICAL", type: "auth.refresh_replay", actorId: session.userId, sessionId: session.id, ipAddress: metadata.ipAddress, userAgent: metadata.userAgent, correlationId: metadata.correlationId } })]);
+      throw new UnauthorizedException("Refresh token replay detected; session family revoked");
+    }
+    if (session.status !== "ACTIVE" || session.expiresAt <= new Date()) throw new UnauthorizedException("Refresh session is revoked or expired");
+    const memberships = await this.memberships(session.userId);
+    const organizationIds = memberships.map(({ organizationId }) => organizationId);
+    const activeOrganizationId = session.activeOrganizationId && organizationIds.includes(session.activeOrganizationId) ? session.activeOrganizationId : organizationIds[0] ?? null;
+    const next = randomBytes(48).toString("base64url");
+    const updated = await this.prisma.authSession.update({ where: { id: session.id }, data: { previousTokenHash: session.refreshTokenHash, refreshTokenHash: hash(next), organizationIds, activeOrganizationId, lastUsedAt: new Date(), ipAddress: metadata.ipAddress, userAgent: metadata.userAgent } });
+    return this.sessionPayload(updated, next);
+  }
+
+  async list(userId: string) {
+    return this.prisma.authSession.findMany({ where: { userId, status: "ACTIVE", expiresAt: { gt: new Date() } }, select: { id: true, activeOrganizationId: true, authMethods: true, ipAddress: true, userAgent: true, lastUsedAt: true, expiresAt: true, createdAt: true }, orderBy: { lastUsedAt: "desc" } });
+  }
+
+  async createHandoff(userId: string, organizationId: string, capability: "BUYER" | "SUPPLIER", sessionId?: string) {
+    const now = new Date();
+    const session = sessionId
+      ? await this.prisma.authSession.findFirst({ where: { id: sessionId, userId, status: "ACTIVE", expiresAt: { gt: now }, organizationIds: { has: organizationId } } })
+      : await this.prisma.authSession.findFirst({ where: { userId, status: "ACTIVE", expiresAt: { gt: now }, organizationIds: { has: organizationId } }, orderBy: { lastUsedAt: "desc" } });
+    if (!session) throw new UnauthorizedException("Authentication session is not available for handoff");
+    const membership = await this.prisma.organizationMembership.findFirst({ where: { userId, organizationId, status: "ACTIVE", organization: { status: "ACTIVE", capabilities: { some: { capability } } } }, include: { organization: true } });
+    if (!membership) throw new UnauthorizedException("Organization capability is not available for handoff");
+    const code = randomBytes(32).toString("base64url");
+    const expiresAt = new Date(Date.now() + 120_000);
+    await this.prisma.idempotencyRecord.create({ data: { scope: "session-handoff", key: hash(code), requestHash: hash(`${userId}:${organizationId}:${capability}`), responseCode: 200, responseBody: { sessionId: session.id, userId, organizationId, capability } as Prisma.InputJsonValue, expiresAt } });
+    return { handoffCode: code, expiresAt, organizationId, organizationDisplayName: membership.organization.displayName, capability };
+  }
+
+  async exchangeHandoff(code: string) {
+    const record = await this.prisma.idempotencyRecord.findUnique({ where: { scope_key: { scope: "session-handoff", key: hash(code) } } });
+    if (!record || record.expiresAt <= new Date() || record.responseCode !== 200) throw new UnauthorizedException("Session handoff is invalid or expired");
+    const consumed = await this.prisma.idempotencyRecord.updateMany({ where: { id: record.id, responseCode: 200, expiresAt: { gt: new Date() } }, data: { responseCode: 410 } });
+    if (consumed.count !== 1) throw new UnauthorizedException("Session handoff has already been used");
+    const payload = record.responseBody && typeof record.responseBody === "object" && !Array.isArray(record.responseBody) ? record.responseBody as { sessionId?: string; userId?: string; organizationId?: string; capability?: "BUYER" | "SUPPLIER" } : {};
+    if (!payload.sessionId || !payload.userId || !payload.organizationId || !payload.capability) throw new UnauthorizedException("Session handoff payload is invalid");
+    const session = await this.prisma.authSession.findFirst({ where: { id: payload.sessionId, userId: payload.userId, status: "ACTIVE", expiresAt: { gt: new Date() }, organizationIds: { has: payload.organizationId } } });
+    if (!session) throw new UnauthorizedException("Authentication session is revoked or expired");
+    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: payload.userId }, select: { id: true, email: true, displayName: true } });
+    return { user, capability: payload.capability, organizationId: payload.organizationId, ...this.sessionPayload(session, ""), refreshToken: undefined };
+  }
+
+  async revoke(sessionId: string, userId: string, reason: string) {
+    const session = await this.prisma.authSession.findFirst({ where: { id: sessionId, userId } });
+    if (!session) throw new NotFoundException("Session not found");
+    return this.prisma.authSession.update({ where: { id: session.id }, data: { status: "REVOKED", revokedAt: new Date(), revokeReason: reason } });
+  }
+
+  async revokeByRefreshToken(refreshToken: string, userId: string | undefined, reason: string) {
+    const session = await this.prisma.authSession.findFirst({ where: { refreshTokenHash: hash(refreshToken), ...(userId ? { userId } : {}) } });
+    if (!session) return { revoked: false };
+    await this.prisma.authSession.update({ where: { id: session.id }, data: { status: "REVOKED", revokedAt: new Date(), revokeReason: reason } });
+    return { revoked: true };
+  }
+
+  async switchOrganization(sessionId: string, userId: string, organizationId: string) {
+    const session = await this.prisma.authSession.findFirst({ where: { id: sessionId, userId, status: "ACTIVE", expiresAt: { gt: new Date() } } });
+    if (!session) throw new NotFoundException("Session not found");
+    const membership = await this.prisma.organizationMembership.findUnique({ where: { userId_organizationId: { userId, organizationId } } });
+    if (membership?.status !== "ACTIVE") throw new UnauthorizedException("Organization membership is not active");
+    const updated = await this.prisma.authSession.update({ where: { id: sessionId }, data: { activeOrganizationId: organizationId, lastUsedAt: new Date() } });
+    return { activeOrganizationId: organizationId, accessToken: this.issueAccessToken(userId, updated.organizationIds, organizationId, updated.authMethods, updated.id), accessTokenExpiresIn: environment().AUTH_ACCESS_TOKEN_TTL_SECONDS };
+  }
+
+  async elevateMfa(sessionId: string, userId: string, organizationId: string) {
+    const session = await this.prisma.authSession.findFirst({ where: { id: sessionId, userId, status: "ACTIVE", expiresAt: { gt: new Date() }, organizationIds: { has: organizationId } } });
+    if (!session) throw new UnauthorizedException("Authentication session is not available for MFA elevation");
+    const authMethods = Array.from(new Set([...session.authMethods, "totp"]));
+    const updated = await this.prisma.authSession.update({ where: { id: session.id }, data: { authMethods, activeOrganizationId: organizationId, lastUsedAt: new Date() } });
+    return { accessToken: this.issueAccessToken(userId, updated.organizationIds, organizationId, authMethods, updated.id), accessTokenExpiresIn: environment().AUTH_ACCESS_TOKEN_TTL_SECONDS, activeOrganizationId: organizationId, authenticationMethods: authMethods };
+  }
+
+  async unlink(userId: string, provider: "GOOGLE" | "APPLE") {
+    const identities = await this.prisma.externalIdentity.findMany({ where: { userId } });
+    if (identities.length <= 1) throw new ConflictException("The only sign-in method cannot be unlinked");
+    const identity = identities.find((item) => item.provider === provider);
+    if (!identity) throw new NotFoundException("Social identity not found");
+    await this.prisma.$transaction([this.prisma.externalIdentity.delete({ where: { id: identity.id } }), this.prisma.authSession.updateMany({ where: { userId, authMethods: { has: provider.toLowerCase() }, status: "ACTIVE" }, data: { status: "REVOKED", revokedAt: new Date(), revokeReason: "identity_unlinked" } }), this.prisma.auditLog.create({ data: { actorId: userId, action: "identity.social.unlinked", entityType: "ExternalIdentity", entityId: identity.id, before: { provider } } })]);
+    return { unlinked: true, provider };
+  }
+}

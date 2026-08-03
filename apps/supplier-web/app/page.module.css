@@ -1,0 +1,50 @@
+.switcher { min-width: 210px; }
+.attentionGrid { display:grid; grid-template-columns:1.2fr 1fr 1fr; }
+.attentionGrid button { min-width:0; min-height:148px; display:flex; flex-direction:column; align-items:flex-start; gap:10px; padding:18px; border:0; border-right:1px solid var(--colorNeutralStroke2); background:var(--colorNeutralBackground1); color:var(--colorNeutralForeground1); text-align:left; cursor:pointer; }
+.attentionGrid button:last-child { border-right:0; }
+.attentionGrid button:hover { background:var(--colorNeutralBackground1Hover); }
+.attentionGrid button:active { transform:translateY(1px); }
+.attentionGrid strong { font-size:14px; line-height:1.35; }
+.attentionGrid span:last-child { color:var(--colorNeutralForeground3); font-size:11px; line-height:1.45; }
+.healthGrid { display: grid; grid-template-columns: repeat(3, 1fr); }
+.healthItem { min-height: 112px; display: grid; align-content: center; gap: 7px; padding: 18px; border-right: 1px solid var(--colorNeutralStroke2); }
+.healthItem:last-child { border-right: 0; }
+.healthItem strong { font-size: 15px; }
+.healthItem p { margin: 0; color: var(--colorNeutralForeground3); font-size: 11px; line-height: 1.45; }
+.editCell { display: flex; align-items: center; gap: 6px; min-width: 210px; }
+.editCell input { min-width: 90px; }
+.timeline { display: grid; }
+.event { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 7px 12px; padding: 14px 18px 14px 35px; border-bottom: 1px solid var(--colorNeutralStroke3); }
+.event:last-child { border-bottom: 0; }
+.event::before { content: ""; position: absolute; left: 18px; top: 20px; width: 7px; height: 7px; border-radius: 50%; background: var(--colorBrandBackground); }
+.event > span:first-child { grid-column: 1 / -1; color: var(--colorNeutralForeground3); font-size: 10px; }
+.event strong { font-size: 12px; }
+.event p { margin: 4px 0 0; color: var(--colorNeutralForeground3); font-size: 11px; }
+.integrationList, .credentialList, .documentList { display: grid; }
+.integration, .credential, .document { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 20px; padding: 16px 18px; border-bottom: 1px solid var(--colorNeutralStroke3); }
+.integration:last-child, .credential:last-child, .document:last-child { border-bottom: 0; }
+.integration strong, .credential strong, .document strong { display: block; margin-bottom: 4px; font-size: 13px; }
+.integration p, .credential p, .document p { margin: 0; color: var(--colorNeutralForeground3); font-size: 11px; line-height: 1.45; }
+.formRow { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; align-items: end; padding: 16px 18px; border-bottom: 1px solid var(--colorNeutralStroke2); }
+.toast { position: fixed; right: 22px; bottom: 22px; z-index: 50; max-width: 390px; padding: 13px 16px; border: 1px solid var(--colorNeutralStroke2); border-radius: 12px; background: var(--colorNeutralBackground1); box-shadow: var(--shadow16); font-size: 12px; }
+
+@media (max-width: 900px) { .attentionGrid,.healthGrid { grid-template-columns: 1fr; } .attentionGrid button,.healthItem { border-right: 0; border-bottom: 1px solid var(--colorNeutralStroke2); } .attentionGrid button:last-child,.healthItem:last-child { border-bottom:0; } .event { grid-template-columns: minmax(0, 1fr) auto; } }
+@media (max-width: 650px) { .switcher { min-width: 0; max-width: 130px; } .refreshButton { display:none !important; } .integration, .credential, .document { grid-template-columns: 1fr; } .formRow { grid-template-columns: 1fr; } }
+.fileInput {
+  min-height: 32px;
+  width: 100%;
+  padding: 5px 8px;
+  border: 1px solid var(--colorNeutralStroke1);
+  border-radius: 4px;
+  background: var(--colorNeutralBackground1);
+  color: var(--colorNeutralForeground1);
+}
+.pdfUpload { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: end; padding: 18px; border-bottom: 1px solid var(--colorNeutralStroke2); }
+.importList { display: grid; }
+.importItem { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 18px; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--colorNeutralStroke3); }
+.importItem:last-child { border-bottom: 0; }
+.importItem strong { display: block; font-size: 13px; margin-bottom: 4px; }
+.importItem p { margin: 0; color: var(--colorNeutralForeground3); font-size: 11px; line-height: 1.45; }
+.importItem .importWarning { color: #8a4b08; margin-top: 4px; }
+.importActions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+@media (max-width: 650px) { .pdfUpload, .importItem { grid-template-columns: 1fr; } .importActions { justify-content: flex-start; flex-wrap: wrap; } }
