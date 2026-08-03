@@ -34,6 +34,7 @@
     "verify:supplier-cycle:csv": "node scripts/verify-csv-supplier-cycle.mjs",
     "verify:document-compliance": "node scripts/verify-document-compliance.mjs",
     "verify:search-commerce": "node scripts/verify-search-commerce.mjs",
+    "verify:pilot-backend": "pnpm --filter @marketplace/api build && node scripts/verify-pilot-backend.mjs",
     "verify:trust-geo": "node scripts/verify-trust-geo.mjs",
     "verify:onboarding-agreement": "node scripts/verify-onboarding-agreement.mjs",
     "verify:security": "node scripts/verify-security.mjs",
