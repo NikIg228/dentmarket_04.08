@@ -51,11 +51,16 @@ jobs:
       - run: pnpm db:generate
       - run: pnpm --filter @marketplace/api exec prisma migrate deploy
       - run: pnpm db:seed
+      - name: Prepare deterministic pilot market
+        run: |
+          pnpm catalog:sync-production:apply
+          pnpm db:seed-pilot
       - run: pnpm --filter @marketplace/api exec prisma validate
       - run: pnpm typecheck
       - run: pnpm test
       - run: RUN_TESTCONTAINERS=1 pnpm --filter @marketplace/api test -- postgres-concurrency.testcontainers.spec.ts
       - run: pnpm build
+      - run: pnpm verify:core-contract
       - run: pnpm verify:production-config
       - run: pnpm audit --prod --audit-level high
       - run: docker compose config --quiet

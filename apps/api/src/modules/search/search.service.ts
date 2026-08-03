@@ -16,6 +16,7 @@ import { resolvePriceRules } from "../pricing/price-resolver";
 import type { SupplierActorContext } from "../suppliers/supplier-access.service";
 import { MediaAccessService } from "../../platform/storage/media-access.service";
 import { scopeMatches } from "../promotions/promotion-engine";
+import { environment } from "../../platform/config/environment";
 
 type SearchRow = { productId: string; rank: number };
 type PublicSearchPromotion = {
@@ -122,6 +123,10 @@ export class SearchService {
       Prisma.sql`p.status = 'ACTIVE'`,
       Prisma.sql`EXISTS (SELECT 1 FROM "MarketplaceAgreement" ma WHERE ma.status IN ('ACTIVE', 'NON_RENEWING') AND ma."startsAt" <= NOW() AND ma."endsAt" > NOW() AND ma."supplierOrganizationId" = ANY(d."supplierIds"))`,
     ];
+    if (environment().DEPLOYMENT_PROFILE === "pilot")
+      where.push(
+        Prisma.sql`p."externalMetadata" ->> 'importedAsCanonicalDraft' = 'true'`,
+      );
     if (q)
       where.push(
         Prisma.sql`(d."searchVector" @@ websearch_to_tsquery('simple', ${expandedQuery}) OR d."normalizedText" % ${q})`,

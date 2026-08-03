@@ -4,6 +4,7 @@ import { PrismaService } from "./platform/prisma/prisma.service";
 import { BackgroundQueueService } from "./platform/jobs/background-queue.service";
 import { ObjectStorageService } from "./platform/storage/object-storage.service";
 import { environment } from "./platform/config/environment";
+import { ApiCoreResponse } from "./platform/openapi/core-openapi";
 
 @ApiTags("health")
 @Controller("health")
@@ -11,12 +12,13 @@ export class HealthController {
   constructor(private readonly prisma: PrismaService, private readonly queue: BackgroundQueueService, private readonly storage: ObjectStorageService) {}
 
   @Get()
-  @ApiOkResponse({ schema: { example: { status: "ok" } } })
+  @ApiOkResponse({ schema: { $ref: "#/components/schemas/HealthResponse" } })
   health() {
     return { status: "ok", service: "marketplace-api", environment: environment().NODE_ENV, release: process.env.APP_RELEASE ?? "local" };
   }
 
   @Get("ready")
+  @ApiCoreResponse("ReadinessResponse")
   async ready() {
     const checks: Record<string, unknown> = {};
     try { await this.prisma.$queryRaw`SELECT 1`; checks.database = { status: "ok" }; } catch (error) { checks.database = { status: "down", error: error instanceof Error ? error.message : "Database unavailable" }; }

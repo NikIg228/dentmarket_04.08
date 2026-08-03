@@ -139,11 +139,13 @@ DentMarket — B2B-маркетплейс стоматологических т�
 
 ### P0. OpenAPI не является контрактом frontend/backend
 
-В живом Swagger-документе обнаружено 287 operations, но:
+В исходном живом Swagger-документе было обнаружено 287 operations, но:
 
 - `requestBody` описан у 0 operations;
 - JSON response schema описана только у одного успешного ответа;
 - component schemas отсутствуют.
+
+Этот baseline устранён для основного потока в B0.2: теперь зарегистрирована 21 именованная component schema, 16 core operations имеют проверенные response contracts, четыре изменяющих endpoint имеют request body contracts, а стандартный error envelope проверяется живым запросом. Остальной широкий API по-прежнему переводится на контракты только по мере попадания в согласованный scope.
 
 Zod действительно валидирует многие запросы во время выполнения, но frontend, QA и Codex не могут по OpenAPI узнать форму запроса и ответа. В итоге интеграция строится по чтению контроллеров, ручным типам и догадкам.
 
@@ -328,16 +330,29 @@ PostgreSQL concurrency test существует, но пропускается 
 
 Цель: сделать текущее ядро измеримым и безопасным для дальнейшей работы.
 
-| ID | Задача | Результат | Gate |
-|---|---|---|---|
-| B0.1 | Живой pilot backend flow | Динамический тест покупки | `pnpm verify:pilot-backend` |
-| B0.2 | Core API contract | Полные schemas для auth/catalog/compare/cart/checkout/orders | OpenAPI contract test + generated client |
-| B0.3 | Runtime split | API не запускает worker jobs; worker имеет отдельный entrypoint | process-level smoke tests |
-| B0.4 | PostgreSQL integration suite | Concurrency, rollback, idempotency, tenant isolation | обязательный CI job |
-| B0.5 | Seed profiles | reference/operator/pilot/test разделены | manifest/count assertions |
-| B0.6 | Outbox ADR | Однозначные delivery/status/retry правила | dispatcher tests |
+| Готово | ID | Задача | Результат | Gate |
+|---|---|---|---|---|
+| [x] | B0.1 | Живой pilot backend flow | Динамический тест покупки | `pnpm verify:pilot-backend` |
+| [x] | B0.2 | Core API contract | Полные schemas для catalog/compare/cart/checkout/orders | `pnpm verify:core-contract` |
+| [ ] | B0.3 | Runtime split | API не запускает worker jobs; worker имеет отдельный entrypoint | process-level smoke tests |
+| [ ] | B0.4 | PostgreSQL integration suite | Concurrency, rollback, idempotency, tenant isolation | обязательный CI job |
+| [ ] | B0.5 | Seed profiles | reference/operator/pilot/test разделены | manifest/count assertions |
+| [ ] | B0.6 | Outbox ADR | Однозначные delivery/status/retry правила | dispatcher tests |
 
-Текущий статус: **B0.1 реализован и проходит**. Следующая задача: **B0.2**.
+Выполнено в B0.2:
+
+- [x] Shared Zod response schemas для health, catalog, comparison, cart, checkout и supplier orders.
+- [x] Отдельные типы сырого HTTP request и нормализованного service input.
+- [x] OpenAPI 3.1 components и `$ref` для 16 операций основного потока.
+- [x] Request body, query, path parameter, bearer auth и error schemas.
+- [x] Единый безопасный error envelope с `code`, `requestId`, `path` и `details`.
+- [x] Типизированные методы core-flow в общем `@marketplace/api-client`.
+- [x] Contract-only gate без создания заказа.
+- [x] Runtime-валидация реальных response payloads shared-схемами.
+- [x] Проверка contract gate в GitHub CI.
+- [x] Полный purchase gate после изменения контрактов.
+
+Текущий статус: **B0.1 и B0.2 реализованы и проходят**. Следующая задача: **B0.3 Runtime split**.
 
 ### B1 — покупка клиникой
 
@@ -383,7 +398,7 @@ Gate: одна клиника оформляет заказы у одного и
 
 ### B5 — frontend unification
 
-Начинать после B0.2 и стабильного B1. Общая дизайн-система должна использовать один generated API client, общие состояния loading/error/empty и одинаковую терминологию. Marketplace, кабинет клиники, поставщика и оператора сохраняют разные задачи, но не разные визуальные языки.
+Начинать после B0.2 и стабильного B1. Общая дизайн-система должна использовать общий типизированный API client, общие состояния loading/error/empty и одинаковую терминологию. Marketplace, кабинет клиники, поставщика и оператора сохраняют разные задачи, но не разные визуальные языки.
 
 ## 9. Как ставить задачи Codex партнёру
 
@@ -426,25 +441,17 @@ Definition of Done: наблюдаемый итог, а не список фай
 
 ## 11. Ближайший следующий шаг
 
-Реализовать **B0.2 Core API contract** только для первого потока:
+Реализовать **B0.3 Runtime split** без перехода на микросервисы:
 
-- public catalog search;
-- product offer comparison;
-- create/get cart;
-- add/reprice cart item;
-- checkout;
-- get checkout;
-- buyer orders;
-- supplier orders;
-- supplier confirmation;
-- health/readiness.
+- [x] Изолировать pilot search от повторного появления legacy fixtures после фоновой проекции.
+- [ ] Ввести явную роль процесса `api | worker | all`.
+- [ ] Запретить cron и queue consumers в роли `api`.
+- [ ] Создать отдельный worker entrypoint из того же NestJS-приложения.
+- [ ] Оставить `all` только для удобного локального запуска.
+- [ ] Сделать readiness зависимым от роли процесса.
+- [ ] Добавить process-level smoke test, доказывающий, какие фоновые службы запускаются в каждой роли.
 
-Результат следующего этапа:
-
-- request и response видны в `/docs` и `/docs-json`;
-- из OpenAPI генерируется клиент для Next.js приложений;
-- CI проверяет, что core operations не потеряли schemas;
-- frontend больше не угадывает форму backend-ответа.
+Результат следующего этапа: несколько API-инстансов можно масштабировать без дублирования cron-циклов, а worker можно перезапускать независимо от HTTP API.
 
 ## 12. Команды локальной проверки
 
@@ -452,6 +459,7 @@ Definition of Done: наблюдаемый итог, а не список фай
 pnpm db:prepare-pilot
 pnpm typecheck
 pnpm test
+pnpm verify:core-contract
 pnpm verify:pilot-backend
 pnpm build
 ```

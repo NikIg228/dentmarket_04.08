@@ -107,19 +107,19 @@ export class CommerceService {
 
   async createCart(buyerOrganizationId: string, input: CreateCartInput, context: SupplierActorContext) {
     await this.assertBuyerAccess(buyerOrganizationId, context);
-    const existing = await this.prisma.cart.findFirst({ where: { buyerOrganizationId, status: "ACTIVE" }, include: { items: true } });
+    const existing = await this.prisma.cart.findFirst({ where: { buyerOrganizationId, status: "ACTIVE" }, include: { items: true, checkout: true } });
     if (existing) {
       if (existing.currency !== input.currency) throw new ConflictException("Active cart already uses another currency");
       return existing;
     }
     try {
       return await this.prisma.$transaction(async (tx) => {
-        const cart = await tx.cart.create({ data: { buyerOrganizationId, currency: input.currency, createdById: context.actorId } });
+        const cart = await tx.cart.create({ data: { buyerOrganizationId, currency: input.currency, createdById: context.actorId }, include: { items: true, checkout: true } });
         await tx.auditLog.create({ data: { ...context, action: "cart.created", entityType: "Cart", entityId: cart.id, after: cart } });
         return cart;
       });
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") return this.prisma.cart.findFirstOrThrow({ where: { buyerOrganizationId, status: "ACTIVE" } });
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") return this.prisma.cart.findFirstOrThrow({ where: { buyerOrganizationId, status: "ACTIVE" }, include: { items: true, checkout: true } });
       throw error;
     }
   }

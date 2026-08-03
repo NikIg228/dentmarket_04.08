@@ -7,8 +7,18 @@ import { SearchProjectionService } from "./search-projection.service";
 import { SearchService } from "./search.service";
 import { SearchAnalyticsService } from "./search-analytics.service";
 import { environment } from "../../platform/config/environment";
+import {
+  ApiCoreErrors,
+  ApiCoreProtected,
+  ApiCoreQuery,
+  ApiCoreResponse,
+  ApiCoreValidationErrors,
+  ApiUuidParam,
+} from "../../platform/openapi/core-openapi";
 
 @ApiTags("marketplace-search")
+@ApiCoreProtected()
+@ApiCoreErrors()
 @UseGuards(PermissionsGuard)
 @Controller("marketplace")
 export class SearchController {
@@ -16,6 +26,8 @@ export class SearchController {
   private context(actorId: string, organizationId: string) { return { actorId, organizationId }; }
 
   @Get("search")
+  @ApiCoreQuery("AuthenticatedCatalogSearchQuery")
+  @ApiCoreResponse("CatalogSearchResponse")
   @RequirePermissions("order.create")
   search(@Query() query: Record<string, unknown>, @Headers("x-user-id") actorId: string, @Headers("x-organization-id") organizationId: string) {
     const parsed = searchCatalogSchema.safeParse(query); if (!parsed.success) throw new BadRequestException(parsed.error.flatten());
@@ -23,6 +35,9 @@ export class SearchController {
   }
 
   @Get("products/:productId/compare")
+  @ApiUuidParam("productId", "Canonical product identifier")
+  @ApiCoreQuery("AuthenticatedCompareOffersQuery")
+  @ApiCoreResponse("OfferComparisonResponse")
   @RequirePermissions("order.create")
   compare(@Param("productId") productId: string, @Query() query: Record<string, unknown>, @Headers("x-user-id") actorId: string, @Headers("x-organization-id") organizationId: string) {
     const parsed = compareOffersSchema.safeParse({ ...query, productId }); if (!parsed.success) throw new BadRequestException(parsed.error.flatten());
@@ -39,20 +54,27 @@ export class SearchController {
 }
 
 @ApiTags("public-catalog")
+@ApiCoreValidationErrors()
 @Controller("catalog")
 export class PublicCatalogController {
   constructor(private readonly searchService: SearchService) {}
   @Get("cities")
+  @ApiCoreResponse("PublicCityListResponse")
   cities() { return this.searchService.publicCities(); }
   private input(query: Record<string, unknown>) { const organizationId = environment().PUBLIC_CATALOG_ORGANIZATION_ID; return { query: { ...query, buyerOrganizationId: organizationId }, context: { actorId: "public-catalog", organizationId } }; }
 
   @Get("search")
+  @ApiCoreQuery("PublicCatalogSearchQuery")
+  @ApiCoreResponse("CatalogSearchResponse")
   search(@Query() query: Record<string, unknown>) {
     const input = this.input(query); const parsed = searchCatalogSchema.safeParse(input.query); if (!parsed.success) throw new BadRequestException(parsed.error.flatten());
     return this.searchService.search(parsed.data, input.context);
   }
 
   @Get("products/:productId/compare")
+  @ApiUuidParam("productId", "Canonical product identifier")
+  @ApiCoreQuery("PublicCompareOffersQuery")
+  @ApiCoreResponse("OfferComparisonResponse")
   compare(@Param("productId") productId: string, @Query() query: Record<string, unknown>) {
     const input = this.input({ ...query, productId }); const parsed = compareOffersSchema.safeParse(input.query); if (!parsed.success) throw new BadRequestException(parsed.error.flatten());
     return this.searchService.compare(parsed.data, input.context);

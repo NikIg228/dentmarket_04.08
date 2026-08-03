@@ -1,3 +1,18 @@
+import type {
+  AddCartItemRequest,
+  CartItemResponse,
+  CartResponse,
+  CatalogSearchResponse,
+  CheckoutCartRequest,
+  CheckoutResponse,
+  CompareOffersRequest,
+  ConfirmSupplierOrderRequest,
+  CreateCartRequest,
+  OfferComparisonResponse,
+  SearchCatalogRequest,
+  SupplierOrderResponse,
+} from "@marketplace/schemas";
+
 export type ApiContext = {
   actorId?: string;
   organizationId?: string;
@@ -128,5 +143,86 @@ export class MarketplaceApiClient {
       method: "PATCH",
       body: JSON.stringify(body),
     });
+  }
+
+  private withQuery(path: string, input: Record<string, unknown>) {
+    const query = new URLSearchParams();
+    for (const [key, value] of Object.entries(input)) {
+      if (value === undefined || value === null || value === "") continue;
+      query.set(key, String(value));
+    }
+    const serialized = query.toString();
+    return serialized ? `${path}?${serialized}` : path;
+  }
+
+  searchCatalog(input: SearchCatalogRequest) {
+    return this.get<CatalogSearchResponse>(
+      this.withQuery("/marketplace/search", input),
+    );
+  }
+
+  searchPublicCatalog(input: Omit<SearchCatalogRequest, "buyerOrganizationId">) {
+    return this.get<CatalogSearchResponse>(
+      this.withQuery("/catalog/search", input),
+    );
+  }
+
+  compareOffers(input: CompareOffersRequest) {
+    const { productId, ...query } = input;
+    return this.get<OfferComparisonResponse>(
+      this.withQuery(`/marketplace/products/${productId}/compare`, query),
+    );
+  }
+
+  comparePublicOffers(
+    productId: string,
+    input: Omit<CompareOffersRequest, "buyerOrganizationId" | "productId">,
+  ) {
+    return this.get<OfferComparisonResponse>(
+      this.withQuery(`/catalog/products/${productId}/compare`, input),
+    );
+  }
+
+  listCarts(buyerOrganizationId: string) {
+    return this.get<CartResponse[]>(`/buyers/${buyerOrganizationId}/carts`);
+  }
+
+  createCart(buyerOrganizationId: string, input: CreateCartRequest) {
+    return this.post<CartResponse>(`/buyers/${buyerOrganizationId}/carts`, input);
+  }
+
+  addCartItem(cartId: string, input: AddCartItemRequest) {
+    return this.post<CartItemResponse>(`/carts/${cartId}/items`, input);
+  }
+
+  repriceCart(cartId: string) {
+    return this.post<CartResponse>(`/carts/${cartId}/reprice`);
+  }
+
+  checkoutCart(cartId: string, input: CheckoutCartRequest) {
+    return this.post<CheckoutResponse>(`/carts/${cartId}/checkout`, input);
+  }
+
+  getCheckout(checkoutId: string) {
+    return this.get<CheckoutResponse>(`/checkouts/${checkoutId}`);
+  }
+
+  listBuyerOrders(buyerOrganizationId: string) {
+    return this.get<SupplierOrderResponse[]>(
+      `/buyers/${buyerOrganizationId}/orders`,
+    );
+  }
+
+  listSupplierOrders(checkoutId?: string) {
+    return this.get<SupplierOrderResponse[]>(
+      this.withQuery("/supplier-orders", { checkoutId }),
+    );
+  }
+
+  confirmSupplierOrder(orderId: string, input: ConfirmSupplierOrderRequest) {
+    return this.post<SupplierOrderResponse>(
+      `/supplier-orders/${orderId}/confirm`,
+      input,
+    );
   }
 }

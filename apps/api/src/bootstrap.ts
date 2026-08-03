@@ -10,6 +10,8 @@ import {
   NestStructuredLogger,
 } from "./platform/observability/structured-logger";
 import { identityContextMiddleware } from "./platform/security/identity-context.middleware";
+import { registerCoreOpenApiSchemas } from "./platform/openapi/core-openapi";
+import { ApiExceptionFilter } from "./platform/http/api-exception.filter";
 
 export async function createMarketplaceApp(
   options: { serverless?: boolean } = {},
@@ -53,6 +55,7 @@ export async function createMarketplaceApp(
   );
   app.use(identityContextMiddleware());
   app.use(httpLoggerMiddleware());
+  app.useGlobalFilters(new ApiExceptionFilter());
   app.useBodyParser("json", { limit: "32mb" });
   app.useBodyParser("urlencoded", { limit: "1mb", extended: true });
   app.setGlobalPrefix("api");
@@ -71,7 +74,14 @@ export async function createMarketplaceApp(
     .setTitle("B2B Procurement Platform API")
     .setDescription("Industry-independent procurement core")
     .setVersion("0.1.0")
+    .addBearerAuth(
+      { type: "http", scheme: "bearer", bearerFormat: "JWT" },
+      "access-token",
+    )
     .build();
-  SwaggerModule.setup("docs", app, SwaggerModule.createDocument(app, openApi));
+  const document = registerCoreOpenApiSchemas(
+    SwaggerModule.createDocument(app, openApi),
+  );
+  SwaggerModule.setup("docs", app, document);
   return app;
 }

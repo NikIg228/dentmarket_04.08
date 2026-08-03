@@ -2,6 +2,7 @@ import { z } from "zod";
 
 export * from "./commercial.js";
 export * from "./trust-commerce.js";
+export * from "./core-api.js";
 
 export const organizationCapabilitySchema = z.enum([
   "BUYER",
@@ -504,6 +505,8 @@ export type UpsertFreshnessPolicyInput = z.infer<typeof upsertFreshnessPolicySch
 export type CreateDataOverrideInput = z.infer<typeof createDataOverrideSchema>;
 export type SearchCatalogInput = z.infer<typeof searchCatalogSchema>;
 export type CompareOffersInput = z.infer<typeof compareOffersSchema>;
+export type SearchCatalogRequest = z.input<typeof searchCatalogSchema>;
+export type CompareOffersRequest = z.input<typeof compareOffersSchema>;
 
 export const createCartSchema = z.object({
   currency: z.string().trim().regex(/^[A-Z]{3}$/).default("KZT"),
@@ -617,6 +620,10 @@ export type CreateCartInput = z.infer<typeof createCartSchema>;
 export type AddCartItemInput = z.infer<typeof addCartItemSchema>;
 export type CheckoutCartInput = z.infer<typeof checkoutCartSchema>;
 export type ConfirmSupplierOrderInput = z.infer<typeof confirmSupplierOrderSchema>;
+export type CreateCartRequest = z.input<typeof createCartSchema>;
+export type AddCartItemRequest = z.input<typeof addCartItemSchema>;
+export type CheckoutCartRequest = z.input<typeof checkoutCartSchema>;
+export type ConfirmSupplierOrderRequest = z.input<typeof confirmSupplierOrderSchema>;
 export type CreatePaymentIntentInput = z.infer<typeof createPaymentIntentSchema>;
 export type CaptureMockPaymentInput = z.infer<typeof captureMockPaymentSchema>;
 export type CreatePaymentSessionInput = z.infer<typeof createPaymentSessionSchema>;

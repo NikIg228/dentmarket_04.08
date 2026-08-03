@@ -12,6 +12,9 @@
     "lint": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run --passWithNoTests"
   },
+  "dependencies": {
+    "@marketplace/schemas": "workspace:*"
+  },
   "devDependencies": {
     "vitest": "^3.2.4"
   }

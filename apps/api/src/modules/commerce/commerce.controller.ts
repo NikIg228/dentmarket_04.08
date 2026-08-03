@@ -4,8 +4,18 @@ import { ApiTags } from "@nestjs/swagger";
 import { PermissionsGuard } from "../access-control/permissions.guard";
 import { RequirePermissions } from "../access-control/require-permissions.decorator";
 import { CommerceService } from "./commerce.service";
+import {
+  ApiCoreBody,
+  ApiCoreErrors,
+  ApiCoreProtected,
+  ApiCoreQuery,
+  ApiCoreResponse,
+  ApiUuidParam,
+} from "../../platform/openapi/core-openapi";
 
 @ApiTags("commerce")
+@ApiCoreProtected()
+@ApiCoreErrors()
 @UseGuards(PermissionsGuard)
 @Controller()
 export class CommerceController {
@@ -19,12 +29,17 @@ export class CommerceController {
   }
 
   @Get("buyers/:buyerOrganizationId/carts")
+  @ApiUuidParam("buyerOrganizationId", "Buyer organization identifier")
+  @ApiCoreResponse("CartListResponse")
   @RequirePermissions("order.create")
   carts(@Param("buyerOrganizationId") buyerOrganizationId: string, @Headers("x-user-id") actorId: string, @Headers("x-organization-id") organizationId: string) {
     return this.commerce.carts(buyerOrganizationId, this.context(actorId, organizationId));
   }
 
   @Post("buyers/:buyerOrganizationId/carts")
+  @ApiUuidParam("buyerOrganizationId", "Buyer organization identifier")
+  @ApiCoreBody("CreateCartRequest")
+  @ApiCoreResponse("CartResponse", 201)
   @RequirePermissions("order.create")
   createCart(@Param("buyerOrganizationId") buyerOrganizationId: string, @Body() body: unknown, @Headers("x-user-id") actorId: string, @Headers("x-organization-id") organizationId: string) {
     const parsed = createCartSchema.safeParse(body ?? {}); if (!parsed.success) throw new BadRequestException(parsed.error.flatten());
@@ -32,6 +47,9 @@ export class CommerceController {
   }
 
   @Post("carts/:cartId/items")
+  @ApiUuidParam("cartId", "Cart identifier")
+  @ApiCoreBody("AddCartItemRequest")
+  @ApiCoreResponse("CartItemResponse", 201)
   @RequirePermissions("order.create")
   addItem(@Param("cartId") cartId: string, @Body() body: unknown, @Headers("x-user-id") actorId: string, @Headers("x-organization-id") organizationId: string) {
     const parsed = addCartItemSchema.safeParse(body); if (!parsed.success) throw new BadRequestException(parsed.error.flatten());
@@ -39,12 +57,17 @@ export class CommerceController {
   }
 
   @Post("carts/:cartId/reprice")
+  @ApiUuidParam("cartId", "Cart identifier")
+  @ApiCoreResponse("CartResponse", 201)
   @RequirePermissions("order.create")
   reprice(@Param("cartId") cartId: string, @Headers("x-user-id") actorId: string, @Headers("x-organization-id") organizationId: string) {
     return this.commerce.reprice(cartId, this.context(actorId, organizationId));
   }
 
   @Post("carts/:cartId/checkout")
+  @ApiUuidParam("cartId", "Cart identifier")
+  @ApiCoreBody("CheckoutCartRequest")
+  @ApiCoreResponse("CheckoutResponse", 201)
   @RequirePermissions("order.create")
   checkout(@Param("cartId") cartId: string, @Body() body: unknown, @Headers("x-user-id") actorId: string, @Headers("x-organization-id") organizationId: string) {
     const parsed = checkoutCartSchema.safeParse(body); if (!parsed.success) throw new BadRequestException(parsed.error.flatten());
@@ -52,24 +75,33 @@ export class CommerceController {
   }
 
   @Get("checkouts/:checkoutId")
+  @ApiUuidParam("checkoutId", "Checkout identifier")
+  @ApiCoreResponse("CheckoutResponse")
   @RequirePermissions("order.create")
   getCheckout(@Param("checkoutId") checkoutId: string, @Headers("x-user-id") actorId: string, @Headers("x-organization-id") organizationId: string) {
     return this.commerce.getCheckout(checkoutId, this.context(actorId, organizationId));
   }
 
   @Get("supplier-orders")
+  @ApiCoreQuery("SupplierOrdersQuery")
+  @ApiCoreResponse("SupplierOrderListResponse")
   @RequirePermissions("order.confirm")
   supplierOrders(@Query("checkoutId") checkoutId: string | undefined, @Headers("x-user-id") actorId: string, @Headers("x-organization-id") organizationId: string) {
     return this.commerce.supplierOrders(this.context(actorId, organizationId), checkoutId);
   }
 
   @Get("buyers/:buyerOrganizationId/orders")
+  @ApiUuidParam("buyerOrganizationId", "Buyer organization identifier")
+  @ApiCoreResponse("SupplierOrderListResponse")
   @RequirePermissions("order.create")
   buyerOrders(@Param("buyerOrganizationId") buyerOrganizationId: string, @Headers("x-user-id") actorId: string, @Headers("x-organization-id") organizationId: string) {
     return this.commerce.buyerOrders(buyerOrganizationId, this.context(actorId, organizationId));
   }
 
   @Post("supplier-orders/:orderId/confirm")
+  @ApiUuidParam("orderId", "Supplier order identifier")
+  @ApiCoreBody("ConfirmSupplierOrderRequest")
+  @ApiCoreResponse("SupplierOrderResponse", 201)
   @RequirePermissions("order.confirm")
   confirmSupplierOrder(@Param("orderId") orderId: string, @Body() body: unknown, @Headers("x-user-id") actorId: string, @Headers("x-organization-id") organizationId: string) {
     const parsed = confirmSupplierOrderSchema.safeParse(body); if (!parsed.success) throw new BadRequestException(parsed.error.flatten());
