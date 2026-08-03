@@ -1,0 +1,168 @@
+{
+  "policyVersion": 1,
+  "sourceGeneratedAt": "2026-07-22T13:26:19.622Z",
+  "sourceCards": 3329,
+  "eligibleCards": 1138,
+  "selectedCards": 500,
+  "selectedVariants": 675,
+  "selectedOffers": 500,
+  "cardsWithBrand": 42,
+  "cardsWithPrice": 50,
+  "cardsAvailable": 50,
+  "mediaEntries": 429,
+  "demoSuppliers": 10,
+  "demoProductsWithOffers": 50,
+  "demoOffersPerSupplier": 50,
+  "categories": [
+    {
+      "name": "Стоматологические материалы и оборудование",
+      "cards": 120
+    },
+    {
+      "name": "Имплантология",
+      "cards": 73
+    },
+    {
+      "name": "Инструменты",
+      "cards": 70
+    },
+    {
+      "name": "Зуботехнические материалы",
+      "cards": 59
+    },
+    {
+      "name": "Терапевтические материалы",
+      "cards": 42
+    },
+    {
+      "name": "Оборудование",
+      "cards": 40
+    },
+    {
+      "name": "Ортодонтия",
+      "cards": 35
+    },
+    {
+      "name": "Стерилизация",
+      "cards": 16
+    },
+    {
+      "name": "Композитные материалы",
+      "cards": 10
+    },
+    {
+      "name": "Гигиена и профилактика",
+      "cards": 6
+    },
+    {
+      "name": "Стоматологические цементы",
+      "cards": 6
+    },
+    {
+      "name": "Эндодонтия",
+      "cards": 6
+    },
+    {
+      "name": "Адгезивные системы",
+      "cards": 5
+    },
+    {
+      "name": "Профилактические материалы",
+      "cards": 2
+    },
+    {
+      "name": "Стоматологические установки",
+      "cards": 2
+    },
+    {
+      "name": "Десенситайзеры",
+      "cards": 1
+    },
+    {
+      "name": "Профилактическое оборудование",
+      "cards": 1
+    },
+    {
+      "name": "Пьезохирургические аппараты",
+      "cards": 1
+    },
+    {
+      "name": "Расходные материалы",
+      "cards": 1
+    },
+    {
+      "name": "Стеклоиономерные материалы",
+      "cards": 1
+    },
+    {
+      "name": "Ультразвуковые скалеры",
+      "cards": 1
+    },
+    {
+      "name": "Фрезерные системы",
+      "cards": 1
+    },
+    {
+      "name": "Хирургические моторы",
+      "cards": 1
+    }
+  ],
+  "brands": [
+    {
+      "name": "NSK",
+      "cards": 9
+    },
+    {
+      "name": "Planmeca",
+      "cards": 6
+    },
+    {
+      "name": "GC",
+      "cards": 5
+    },
+    {
+      "name": "Solventum",
+      "cards": 5
+    },
+    {
+      "name": "VOCO",
+      "cards": 5
+    },
+    {
+      "name": "Kerr",
+      "cards": 4
+    },
+    {
+      "name": "Tokuyama Dental",
+      "cards": 4
+    },
+    {
+      "name": "Ivoclar",
+      "cards": 2
+    },
+    {
+      "name": "TORNADO",
+      "cards": 2
+    }
+  ],
+  "policy": {
+    "targetSize": 500,
+    "demoSupplierCount": 10,
+    "demoProductsPerSupplier": 50,
+    "minimumDescriptionLength": 60,
+    "requiresVariant": true,
+    "requiresExactLocalMedia": true,
+    "maximumMediaReuse": 3,
+    "defaultCategoryCap": 60,
+    "categoryCaps": {
+      "Стоматологические материалы и оборудование": 120,
+      "Имплантология": 70,
+      "Инструменты": 70,
+      "Оборудование": 40,
+      "Ортодонтия": 35
+    },
+    "quarantinePatterns": [
+      "ножницы\\s+iris\\s+delicate"
+    ]
+  }
+}

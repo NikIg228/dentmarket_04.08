@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 
 import { execFileSync } from "node:child_process";
-import { access, writeFile } from "node:fs/promises";
+import { access, mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const projectRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
-const outputPath = join(projectRoot, "apps/buyer-web/app/data/public-catalog-media.json");
+const outputPath = join(projectRoot, "data/archive/public-catalog-media-full.json");
 const restBase = "https://tlxxicjzppflpkcgnauo.supabase.co/rest/v1";
 const apiKey = JSON.parse(execFileSync("pnpm", ["dlx", "supabase", "projects", "api-keys", "--project-ref", "tlxxicjzppflpkcgnauo"], { encoding: "utf8" })).keys.find((key) => key.id === "service_role").api_key;
 const headers = { apikey: apiKey, Authorization: `Bearer ${apiKey}` };
@@ -42,5 +42,6 @@ for (const item of media) {
     metadata: item.metadata ?? null,
   };
 }
+await mkdir(join(projectRoot, "data/archive"), { recursive: true });
 await writeFile(outputPath, `${JSON.stringify({ generatedAt: new Date().toISOString(), total: Object.keys(entries).length, entries }, null, 2)}\n`);
 console.log(JSON.stringify({ outputPath, total: Object.keys(entries).length }, null, 2));

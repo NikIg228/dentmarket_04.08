@@ -18,7 +18,7 @@ const root = path.resolve(process.cwd());
 const inputDir = path.join(root, "data/imports");
 const output = path.join(
   root,
-  "apps/buyer-web/app/data/public-catalog-fallback.json",
+  "data/archive/public-catalog-full.json",
 );
 const aliasesPath = path.join(root, "data/catalog-model-aliases-wave-1.csv");
 const skuLabelsPath = path.join(root, "data/catalog-product-skus-wave-1.csv");
@@ -420,6 +420,7 @@ const quarantine = quarantined.map(([key, rowCount]) => {
     reason: "Одинаковое название повторяется в разных URL",
   };
 });
+await fs.mkdir(path.dirname(output), { recursive: true });
 await fs.writeFile(
   output,
   `${JSON.stringify({ generatedAt: new Date().toISOString(), sourceFiles: files, total: products.length, quarantine, products }, null, 2)}\n`,
