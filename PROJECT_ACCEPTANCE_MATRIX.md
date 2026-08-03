@@ -38,12 +38,12 @@
 | Область | Фактический статус | Доказательство | Критический разрыв | Решение |
 |---|---|---|---|---|
 | История изменений и откат | `CODED` | Создан локальный Git-репозиторий; baseline-коммит `8646bf6` на ветке `main` содержит 3 415 файлов | Пока нет удалённого резервного репозитория и branch protection | Создать приватный remote и отдельную recovery-ветку перед следующими изменениями |
-| Node.js и pnpm | `CODED` | Локально доступны Node `24.18.0` и pnpm `11.9.0`; есть `pnpm-lock.yaml` и workspace | Наличие команд не доказывает полноту `node_modules` | Выполнить чистую установку строго по lockfile |
+| Node.js и pnpm | `INTEGRATION_VERIFIED` | Node `24.18.0`, pnpm `11.9.0`; `pnpm install --frozen-lockfile` успешно восстановил все 10 workspace-проектов | Offline-store не содержал четыре записи, поэтому полностью автономная установка пока не доказана | Использовать frozen lockfile; отдельно подготовить CI/cache, если нужен offline build |
 | Локальная инфраструктура | `BLOCKED` | `compose.yaml` описывает PostgreSQL, Redis, MinIO и ClamAV | Команда `docker` на текущей машине отсутствует | Установить Docker Desktop либо явно утвердить локальный режим без Docker |
 | PostgreSQL-схема | `CODED` | `apps/api/prisma/schema.prisma`, 28 каталогов миграций, `apps/api/prisma/seed.ts` | Нет подтверждения, что пустая БД разворачивается всеми миграциями и seed | Поднять новую локальную БД, выполнить `prisma migrate deploy` и seed |
 | Backend API | `CODED` | NestJS-модули и контроллеры присутствуют для identity, catalog, search, imports, offers, inventory, commerce, logistics, documents и других доменов | API локально не запущен и healthcheck не пройден | После БД выполнить build, старт и smoke API |
-| Автоматические тесты | `BLOCKED` | В репозитории есть Vitest/unit, testcontainers и Playwright-сценарии | `pnpm --filter @marketplace/api test` не завершился за 60 секунд; зелёного отчёта нет | Диагностировать установку и зависание, затем сохранить полный отчёт тестов |
-| Typecheck и build | `BLOCKED` | Скрипты определены во всех пакетах | Актуального успешного `pnpm typecheck` и `pnpm build` нет | Сделать их обязательным merge-gate |
+| Автоматические тесты | `UNIT_VERIFIED` | `pnpm test`: 99 API-тестов, 36 schema-тестов, 2 api-client, 5 Buyer и 1 Supplier прошли; все 11 Turbo-задач успешны | PostgreSQL testcontainers-тест пропущен без Docker; Admin/Landing/UI фактически не имеют test-файлов | Сохранить unit gate и добавить integration/browser gates |
+| Typecheck и build | `UNIT_VERIFIED` | `pnpm typecheck`: 12/12 задач; `pnpm build`: 8/8 задач, API и четыре web-приложения собраны | Общая сборка заняла 7:46, Buyer — около 6 минут; Next предупреждает о deprecated middleware convention | Сделать merge-gate и отдельно оптимизировать Buyer bundle/build |
 | Настоящий lint | `SPEC_ONLY` | `lint` во фронтендах и API фактически запускает только `tsc --noEmit` | Нет ESLint/Biome-проверок качества и опасных паттернов | После стабилизации подключить ESLint или Biome отдельной задачей |
 
 ## 4. Откуда берутся карточки товаров
@@ -202,15 +202,15 @@
 Gate 0 считается закрытым только при одновременном выполнении всех пунктов:
 
 - [x] В каталоге есть Git-репозиторий и baseline-коммит исходного ZIP (`8646bf6`).
-- [ ] Рабочая ветка создаётся без ошибок, `git status` чистый перед первой задачей.
-- [ ] Выполнена чистая установка зависимостей по `pnpm-lock.yaml`.
+- [x] Рабочая ветка `recovery/gate-0` создана без ошибок; baseline был чистым перед проверками.
+- [x] Выполнена установка зависимостей по `pnpm-lock.yaml` командой `pnpm install --frozen-lockfile`.
 - [ ] Выбран и задокументирован способ запуска PostgreSQL/Redis/storage/ClamAV.
 - [ ] Все Prisma migrations применяются к пустой PostgreSQL.
 - [ ] Seed завершается и создаёт тестовые роли/организации/товары.
 - [ ] API стартует и `/api/health` возвращает нормальный статус.
-- [ ] `pnpm typecheck` проходит.
-- [ ] `pnpm test` проходит и сохраняется итоговый отчёт.
-- [ ] `pnpm build` проходит для API и всех web-приложений.
+- [x] `pnpm typecheck` проходит: 12/12 Turbo-задач.
+- [x] `pnpm test` проходит: 11/11 Turbo-задач; PostgreSQL testcontainers-тест отдельно ожидает Docker.
+- [x] `pnpm build` проходит: 8/8 Turbo-задач, включая API и четыре web-приложения.
 - [ ] Playwright smoke открывает landing, Buyer, Supplier и Admin без критических console errors.
 - [ ] В отдельном файле зафиксированы известные исключения, а не скрыты как успешная проверка.
 
@@ -244,4 +244,4 @@ Gate 0 считается закрытым только при одноврем�
 
 ## 11. Следующее действие
 
-Следующая реализационная задача — **Gate 0.2: создать recovery-ветку и доказать чистую установку зависимостей**. После неё нужно выбрать локальную инфраструктуру, развернуть пустую PostgreSQL и пройти migrations/seed. До зелёного baseline нельзя безопасно начинать массовый рефакторинг или Buyer V2.
+Следующая реализационная задача — **Gate 0.3: выбрать локальную инфраструктуру, развернуть пустую PostgreSQL и пройти migrations/seed**. Docker сейчас отсутствует, поэтому требуется либо установить Docker Desktop для штатного `compose.yaml`, либо утвердить отдельный native PostgreSQL-профиль. После этого можно запускать API healthcheck и три core-flow. До интеграционного baseline нельзя безопасно начинать Buyer V2.
