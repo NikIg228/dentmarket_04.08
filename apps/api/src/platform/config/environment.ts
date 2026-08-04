@@ -14,6 +14,7 @@ const encryptionKeySchema = z.string().refine((value) => {
 const environmentSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   DEPLOYMENT_PROFILE: z.enum(["go_live", "pilot"]).default("go_live"),
+  PROCESS_ROLE: z.enum(["api", "worker", "all"]).default("api"),
   DATABASE_URL: z.string().min(1),
   API_HOST: z.string().default("0.0.0.0"),
   API_PORT: z.coerce.number().int().min(1).max(65_535).default(4000),
@@ -76,6 +77,7 @@ const environmentSchema = z.object({
   NOTIFICATION_WEBHOOK_SECRET: z.string().min(32).optional(),
   LOG_LEVEL: z.enum(["trace", "debug", "info", "warn", "error", "fatal"]).default("info"),
 }).superRefine((value, context) => {
+  if (value.NODE_ENV === "production" && value.PROCESS_ROLE === "all") context.addIssue({ code: "custom", path: ["PROCESS_ROLE"], message: "The all process role is restricted to local development and tests" });
   if (value.NODE_ENV === "production" && value.AUTH_MODE === "development") context.addIssue({ code: "custom", path: ["AUTH_MODE"], message: "Development identity headers are forbidden in production" });
   if (value.AUTH_MODE === "jwt" && !value.JWT_SECRET && !value.JWT_PUBLIC_KEY) context.addIssue({ code: "custom", path: ["JWT_PUBLIC_KEY"], message: "JWT_PUBLIC_KEY or JWT_SECRET is required in JWT mode" });
   if (value.SOCIAL_AUTH_ENABLED && !value.JWT_SECRET && !value.JWT_PRIVATE_KEY) context.addIssue({ code: "custom", path: ["JWT_PRIVATE_KEY"], message: "JWT_PRIVATE_KEY or JWT_SECRET is required to issue social sessions" });

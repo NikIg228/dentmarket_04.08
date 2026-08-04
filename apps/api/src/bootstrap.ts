@@ -12,11 +12,13 @@ import {
 import { identityContextMiddleware } from "./platform/security/identity-context.middleware";
 import { registerCoreOpenApiSchemas } from "./platform/openapi/core-openapi";
 import { ApiExceptionFilter } from "./platform/http/api-exception.filter";
+import { runtimeCapabilities } from "./platform/runtime/process-role";
 
 export async function createMarketplaceApp(
   options: { serverless?: boolean } = {},
 ) {
   const config = environment();
+  if (!runtimeCapabilities(config.PROCESS_ROLE).http) throw new Error("HTTP bootstrap is disabled for PROCESS_ROLE=worker");
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     bodyParser: false,
     rawBody: true,

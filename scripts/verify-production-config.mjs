@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { statSync } from "node:fs";
 
 const requiredFiles = [
   ".env.production.example",
@@ -13,8 +14,9 @@ const requiredFiles = [
   ".github/workflows/security.yml",
 ];
 for (const file of requiredFiles) {
-  const check = spawnSync("test", ["-s", file]);
-  if (check.status !== 0)
+  let nonEmpty = false;
+  try { nonEmpty = statSync(file).size > 0; } catch {}
+  if (!nonEmpty)
     throw new Error(
       `Required production artifact is missing or empty: ${file}`,
     );
@@ -42,6 +44,7 @@ const valid = {
   S3_ACCESS_KEY_ID: "access",
   S3_SECRET_ACCESS_KEY: "s".repeat(32),
   S3_SERVER_SIDE_ENCRYPTION: "AES256",
+  MEDIA_SIGNING_SECRET: "s".repeat(48),
   AV_SCAN_MODE: "required",
   SIGNATURE_GATEWAY_URL: "https://eds.example.kz",
   SIGNATURE_CALLBACK_SECRET: "e".repeat(48),

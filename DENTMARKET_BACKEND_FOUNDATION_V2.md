@@ -334,7 +334,7 @@ PostgreSQL concurrency test существует, но пропускается 
 | ------ | ---- | ---------------------------- | --------------------------------------------------------------- | --------------------------- |
 | [x]    | B0.1 | Живой pilot backend flow     | Динамический тест покупки                                       | `pnpm verify:pilot-backend` |
 | [x]    | B0.2 | Core API contract            | Полные schemas для catalog/compare/cart/checkout/orders         | `pnpm verify:core-contract` |
-| [ ]    | B0.3 | Runtime split                | API не запускает worker jobs; worker имеет отдельный entrypoint | process-level smoke tests   |
+| [x]    | B0.3 | Runtime split                | API не запускает worker jobs; worker имеет отдельный entrypoint | `pnpm verify:runtime-split` |
 | [ ]    | B0.4 | PostgreSQL integration suite | Concurrency, rollback, idempotency, tenant isolation            | обязательный CI job         |
 | [ ]    | B0.5 | Seed profiles                | reference/operator/pilot/test разделены                         | manifest/count assertions   |
 | [ ]    | B0.6 | Outbox ADR                   | Однозначные delivery/status/retry правила                       | dispatcher tests            |
@@ -352,7 +352,18 @@ PostgreSQL concurrency test существует, но пропускается 
 - [x] Проверка contract gate в GitHub CI.
 - [x] Полный purchase gate после изменения контрактов.
 
-Текущий статус: **B0.1 и B0.2 реализованы и проходят**. Следующая задача: **B0.3 Runtime split**.
+Выполнено в B0.3:
+
+- [x] Явные роли процесса `api | worker | all` и единый capability contract.
+- [x] API запускает HTTP и BullMQ producer без cron и queue consumer.
+- [x] Worker имеет отдельный `start:worker`, запускает cron и BullMQ consumer без HTTP.
+- [x] Роль `all` разрешена только в development/test и используется `dev:local`.
+- [x] Readiness проверяет зависимости и queue capability текущей роли.
+- [x] Local и production Compose запускают API и worker раздельно.
+- [x] Process-level gate проверяет capability matrix, entrypoint guards и production-запрет `all`.
+- [x] Gate добавлен в GitHub CI.
+
+Текущий статус: **B0.1, B0.2 и B0.3 реализованы и проходят**. Следующая задача: **B0.4 PostgreSQL integration suite**.
 
 ### B1 — покупка клиникой
 
@@ -441,15 +452,15 @@ Definition of Done: наблюдаемый итог, а не список фай
 
 ## 11. Ближайший следующий шаг
 
-Реализовать **B0.3 Runtime split** без перехода на микросервисы:
+Реализован **B0.3 Runtime split** без перехода на микросервисы:
 
 - [x] Изолировать pilot search от повторного появления legacy fixtures после фоновой проекции.
-- [ ] Ввести явную роль процесса `api | worker | all`.
-- [ ] Запретить cron и queue consumers в роли `api`.
-- [ ] Создать отдельный worker entrypoint из того же NestJS-приложения.
-- [ ] Оставить `all` только для удобного локального запуска.
-- [ ] Сделать readiness зависимым от роли процесса.
-- [ ] Добавить process-level smoke test, доказывающий, какие фоновые службы запускаются в каждой роли.
+- [x] Ввести явную роль процесса `api | worker | all`.
+- [x] Запретить cron и queue consumers в роли `api`.
+- [x] Создать отдельный worker entrypoint из того же NestJS-приложения.
+- [x] Оставить `all` только для удобного локального запуска.
+- [x] Сделать readiness зависимым от роли процесса.
+- [x] Добавить process-level smoke test, доказывающий, какие фоновые службы запускаются в каждой роли.
 
 Результат следующего этапа: несколько API-инстансов можно масштабировать без дублирования cron-циклов, а worker можно перезапускать независимо от HTTP API.
 
@@ -459,6 +470,7 @@ Definition of Done: наблюдаемый итог, а не список фай
 pnpm db:prepare-pilot
 pnpm typecheck
 pnpm test
+pnpm verify:runtime-split
 pnpm verify:core-contract
 pnpm verify:pilot-backend
 pnpm build

@@ -23,6 +23,13 @@ export const healthResponseSchema = z.object({
   service: z.string(),
   environment: z.enum(["development", "test", "production"]),
   release: z.string(),
+  role: z.enum(["api", "worker", "all"]),
+  capabilities: z.object({
+    http: z.boolean(),
+    schedules: z.boolean(),
+    queueProducer: z.boolean(),
+    queueConsumer: z.boolean(),
+  }),
 });
 
 const dependencyHealthSchema = z
@@ -34,6 +41,14 @@ const dependencyHealthSchema = z
 
 export const readinessResponseSchema = z.object({
   status: z.literal("ready"),
+  role: z.enum(["api", "worker", "all"]),
+  capabilities: z.object({
+    http: z.boolean(),
+    schedules: z.boolean(),
+    queueProducer: z.boolean(),
+    queueConsumer: z.boolean(),
+  }),
+  requiredChecks: z.array(z.string()),
   checks: z.record(z.string(), dependencyHealthSchema),
 });
 

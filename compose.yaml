@@ -105,6 +105,7 @@ services:
         condition: service_healthy
     environment:
       NODE_ENV: development
+      PROCESS_ROLE: api
       DATABASE_URL: postgresql://marketplace:marketplace@postgres:5432/marketplace?schema=public
       REDIS_URL: redis://redis:6379
       OBJECT_STORAGE_DRIVER: s3
@@ -131,6 +132,41 @@ services:
       interval: 10s
       timeout: 5s
       retries: 20
+
+  worker:
+    build:
+      context: .
+      target: api
+    command: ["pnpm", "--filter", "@marketplace/api", "start:worker"]
+    depends_on:
+      api:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+      clamav:
+        condition: service_healthy
+    environment:
+      NODE_ENV: development
+      PROCESS_ROLE: worker
+      DATABASE_URL: postgresql://marketplace:marketplace@postgres:5432/marketplace?schema=public
+      REDIS_URL: redis://redis:6379
+      OBJECT_STORAGE_DRIVER: s3
+      S3_ENDPOINT: http://minio:9000
+      S3_REGION: us-east-1
+      S3_BUCKET: marketplace
+      S3_ACCESS_KEY_ID: minio
+      S3_SECRET_ACCESS_KEY: minio-local-secret
+      S3_FORCE_PATH_STYLE: "true"
+      AUTH_MODE: development
+      INTEGRATION_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+      APP_SECURITY_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+      SIGNATURE_CALLBACK_SECRET: local-signature-callback-secret-change-in-production
+      AV_SCAN_MODE: required
+      CLAMAV_HOST: clamav
+      CLAMAV_PORT: 3310
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
 
   seed:
     build:
