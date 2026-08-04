@@ -292,16 +292,55 @@ export const cartResponseSchema = z
     version: z.number().int().positive(),
     createdById: z.uuid().nullable(),
     items: z.array(cartItemResponseSchema),
-    checkout: z
-      .object({ id: z.uuid() })
-      .passthrough()
-      .nullable(),
+    checkout: z.object({ id: z.uuid() }).passthrough().nullable(),
     createdAt: dateTimeSchema,
     updatedAt: dateTimeSchema,
   })
   .passthrough();
 
 export const cartListResponseSchema = z.array(cartResponseSchema);
+
+export const cartLineSnapshotSchema = z.object({
+  resolvedAt: dateTimeSchema,
+  offerVersion: z.number().int().nonnegative(),
+  source: z.string(),
+  ruleId: z.string().nullable(),
+  unitPriceMinor: decimalStringSchema,
+  quantity: decimalStringSchema,
+  totalPriceMinor: decimalStringSchema,
+  currency: currencySchema,
+  minimumOrderQuantity: decimalStringSchema,
+  orderIncrement: decimalStringSchema,
+  availableQuantity: decimalStringSchema.nullable(),
+  fulfillmentStatus: z.enum([
+    "AVAILABLE",
+    "INSUFFICIENT_STOCK",
+    "OUT_OF_STOCK",
+  ]),
+});
+
+export const cartValidationItemSchema = z.object({
+  cartItemId: z.uuid(),
+  offerId: z.uuid(),
+  status: z.enum(["UNCHANGED", "CHANGED", "UNAVAILABLE"]),
+  changes: z.array(z.enum(["PRICE", "STOCK", "AVAILABILITY", "OFFER_RULES"])),
+  previous: cartLineSnapshotSchema,
+  current: cartLineSnapshotSchema.nullable(),
+  canCheckout: z.boolean(),
+  requiresAcceptance: z.boolean(),
+  message: z.string().nullable(),
+});
+
+export const cartValidationResponseSchema = z.object({
+  cartId: z.uuid(),
+  cartVersion: z.number().int().positive(),
+  validatedAt: dateTimeSchema,
+  hasChanges: z.boolean(),
+  requiresAcceptance: z.boolean(),
+  canCheckout: z.boolean(),
+  items: z.array(cartValidationItemSchema),
+});
+
 const checkoutCartSnapshotResponseSchema = cartResponseSchema.omit({
   checkout: true,
 });
@@ -324,7 +363,9 @@ export const supplierOrderItemResponseSchema = z
         id: z.uuid(),
         productVariant: z.object({
           id: z.uuid(),
-          product: z.object({ id: z.uuid(), canonicalName: z.string() }).passthrough(),
+          product: z
+            .object({ id: z.uuid(), canonicalName: z.string() })
+            .passthrough(),
         }),
       })
       .passthrough()
@@ -353,7 +394,9 @@ export const supplierOrderResponseSchema = z
   })
   .passthrough();
 
-export const supplierOrderListResponseSchema = z.array(supplierOrderResponseSchema);
+export const supplierOrderListResponseSchema = z.array(
+  supplierOrderResponseSchema,
+);
 
 export const checkoutResponseSchema = z
   .object({
@@ -373,8 +416,14 @@ export const checkoutResponseSchema = z
   .passthrough();
 
 export type CatalogSearchResponse = z.infer<typeof catalogSearchResponseSchema>;
-export type OfferComparisonResponse = z.infer<typeof offerComparisonResponseSchema>;
+export type OfferComparisonResponse = z.infer<
+  typeof offerComparisonResponseSchema
+>;
 export type CartResponse = z.infer<typeof cartResponseSchema>;
 export type CartItemResponse = z.infer<typeof cartItemResponseSchema>;
+export type CartLineSnapshotResponse = z.infer<typeof cartLineSnapshotSchema>;
+export type CartValidationResponse = z.infer<
+  typeof cartValidationResponseSchema
+>;
 export type CheckoutResponse = z.infer<typeof checkoutResponseSchema>;
 export type SupplierOrderResponse = z.infer<typeof supplierOrderResponseSchema>;

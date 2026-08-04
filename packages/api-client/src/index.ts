@@ -2,6 +2,7 @@ import type {
   AddCartItemRequest,
   CartItemResponse,
   CartResponse,
+  CartValidationResponse,
   CatalogSearchResponse,
   CheckoutCartRequest,
   CheckoutResponse,
@@ -161,7 +162,9 @@ export class MarketplaceApiClient {
     );
   }
 
-  searchPublicCatalog(input: Omit<SearchCatalogRequest, "buyerOrganizationId">) {
+  searchPublicCatalog(
+    input: Omit<SearchCatalogRequest, "buyerOrganizationId">,
+  ) {
     return this.get<CatalogSearchResponse>(
       this.withQuery("/catalog/search", input),
     );
@@ -188,7 +191,10 @@ export class MarketplaceApiClient {
   }
 
   createCart(buyerOrganizationId: string, input: CreateCartRequest) {
-    return this.post<CartResponse>(`/buyers/${buyerOrganizationId}/carts`, input);
+    return this.post<CartResponse>(
+      `/buyers/${buyerOrganizationId}/carts`,
+      input,
+    );
   }
 
   addCartItem(cartId: string, input: AddCartItemRequest) {
@@ -197,6 +203,10 @@ export class MarketplaceApiClient {
 
   repriceCart(cartId: string) {
     return this.post<CartResponse>(`/carts/${cartId}/reprice`);
+  }
+
+  validateCart(cartId: string) {
+    return this.post<CartValidationResponse>(`/carts/${cartId}/validate`);
   }
 
   checkoutCart(cartId: string, input: CheckoutCartRequest) {

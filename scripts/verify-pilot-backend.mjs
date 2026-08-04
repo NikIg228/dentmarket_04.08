@@ -25,7 +25,9 @@ function assert(condition, message) {
 function assertSchema(schema, value, label) {
   const parsed = schema.safeParse(value);
   if (!parsed.success) {
-    throw new Error(`${label} violates its shared response schema: ${JSON.stringify(parsed.error.issues)}`);
+    throw new Error(
+      `${label} violates its shared response schema: ${JSON.stringify(parsed.error.issues)}`,
+    );
   }
 }
 
@@ -38,6 +40,7 @@ function assertOpenApiContract(openApi) {
     "CreateCartRequest",
     "CartResponse",
     "CartListResponse",
+    "CartValidationResponse",
     "AddCartItemRequest",
     "CartItemResponse",
     "CheckoutCartRequest",
@@ -57,38 +60,100 @@ function assertOpenApiContract(openApi) {
     ["/api/health/ready", "get", "200", "ReadinessResponse"],
     ["/api/catalog/cities", "get", "200", "PublicCityListResponse"],
     ["/api/catalog/search", "get", "200", "CatalogSearchResponse"],
-    ["/api/catalog/products/{productId}/compare", "get", "200", "OfferComparisonResponse"],
+    [
+      "/api/catalog/products/{productId}/compare",
+      "get",
+      "200",
+      "OfferComparisonResponse",
+    ],
     ["/api/marketplace/search", "get", "200", "CatalogSearchResponse"],
-    ["/api/marketplace/products/{productId}/compare", "get", "200", "OfferComparisonResponse"],
-    ["/api/buyers/{buyerOrganizationId}/carts", "get", "200", "CartListResponse"],
-    ["/api/buyers/{buyerOrganizationId}/carts", "post", "201", "CartResponse", "CreateCartRequest"],
-    ["/api/carts/{cartId}/items", "post", "201", "CartItemResponse", "AddCartItemRequest"],
+    [
+      "/api/marketplace/products/{productId}/compare",
+      "get",
+      "200",
+      "OfferComparisonResponse",
+    ],
+    [
+      "/api/buyers/{buyerOrganizationId}/carts",
+      "get",
+      "200",
+      "CartListResponse",
+    ],
+    [
+      "/api/buyers/{buyerOrganizationId}/carts",
+      "post",
+      "201",
+      "CartResponse",
+      "CreateCartRequest",
+    ],
+    [
+      "/api/carts/{cartId}/items",
+      "post",
+      "201",
+      "CartItemResponse",
+      "AddCartItemRequest",
+    ],
     ["/api/carts/{cartId}/reprice", "post", "201", "CartResponse"],
-    ["/api/carts/{cartId}/checkout", "post", "201", "CheckoutResponse", "CheckoutCartRequest"],
+    ["/api/carts/{cartId}/validate", "post", "200", "CartValidationResponse"],
+    [
+      "/api/carts/{cartId}/checkout",
+      "post",
+      "201",
+      "CheckoutResponse",
+      "CheckoutCartRequest",
+    ],
     ["/api/checkouts/{checkoutId}", "get", "200", "CheckoutResponse"],
     ["/api/supplier-orders", "get", "200", "SupplierOrderListResponse"],
-    ["/api/buyers/{buyerOrganizationId}/orders", "get", "200", "SupplierOrderListResponse"],
-    ["/api/supplier-orders/{orderId}/confirm", "post", "201", "SupplierOrderResponse", "ConfirmSupplierOrderRequest"],
+    [
+      "/api/buyers/{buyerOrganizationId}/orders",
+      "get",
+      "200",
+      "SupplierOrderListResponse",
+    ],
+    [
+      "/api/supplier-orders/{orderId}/confirm",
+      "post",
+      "201",
+      "SupplierOrderResponse",
+      "ConfirmSupplierOrderRequest",
+    ],
   ];
-  for (const [pathName, method, status, responseName, requestName] of coreOperations) {
+  for (const [
+    pathName,
+    method,
+    status,
+    responseName,
+    requestName,
+  ] of coreOperations) {
     const operation = openApi.paths?.[pathName]?.[method];
-    assert(operation, `OpenAPI operation ${method.toUpperCase()} ${pathName} is missing`);
-    const responseSchema = operation.responses?.[status]?.content?.["application/json"]?.schema;
+    assert(
+      operation,
+      `OpenAPI operation ${method.toUpperCase()} ${pathName} is missing`,
+    );
+    const responseSchema =
+      operation.responses?.[status]?.content?.["application/json"]?.schema;
     assert(
       responseSchema?.$ref === `#/components/schemas/${responseName}`,
       `${method.toUpperCase()} ${pathName} does not reference ${responseName}`,
     );
     if (requestName) {
-      const requestSchema = operation.requestBody?.content?.["application/json"]?.schema;
+      const requestSchema =
+        operation.requestBody?.content?.["application/json"]?.schema;
       assert(
         requestSchema?.$ref === `#/components/schemas/${requestName}`,
         `${method.toUpperCase()} ${pathName} does not reference ${requestName}`,
       );
     }
   }
-  for (const pathName of ["/api/catalog/search", "/api/catalog/products/{productId}/compare"]) {
+  for (const pathName of [
+    "/api/catalog/search",
+    "/api/catalog/products/{productId}/compare",
+  ]) {
     const parameters = openApi.paths[pathName].get.parameters ?? [];
-    assert(parameters.length > 0, `GET ${pathName} has no documented query/path parameters`);
+    assert(
+      parameters.length > 0,
+      `GET ${pathName} has no documented query/path parameters`,
+    );
   }
   for (const pathName of [
     "/api/marketplace/search",
@@ -99,7 +164,9 @@ function assertOpenApiContract(openApi) {
     const pathItem = openApi.paths[pathName];
     const operation = pathItem.get ?? pathItem.post;
     assert(
-      operation.security?.some((requirement) => Object.hasOwn(requirement, "access-token")),
+      operation.security?.some((requirement) =>
+        Object.hasOwn(requirement, "access-token"),
+      ),
       `${pathName} does not document bearer authentication`,
     );
   }
@@ -167,7 +234,9 @@ try {
     );
   }
   if (!fs.existsSync(apiEntry)) {
-    throw new Error("Built API entry is missing. Run `pnpm --filter @marketplace/api build` first.");
+    throw new Error(
+      "Built API entry is missing. Run `pnpm --filter @marketplace/api build` first.",
+    );
   }
 
   await prisma.$queryRaw`SELECT 1`;
@@ -175,7 +244,9 @@ try {
     prisma.organizationMembership.findFirst({
       where: {
         status: "ACTIVE",
-        organization: { capabilities: { some: { capability: "MARKETPLACE_OPERATOR" } } },
+        organization: {
+          capabilities: { some: { capability: "MARKETPLACE_OPERATOR" } },
+        },
       },
       select: { userId: true, organizationId: true },
       orderBy: { createdAt: "asc" },
@@ -185,8 +256,14 @@ try {
       select: { id: true, displayName: true },
     }),
   ]);
-  assert(operatorMembership, "Active marketplace operator membership is missing");
-  assert(buyer, "Pilot buyer 970000000001 is missing; run `pnpm db:prepare-pilot`");
+  assert(
+    operatorMembership,
+    "Active marketplace operator membership is missing",
+  );
+  assert(
+    buyer,
+    "Pilot buyer 970000000001 is missing; run `pnpm db:prepare-pilot`",
+  );
 
   api = spawn(process.execPath, [apiEntry], {
     cwd: path.join(root, "apps", "api"),
@@ -212,53 +289,109 @@ try {
   const readiness = await waitUntilReady();
   const health = await request("/health");
   assert(health?.status === "ok", "Liveness endpoint did not return status=ok");
-  assert(readiness?.checks?.database?.status === "ok", "Readiness did not confirm the database");
+  assert(
+    readiness?.checks?.database?.status === "ok",
+    "Readiness did not confirm the database",
+  );
   assertSchema(coreSchemas.healthResponseSchema, health, "GET /health");
-  assertSchema(coreSchemas.readinessResponseSchema, readiness, "GET /health/ready");
+  assertSchema(
+    coreSchemas.readinessResponseSchema,
+    readiness,
+    "GET /health/ready",
+  );
 
   const openApiResponse = await fetch(`http://127.0.0.1:${port}/docs-json`);
-  assert(openApiResponse.ok, `OpenAPI document failed (${openApiResponse.status})`);
+  assert(
+    openApiResponse.ok,
+    `OpenAPI document failed (${openApiResponse.status})`,
+  );
   const openApi = await openApiResponse.json();
   const operations = Object.values(openApi.paths ?? {}).flatMap((pathItem) =>
     Object.entries(pathItem).filter(([method]) =>
-      ["get", "post", "put", "patch", "delete", "options", "head"].includes(method),
+      ["get", "post", "put", "patch", "delete", "options", "head"].includes(
+        method,
+      ),
     ),
   );
-  const operationsWithRequestBody = operations.filter(([, operation]) => operation.requestBody).length;
+  const operationsWithRequestBody = operations.filter(
+    ([, operation]) => operation.requestBody,
+  ).length;
   const operationsWithSuccessSchema = operations.filter(([, operation]) =>
     Object.entries(operation.responses ?? {}).some(
-      ([status, response]) => /^2\d\d$/.test(status) && response?.content?.["application/json"]?.schema,
+      ([status, response]) =>
+        /^2\d\d$/.test(status) &&
+        response?.content?.["application/json"]?.schema,
     ),
   ).length;
-  const componentSchemas = Object.keys(openApi.components?.schemas ?? {}).length;
+  const componentSchemas = Object.keys(
+    openApi.components?.schemas ?? {},
+  ).length;
   assert(operations.length > 0, "OpenAPI document contains no operations");
   const verifiedCoreOperations = assertOpenApiContract(openApi);
 
-  const invalidSearchResponse = await fetch(`${apiBase}/catalog/search?limit=0`);
-  assert(invalidSearchResponse.status === 400, "Invalid catalog query did not return HTTP 400");
+  const invalidSearchResponse = await fetch(
+    `${apiBase}/catalog/search?limit=0`,
+  );
+  assert(
+    invalidSearchResponse.status === 400,
+    "Invalid catalog query did not return HTTP 400",
+  );
   const invalidSearch = await invalidSearchResponse.json();
-  assertSchema(coreSchemas.errorResponseSchema, invalidSearch, "Catalog validation error");
-  const documentedBadRequest = openApi.paths?.["/api/catalog/search"]?.get?.responses?.["400"]
-    ?.content?.["application/json"]?.schema;
+  assertSchema(
+    coreSchemas.errorResponseSchema,
+    invalidSearch,
+    "Catalog validation error",
+  );
+  const documentedBadRequest =
+    openApi.paths?.["/api/catalog/search"]?.get?.responses?.["400"]?.content?.[
+      "application/json"
+    ]?.schema;
   assert(
     documentedBadRequest?.$ref === "#/components/schemas/ErrorResponse",
     "Public catalog validation error is absent from OpenAPI",
   );
 
-  const search = await request("/catalog/search?inStock=true&limit=100&sort=PRICE_ASC");
-  assertSchema(coreSchemas.catalogSearchResponseSchema, search, "GET /catalog/search");
-  assert(search?.total === 50, `Expected 50 buyable pilot products, received ${search?.total}`);
-  const offerCount = search.items.reduce((sum, item) => sum + item.offers.length, 0);
-  assert(offerCount === 500, `Expected 500 visible pilot offers, received ${offerCount}`);
+  const search = await request(
+    "/catalog/search?inStock=true&limit=100&sort=PRICE_ASC",
+  );
+  assertSchema(
+    coreSchemas.catalogSearchResponseSchema,
+    search,
+    "GET /catalog/search",
+  );
+  assert(
+    search?.total === 50,
+    `Expected 50 buyable pilot products, received ${search?.total}`,
+  );
+  const offerCount = search.items.reduce(
+    (sum, item) => sum + item.offers.length,
+    0,
+  );
+  assert(
+    offerCount === 500,
+    `Expected 500 visible pilot offers, received ${offerCount}`,
+  );
 
   const product = search.items.find((item) => item.offers.length === 10);
-  assert(product, "No pilot product with ten comparable supplier offers was found");
+  assert(
+    product,
+    "No pilot product with ten comparable supplier offers was found",
+  );
   const comparison = await request(
     `/catalog/products/${product.id}/compare?quantity=1`,
   );
-  assertSchema(coreSchemas.offerComparisonResponseSchema, comparison, "GET /catalog/products/:id/compare");
-  assert(comparison.offers.length === 10, `Expected 10 compared offers, received ${comparison.offers.length}`);
-  const prices = comparison.offers.map((offer) => Number(offer.price.normalizedPriceMinor));
+  assertSchema(
+    coreSchemas.offerComparisonResponseSchema,
+    comparison,
+    "GET /catalog/products/:id/compare",
+  );
+  assert(
+    comparison.offers.length === 10,
+    `Expected 10 compared offers, received ${comparison.offers.length}`,
+  );
+  const prices = comparison.offers.map((offer) =>
+    Number(offer.price.normalizedPriceMinor),
+  );
   assert(
     prices.every((price, index) => index === 0 || price >= prices[index - 1]),
     "Compared offers are not sorted by normalized price",
@@ -287,9 +420,9 @@ try {
     console.log(JSON.stringify(baseSummary, null, 2));
   } else {
     const identityHeaders = {
-    "content-type": "application/json",
-    "x-user-id": operatorMembership.userId,
-    "x-organization-id": operatorMembership.organizationId,
+      "content-type": "application/json",
+      "x-user-id": operatorMembership.userId,
+      "x-organization-id": operatorMembership.organizationId,
     };
     const post = (route, body) =>
       request(route, {
@@ -299,58 +432,263 @@ try {
       });
 
     const cart = await post(`/buyers/${buyer.id}/carts`, { currency: "KZT" });
-    assertSchema(coreSchemas.cartResponseSchema, cart, "POST /buyers/:id/carts");
+    assertSchema(
+      coreSchemas.cartResponseSchema,
+      cart,
+      "POST /buyers/:id/carts",
+    );
     const selectedOffer = product.offers[0];
     const cartItem = await post(`/carts/${cart.id}/items`, {
       offerId: selectedOffer.id,
       quantity: 1,
     });
-    assertSchema(coreSchemas.cartItemResponseSchema, cartItem, "POST /carts/:id/items");
+    assertSchema(
+      coreSchemas.cartItemResponseSchema,
+      cartItem,
+      "POST /carts/:id/items",
+    );
     assert(cartItem?.id, "Cart item was not created");
+    const initialValidation = await post(`/carts/${cart.id}/validate`);
+    assertSchema(
+      coreSchemas.cartValidationResponseSchema,
+      initialValidation,
+      "POST /carts/:id/validate",
+    );
+    assert(
+      initialValidation.canCheckout,
+      "Freshly added cart item did not pass validation",
+    );
+
+    assert(
+      cartItem.priceSource === "BASE" && cartItem.priceRuleId,
+      "Pilot reprice gate requires a base price rule",
+    );
+    const [originalPrice, originalBalance] = await Promise.all([
+      prisma.offerPrice.findUnique({ where: { id: cartItem.priceRuleId } }),
+      prisma.inventoryBalance.findFirst({
+        where: {
+          offerId: selectedOffer.id,
+          freshnessStatus: "FRESH",
+          quantityAvailable: { gte: 2 },
+        },
+        orderBy: { quantityAvailable: "desc" },
+      }),
+    ]);
+    assert(originalPrice, "Pilot offer base price is missing");
+    assert(
+      originalBalance,
+      "Pilot offer has no mutable fresh inventory balance",
+    );
+    const changedPrice = (
+      BigInt(originalPrice.amountMinor.toString()) + 137n
+    ).toString();
+    const changedStock = originalBalance.quantityAvailable.minus(1).toString();
+    try {
+      await Promise.all([
+        prisma.offerPrice.update({
+          where: { id: originalPrice.id },
+          data: { amountMinor: changedPrice },
+        }),
+        prisma.inventoryBalance.update({
+          where: { id: originalBalance.id },
+          data: { quantityAvailable: changedStock, version: { increment: 1 } },
+        }),
+      ]);
+      const changedValidation = await post(`/carts/${cart.id}/validate`);
+      assertSchema(
+        coreSchemas.cartValidationResponseSchema,
+        changedValidation,
+        "Changed cart validation",
+      );
+      const changedLine = changedValidation.items.find(
+        (item) => item.cartItemId === cartItem.id,
+      );
+      assert(
+        changedLine?.changes.includes("PRICE"),
+        "Cart validation did not detect the changed price",
+      );
+      assert(
+        changedLine?.changes.includes("STOCK"),
+        "Cart validation did not detect the changed stock",
+      );
+      assert(
+        changedLine.previous.unitPriceMinor !==
+          changedLine.current?.unitPriceMinor,
+        "Old and new prices are identical",
+      );
+      assert(
+        changedLine.previous.availableQuantity !==
+          changedLine.current?.availableQuantity,
+        "Old and new stock values are identical",
+      );
+
+      const staleCheckoutResponse = await fetch(
+        `${apiBase}/carts/${cart.id}/checkout`,
+        {
+          method: "POST",
+          headers: identityHeaders,
+          body: JSON.stringify({ idempotencyKey: `stale-cart-${Date.now()}` }),
+        },
+      );
+      const staleCheckout = await staleCheckoutResponse.json();
+      assert(
+        staleCheckoutResponse.status === 409,
+        "Checkout did not reject an unaccepted price change",
+      );
+      assert(
+        staleCheckout.code === "CART_REVALIDATION_REQUIRED",
+        "Checkout returned the wrong stale-cart error code",
+      );
+
+      await post(`/carts/${cart.id}/reprice`);
+      const acceptedValidation = await post(`/carts/${cart.id}/validate`);
+      assertSchema(
+        coreSchemas.cartValidationResponseSchema,
+        acceptedValidation,
+        "Accepted cart validation",
+      );
+      assert(
+        !acceptedValidation.requiresAcceptance,
+        "Reprice did not accept the latest price",
+      );
+    } finally {
+      await Promise.all([
+        prisma.offerPrice.update({
+          where: { id: originalPrice.id },
+          data: { amountMinor: originalPrice.amountMinor },
+        }),
+        prisma.inventoryBalance.update({
+          where: { id: originalBalance.id },
+          data: {
+            quantityAvailable: originalBalance.quantityAvailable,
+            version: { increment: 1 },
+          },
+        }),
+      ]);
+    }
     const repricedCart = await post(`/carts/${cart.id}/reprice`);
-    assertSchema(coreSchemas.cartResponseSchema, repricedCart, "POST /carts/:id/reprice");
-    const carts = await request(`/buyers/${buyer.id}/carts`, { headers: identityHeaders });
-    assertSchema(coreSchemas.cartListResponseSchema, carts, "GET /buyers/:id/carts");
+    assertSchema(
+      coreSchemas.cartResponseSchema,
+      repricedCart,
+      "POST /carts/:id/reprice",
+    );
+    const carts = await request(`/buyers/${buyer.id}/carts`, {
+      headers: identityHeaders,
+    });
+    assertSchema(
+      coreSchemas.cartListResponseSchema,
+      carts,
+      "GET /buyers/:id/carts",
+    );
 
     const idempotencyKey = `pilot-backend-${Date.now()}`;
-    const checkout = await post(`/carts/${cart.id}/checkout`, { idempotencyKey });
-    assertSchema(coreSchemas.checkoutResponseSchema, checkout, "POST /carts/:id/checkout");
-    assert(checkout?.status === "COMPLETED", `Checkout status is ${checkout?.status ?? "missing"}`);
-    assert(checkout.supplierOrders?.length === 1, "Checkout did not create exactly one supplier order");
-    const repeated = await post(`/carts/${cart.id}/checkout`, { idempotencyKey });
-    assertSchema(coreSchemas.checkoutResponseSchema, repeated, "Repeated checkout response");
-    assert(repeated.id === checkout.id, "Checkout idempotency returned another checkout");
-    const fetchedCheckout = await request(`/checkouts/${checkout.id}`, { headers: identityHeaders });
-    assertSchema(coreSchemas.checkoutResponseSchema, fetchedCheckout, "GET /checkouts/:id");
+    const checkout = await post(`/carts/${cart.id}/checkout`, {
+      idempotencyKey,
+    });
+    assertSchema(
+      coreSchemas.checkoutResponseSchema,
+      checkout,
+      "POST /carts/:id/checkout",
+    );
+    assert(
+      checkout?.status === "COMPLETED",
+      `Checkout status is ${checkout?.status ?? "missing"}`,
+    );
+    assert(
+      checkout.supplierOrders?.length === 1,
+      "Checkout did not create exactly one supplier order",
+    );
+    const repeated = await post(`/carts/${cart.id}/checkout`, {
+      idempotencyKey,
+    });
+    assertSchema(
+      coreSchemas.checkoutResponseSchema,
+      repeated,
+      "Repeated checkout response",
+    );
+    assert(
+      repeated.id === checkout.id,
+      "Checkout idempotency returned another checkout",
+    );
+    const fetchedCheckout = await request(`/checkouts/${checkout.id}`, {
+      headers: identityHeaders,
+    });
+    assertSchema(
+      coreSchemas.checkoutResponseSchema,
+      fetchedCheckout,
+      "GET /checkouts/:id",
+    );
 
-    const buyerOrders = await request(`/buyers/${buyer.id}/orders`, { headers: identityHeaders });
-    assertSchema(coreSchemas.supplierOrderListResponseSchema, buyerOrders, "GET /buyers/:id/orders");
+    const buyerOrders = await request(`/buyers/${buyer.id}/orders`, {
+      headers: identityHeaders,
+    });
+    assertSchema(
+      coreSchemas.supplierOrderListResponseSchema,
+      buyerOrders,
+      "GET /buyers/:id/orders",
+    );
     assert(
       buyerOrders.some((order) => order.checkoutId === checkout.id),
       "Created checkout is absent from the buyer order history",
     );
-    const supplierOrders = await request(`/supplier-orders?checkoutId=${checkout.id}`, {
-      headers: identityHeaders,
-    });
-    assertSchema(coreSchemas.supplierOrderListResponseSchema, supplierOrders, "GET /supplier-orders");
-    assert(supplierOrders.length === 1, "Checkout-scoped supplier order list is not deterministic");
+    const supplierOrders = await request(
+      `/supplier-orders?checkoutId=${checkout.id}`,
+      {
+        headers: identityHeaders,
+      },
+    );
+    assertSchema(
+      coreSchemas.supplierOrderListResponseSchema,
+      supplierOrders,
+      "GET /supplier-orders",
+    );
+    assert(
+      supplierOrders.length === 1,
+      "Checkout-scoped supplier order list is not deterministic",
+    );
     const supplierOrder = supplierOrders[0];
     const decisions = supplierOrder.items.map((item) => ({
       itemId: item.id,
       acceptedQuantity: Number(item.quantity),
     }));
-    const confirmedOrder = await post(`/supplier-orders/${supplierOrder.id}/confirm`, { decisions });
-    assertSchema(coreSchemas.supplierOrderResponseSchema, confirmedOrder, "POST /supplier-orders/:id/confirm");
-    const repeatedConfirmation = await post(`/supplier-orders/${supplierOrder.id}/confirm`, { decisions });
-    assertSchema(coreSchemas.supplierOrderResponseSchema, repeatedConfirmation, "Repeated supplier confirmation");
-    assert(repeatedConfirmation.id === confirmedOrder.id, "Supplier confirmation is not idempotent");
+    const confirmedOrder = await post(
+      `/supplier-orders/${supplierOrder.id}/confirm`,
+      { decisions },
+    );
+    assertSchema(
+      coreSchemas.supplierOrderResponseSchema,
+      confirmedOrder,
+      "POST /supplier-orders/:id/confirm",
+    );
+    const repeatedConfirmation = await post(
+      `/supplier-orders/${supplierOrder.id}/confirm`,
+      { decisions },
+    );
+    assertSchema(
+      coreSchemas.supplierOrderResponseSchema,
+      repeatedConfirmation,
+      "Repeated supplier confirmation",
+    );
+    assert(
+      repeatedConfirmation.id === confirmedOrder.id,
+      "Supplier confirmation is not idempotent",
+    );
     const persisted = await prisma.checkout.findUnique({
       where: { id: checkout.id },
-      include: { supplierOrders: { include: { items: { include: { reservation: true } } } } },
+      include: {
+        supplierOrders: {
+          include: { items: { include: { reservation: true } } },
+        },
+      },
     });
-    assert(persisted?.status === "COMPLETED", "Checkout was not persisted as COMPLETED");
     assert(
-      persisted.supplierOrders.every((order) => order.items.every((item) => item.reservation)),
+      persisted?.status === "COMPLETED",
+      "Checkout was not persisted as COMPLETED",
+    );
+    assert(
+      persisted.supplierOrders.every((order) =>
+        order.items.every((item) => item.reservation),
+      ),
       "A supplier order item has no inventory reservation",
     );
 
@@ -358,17 +696,18 @@ try {
       JSON.stringify(
         {
           ...baseSummary,
-        purchase: {
-          buyerOrganizationId: buyer.id,
-          cartId: cart.id,
-          checkoutId: checkout.id,
-          supplierOrders: checkout.supplierOrders.length,
-          inventoryReservations: persisted.supplierOrders.reduce(
-            (sum, order) => sum + order.items.filter((item) => item.reservation).length,
-            0,
-          ),
-          idempotencyVerified: true,
-          supplierConfirmationVerified: true,
+          purchase: {
+            buyerOrganizationId: buyer.id,
+            cartId: cart.id,
+            checkoutId: checkout.id,
+            supplierOrders: checkout.supplierOrders.length,
+            inventoryReservations: persisted.supplierOrders.reduce(
+              (sum, order) =>
+                sum + order.items.filter((item) => item.reservation).length,
+              0,
+            ),
+            idempotencyVerified: true,
+            supplierConfirmationVerified: true,
           },
         },
         null,

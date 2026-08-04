@@ -20,6 +20,7 @@ import {
   addCartItemSchema,
   cartItemResponseSchema,
   cartListResponseSchema,
+  cartValidationResponseSchema,
   cartResponseSchema,
   catalogSearchResponseSchema,
   checkoutCartSchema,
@@ -68,6 +69,7 @@ const coreZodSchemas = {
   OfferComparisonResponse: offerComparisonResponseSchema,
   CartResponse: cartResponseSchema,
   CartListResponse: cartListResponseSchema,
+  CartValidationResponse: cartValidationResponseSchema,
   CartItemResponse: cartItemResponseSchema,
   CheckoutResponse: checkoutResponseSchema,
   SupplierOrderResponse: supplierOrderResponseSchema,
@@ -85,7 +87,10 @@ function jsonSchema(schema: ZodType, io: "input" | "output" = "output") {
 export const coreOpenApiSchemas = Object.fromEntries(
   Object.entries(coreZodSchemas).map(([name, schema]) => [
     name,
-    jsonSchema(schema, name.endsWith("Request") || name.endsWith("Query") ? "input" : "output"),
+    jsonSchema(
+      schema,
+      name.endsWith("Request") || name.endsWith("Query") ? "input" : "output",
+    ),
   ]),
 ) as Record<CoreOpenApiSchemaName, SchemaObject>;
 
@@ -122,18 +127,23 @@ export function ApiCoreQuery(name: CoreOpenApiSchemaName) {
   };
   const required = new Set(schema.required ?? []);
   return applyDecorators(
-    ...Object.entries(schema.properties ?? {}).map(([propertyName, propertySchema]) =>
-      ApiQuery({
-        name: propertyName,
-        required: required.has(propertyName),
-        schema: propertySchema,
-      }),
+    ...Object.entries(schema.properties ?? {}).map(
+      ([propertyName, propertySchema]) =>
+        ApiQuery({
+          name: propertyName,
+          required: required.has(propertyName),
+          schema: propertySchema,
+        }),
     ),
   );
 }
 
 export function ApiUuidParam(name: string, description?: string) {
-  return ApiParam({ name, description, schema: { type: "string", format: "uuid" } });
+  return ApiParam({
+    name,
+    description,
+    schema: { type: "string", format: "uuid" },
+  });
 }
 
 export function ApiCoreProtected() {

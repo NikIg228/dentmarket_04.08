@@ -55,23 +55,23 @@ DentMarket — B2B-маркетплейс стоматологических т�
 
 Аудит выполнен по коду, Prisma-схеме, тестам и живому локальному API, а не по статусам в старом ТЗ.
 
-| Область | Фактическое состояние |
-|---|---:|
-| Архитектура | NestJS-модульный монолит |
-| База | PostgreSQL + Prisma |
-| Доменные модули | 29 |
-| Prisma-модели | 148 |
-| Prisma-enum | 116 |
-| Миграции | 28 |
-| Контроллеры | 41 |
-| HTTP operations в OpenAPI | 287 |
-| Сервисные файлы | 73 |
-| API spec-файлы | 32 |
-| Тесты API в текущем suite | 99, один Docker-тест пропускается без Docker |
-| Плановые задачи внутри API | 6 |
-| Пилотный каталог | 500 активных карточек |
-| Покупаемая часть | 50 товаров, 500 офферов |
-| Пилотные стороны | 10 клиник, 10 поставщиков |
+| Область                    |                        Фактическое состояние |
+| -------------------------- | -------------------------------------------: |
+| Архитектура                |                     NestJS-модульный монолит |
+| База                       |                          PostgreSQL + Prisma |
+| Доменные модули            |                                           29 |
+| Prisma-модели              |                                          148 |
+| Prisma-enum                |                                          116 |
+| Миграции                   |                                           28 |
+| Контроллеры                |                                           41 |
+| HTTP operations в OpenAPI  |                                          287 |
+| Сервисные файлы            |                                           73 |
+| API spec-файлы             |                                           32 |
+| Тесты API в текущем suite  | 99, один Docker-тест пропускается без Docker |
+| Плановые задачи внутри API |                                            6 |
+| Пилотный каталог           |                        500 активных карточек |
+| Покупаемая часть           |                      50 товаров, 500 офферов |
+| Пилотные стороны           |                    10 клиник, 10 поставщиков |
 
 Живой acceptance-flow прошёл: `health → readiness → каталог → сравнение 10 офферов → корзина → checkout → supplier order → inventory reservation → повтор checkout с тем же idempotency key`.
 
@@ -330,14 +330,14 @@ PostgreSQL concurrency test существует, но пропускается 
 
 Цель: сделать текущее ядро измеримым и безопасным для дальнейшей работы.
 
-| Готово | ID | Задача | Результат | Gate |
-|---|---|---|---|---|
-| [x] | B0.1 | Живой pilot backend flow | Динамический тест покупки | `pnpm verify:pilot-backend` |
-| [x] | B0.2 | Core API contract | Полные schemas для catalog/compare/cart/checkout/orders | `pnpm verify:core-contract` |
-| [ ] | B0.3 | Runtime split | API не запускает worker jobs; worker имеет отдельный entrypoint | process-level smoke tests |
-| [ ] | B0.4 | PostgreSQL integration suite | Concurrency, rollback, idempotency, tenant isolation | обязательный CI job |
-| [ ] | B0.5 | Seed profiles | reference/operator/pilot/test разделены | manifest/count assertions |
-| [ ] | B0.6 | Outbox ADR | Однозначные delivery/status/retry правила | dispatcher tests |
+| Готово | ID   | Задача                       | Результат                                                       | Gate                        |
+| ------ | ---- | ---------------------------- | --------------------------------------------------------------- | --------------------------- |
+| [x]    | B0.1 | Живой pilot backend flow     | Динамический тест покупки                                       | `pnpm verify:pilot-backend` |
+| [x]    | B0.2 | Core API contract            | Полные schemas для catalog/compare/cart/checkout/orders         | `pnpm verify:core-contract` |
+| [ ]    | B0.3 | Runtime split                | API не запускает worker jobs; worker имеет отдельный entrypoint | process-level smoke tests   |
+| [ ]    | B0.4 | PostgreSQL integration suite | Concurrency, rollback, idempotency, tenant isolation            | обязательный CI job         |
+| [ ]    | B0.5 | Seed profiles                | reference/operator/pilot/test разделены                         | manifest/count assertions   |
+| [ ]    | B0.6 | Outbox ADR                   | Однозначные delivery/status/retry правила                       | dispatcher tests            |
 
 Выполнено в B0.2:
 
@@ -471,6 +471,15 @@ pnpm dev:local
 ```
 
 `verify:pilot-backend` создаёт тестовый заказ и предназначен для локальной пилотной БД. Для удалённой БД команда по умолчанию заблокирована.
+
+### Выполнено в B1.1 — актуализация корзины
+
+- [x] Сохранять подтверждённый снимок цены и доступного остатка при добавлении товара.
+- [x] Возвращать по каждой позиции старую и новую цену, сумму и остаток через `POST /carts/:cartId/validate`.
+- [x] Показывать изменения и недоступность позиции в корзине клиники.
+- [x] Требовать принятия новой цены до checkout.
+- [x] Не резервировать товар на время хранения в корзине; повторно проверять и резервировать его только при checkout.
+- [x] Проверять сценарий на живой PostgreSQL: изменение цены и остатка → diff → `409 CART_REVALIDATION_REQUIRED` → принятие → checkout.
 
 ## 13. Итоговая оценка
 

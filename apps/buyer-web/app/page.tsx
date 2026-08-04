@@ -97,12 +97,12 @@ const dentalSearchAliases: Record<string, string[]> = {
   коффер: ["коффердам", "изоляция"],
   гутта: ["гуттаперча"],
   карпулы: ["карпула", "анестезия"],
-  "перчаткии": ["перчатки"],
+  перчаткии: ["перчатки"],
   "перчатки нитрил": ["перчатки нитриловые"],
-  "компазит": ["композит"],
-  "композитт": ["композит"],
-  "гуттаперчя": ["гуттаперча"],
-  "эндодонтия": ["эндо", "эндодонтический"],
+  компазит: ["композит"],
+  композитт: ["композит"],
+  гуттаперчя: ["гуттаперча"],
+  эндодонтия: ["эндо", "эндодонтический"],
   эндошка: ["эндодонтия", "эндодонтический", "эндомотор"],
 };
 const canonicalSearchQuery = (query: string) => {
@@ -551,6 +551,40 @@ type Cart = {
   checkout?: { id: string } | null;
   createdAt: string;
 };
+type CartLineSnapshot = {
+  resolvedAt: string;
+  offerVersion: number;
+  source: string;
+  ruleId: string | null;
+  unitPriceMinor: string;
+  quantity: string;
+  totalPriceMinor: string;
+  currency: string;
+  minimumOrderQuantity: string;
+  orderIncrement: string;
+  availableQuantity: string | null;
+  fulfillmentStatus: "AVAILABLE" | "INSUFFICIENT_STOCK" | "OUT_OF_STOCK";
+};
+type CartValidationItem = {
+  cartItemId: string;
+  offerId: string;
+  status: "UNCHANGED" | "CHANGED" | "UNAVAILABLE";
+  changes: Array<"PRICE" | "STOCK" | "AVAILABILITY" | "OFFER_RULES">;
+  previous: CartLineSnapshot;
+  current: CartLineSnapshot | null;
+  canCheckout: boolean;
+  requiresAcceptance: boolean;
+  message: string | null;
+};
+type CartValidation = {
+  cartId: string;
+  cartVersion: number;
+  validatedAt: string;
+  hasChanges: boolean;
+  requiresAcceptance: boolean;
+  canCheckout: boolean;
+  items: CartValidationItem[];
+};
 type SupplierOrder = {
   id: string;
   buyerOrganizationId: string;
@@ -646,7 +680,9 @@ type BuyerWorkspaceProps = {
   searchParams: Promise<{ q?: string; offset?: string }>;
 };
 
-export default function BuyerWorkspace({ searchParams: _searchParams }: BuyerWorkspaceProps) {
+export default function BuyerWorkspace({
+  searchParams: _searchParams,
+}: BuyerWorkspaceProps) {
   // URL state is applied in an effect after hydration. Keeping the client
   // component's first render deterministic prevents Safari from leaving the
   // server markup interactive-looking but without event handlers.
@@ -742,7 +778,9 @@ export default function BuyerWorkspace({ searchParams: _searchParams }: BuyerWor
   const [selectedProduct, setSelectedProduct] = useState<SearchProduct | null>(
     null,
   );
-  const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
+  const [selectedVariantId, setSelectedVariantId] = useState<string | null>(
+    null,
+  );
   const [productReviews, setProductReviews] = useState<ProductReviews | null>(
     null,
   );
@@ -750,6 +788,10 @@ export default function BuyerWorkspace({ searchParams: _searchParams }: BuyerWor
     Record<string, SupplierTrust>
   >({});
   const [carts, setCarts] = useState<Cart[]>([]);
+  const [cartValidation, setCartValidation] = useState<CartValidation | null>(
+    null,
+  );
+  const [cartValidationLoading, setCartValidationLoading] = useState(false);
   const [orders, setOrders] = useState<SupplierOrder[]>([]);
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
   const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
@@ -769,7 +811,9 @@ export default function BuyerWorkspace({ searchParams: _searchParams }: BuyerWor
       );
       if (Array.isArray(stored)) {
         setRecentSearches(
-          stored.filter((item): item is string => typeof item === "string").slice(0, 6),
+          stored
+            .filter((item): item is string => typeof item === "string")
+            .slice(0, 6),
         );
       }
     } catch {
@@ -798,6 +842,13 @@ export default function BuyerWorkspace({ searchParams: _searchParams }: BuyerWor
   ]);
 
   const activeCart = carts.find((cart) => cart.status === "ACTIVE") ?? null;
+  const cartValidationByItem = useMemo(
+    () =>
+      new Map(
+        (cartValidation?.items ?? []).map((item) => [item.cartItemId, item]),
+      ),
+    [cartValidation],
+  );
   const buyerOrders = orders.filter(
     (order) => order.buyerOrganizationId === buyerId,
   );
@@ -1001,6 +1052,26 @@ export default function BuyerWorkspace({ searchParams: _searchParams }: BuyerWor
     ],
   );
 
+  const requestCartValidation = useCallback(
+    async (cart: Cart | null) => {
+      if (!cart?.items.length) {
+        setCartValidation(null);
+        return null;
+      }
+      setCartValidationLoading(true);
+      try {
+        const result = await api.post<CartValidation>(
+          `/carts/${cart.id}/validate`,
+        );
+        setCartValidation(result);
+        return result;
+      } finally {
+        setCartValidationLoading(false);
+      }
+    },
+    [api],
+  );
+
   const refresh = useCallback(async () => {
     if (!handoffChecked) return;
     setLoading(true);
@@ -1025,6 +1096,7 @@ export default function BuyerWorkspace({ searchParams: _searchParams }: BuyerWor
         setLoading(false);
         if (!initialOffset) void loadSearch(query, sort);
         setCarts([]);
+        setCartValidation(null);
         setOrders([]);
         setDocuments([]);
         setNotifications([]);
@@ -1049,6 +1121,9 @@ export default function BuyerWorkspace({ searchParams: _searchParams }: BuyerWor
       ]);
       setSearch(searchResult);
       setCarts(cartResult);
+      await requestCartValidation(
+        cartResult.find((cart) => cart.status === "ACTIVE") ?? null,
+      );
       setOrders(orderResult);
       setDocuments(documentResult);
       setNotifications(notificationResult);
@@ -1076,6 +1151,7 @@ export default function BuyerWorkspace({ searchParams: _searchParams }: BuyerWor
     deliveryFilter,
     packagingFilter,
     query,
+    requestCartValidation,
     sort,
     unitFilter,
     initialCatalogLimit,
@@ -1209,7 +1285,10 @@ export default function BuyerWorkspace({ searchParams: _searchParams }: BuyerWor
     const normalizedNextQuery = nextQuery.trim();
     if (normalizedNextQuery) {
       setRecentSearches((current) => {
-        const next = [normalizedNextQuery, ...current.filter((item) => item !== normalizedNextQuery)].slice(0, 6);
+        const next = [
+          normalizedNextQuery,
+          ...current.filter((item) => item !== normalizedNextQuery),
+        ].slice(0, 6);
         window.localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(next));
         return next;
       });
@@ -1255,7 +1334,11 @@ export default function BuyerWorkspace({ searchParams: _searchParams }: BuyerWor
               .filter((offer) => offer.priceMinor && offer.normalizedPriceMinor)
               .map((offer) => ({
                 offerId: offer.id,
-                variantId: offer.variantId ?? variantId ?? product.variants?.[0]?.id ?? "",
+                variantId:
+                  offer.variantId ??
+                  variantId ??
+                  product.variants?.[0]?.id ??
+                  "",
                 supplier: {
                   organizationId: offer.supplier.id,
                   name: offer.supplier.name,
@@ -1367,8 +1450,31 @@ export default function BuyerWorkspace({ searchParams: _searchParams }: BuyerWor
           currency: "KZT",
         }));
       await api.post(`/carts/${cart.id}/items`, { offerId, quantity: 1 });
-      setCarts(await api.get<Cart[]>(`/buyers/${buyerId}/carts`));
+      const nextCarts = await api.get<Cart[]>(`/buyers/${buyerId}/carts`);
+      setCarts(nextCarts);
+      await requestCartValidation(
+        nextCarts.find((item) => item.status === "ACTIVE") ?? null,
+      );
       setToast("Позиция добавлена в корзину");
+    } catch (cause) {
+      setError(errorMessage(cause));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const acceptCartChanges = async () => {
+    if (!activeCart) return;
+    setBusy("reprice");
+    setError(null);
+    try {
+      await api.post(`/carts/${activeCart.id}/reprice`);
+      const nextCarts = await api.get<Cart[]>(`/buyers/${buyerId}/carts`);
+      const nextActive =
+        nextCarts.find((cart) => cart.status === "ACTIVE") ?? null;
+      setCarts(nextCarts);
+      await requestCartValidation(nextActive);
+      setToast("Изменения цены и остатков приняты");
     } catch (cause) {
       setError(errorMessage(cause));
     } finally {
@@ -1378,6 +1484,14 @@ export default function BuyerWorkspace({ searchParams: _searchParams }: BuyerWor
 
   const checkout = async () => {
     if (!activeCart) return;
+    if (!cartValidation?.canCheckout) {
+      setError(
+        cartValidation?.requiresAcceptance
+          ? "Сначала примите обновлённые цены в корзине"
+          : "Некоторые товары сейчас недоступны в выбранном количестве",
+      );
+      return;
+    }
     setBusy("checkout");
     setError(null);
     try {
@@ -2438,7 +2552,8 @@ export default function BuyerWorkspace({ searchParams: _searchParams }: BuyerWor
                 </small>
               </div>
               <div className={styles.productInfo}>
-                {selectedProduct.variants && selectedProduct.variants.length > 1 ? (
+                {selectedProduct.variants &&
+                selectedProduct.variants.length > 1 ? (
                   <div className={styles.variantPicker}>
                     <div>
                       <span className={styles.category}>Вариант товара</span>
@@ -2498,10 +2613,14 @@ export default function BuyerWorkspace({ searchParams: _searchParams }: BuyerWor
                   aria-label="Сводка по товару"
                 >
                   <span>
-                    <strong>{comparison?.offers.length ?? selectedProduct.offers.length}</strong>
+                    <strong>
+                      {comparison?.offers.length ??
+                        selectedProduct.offers.length}
+                    </strong>
                     <small>
                       {ruCount(
-                        comparison?.offers.length ?? selectedProduct.offers.length,
+                        comparison?.offers.length ??
+                          selectedProduct.offers.length,
                         "предложение",
                         "предложения",
                         "предложений",
@@ -2753,6 +2872,32 @@ export default function BuyerWorkspace({ searchParams: _searchParams }: BuyerWor
           title={`${activeCart.items.length} позиций`}
           description="Активная корзина"
         >
+          <div className={styles.cartValidationSummary}>
+            {cartValidationLoading ? (
+              <>
+                <Spinner size="tiny" /> Проверяем актуальные цены и остатки…
+              </>
+            ) : cartValidation?.requiresAcceptance ? (
+              <>
+                <Alert24Regular /> В корзине изменились цены. Проверьте позиции
+                и примите изменения перед оформлением.
+              </>
+            ) : cartValidation && !cartValidation.canCheckout ? (
+              <>
+                <Alert24Regular /> Некоторые позиции сейчас нельзя заказать в
+                выбранном количестве.
+              </>
+            ) : cartValidation?.hasChanges ? (
+              <>
+                <ArrowSync24Regular /> Остатки обновились. Новые значения
+                показаны рядом со старыми.
+              </>
+            ) : (
+              <>
+                <CheckmarkCircle24Regular /> Цены и остатки актуальны.
+              </>
+            )}
+          </div>
           <div className="mp-table-wrap">
             <table className="mp-table">
               <thead>
@@ -2765,30 +2910,106 @@ export default function BuyerWorkspace({ searchParams: _searchParams }: BuyerWor
                 </tr>
               </thead>
               <tbody>
-                {activeCart.items.map((item) => (
-                  <tr key={item.id}>
-                    <td>
-                      <strong>
-                        {item.offer?.productVariant?.product?.canonicalName ??
-                          `Позиция ${item.offerId.slice(0, 8)}`}
-                      </strong>
-                      <small className="mp-mono">
-                        {item.offerId.slice(0, 12)}
-                      </small>
-                    </td>
-                    <td>
-                      {item.offer?.supplier?.organization?.displayName ??
-                        "Поставщик"}
-                    </td>
-                    <td>{item.quantity}</td>
-                    <td>{formatMoney(item.unitPriceMinor, item.currency)}</td>
-                    <td>
-                      <strong>
-                        {formatMoney(item.totalPriceMinor, item.currency)}
-                      </strong>
-                    </td>
-                  </tr>
-                ))}
+                {activeCart.items.map((item) => {
+                  const validation = cartValidationByItem.get(item.id);
+                  const current = validation?.current;
+                  const priceChanged =
+                    validation?.changes.includes("PRICE") ?? false;
+                  const stockChanged =
+                    validation?.changes.includes("STOCK") ?? false;
+                  const unavailable =
+                    validation?.status === "UNAVAILABLE" ||
+                    current?.fulfillmentStatus !== "AVAILABLE";
+                  return (
+                    <tr
+                      key={item.id}
+                      className={
+                        unavailable
+                          ? styles.cartRowUnavailable
+                          : validation?.status === "CHANGED"
+                            ? styles.cartRowChanged
+                            : undefined
+                      }
+                    >
+                      <td>
+                        <strong>
+                          {item.offer?.productVariant?.product?.canonicalName ??
+                            `Позиция ${item.offerId.slice(0, 8)}`}
+                        </strong>
+                        <small className="mp-mono">
+                          {item.offerId.slice(0, 12)}
+                        </small>
+                        {validation?.message ? (
+                          <small
+                            className={
+                              unavailable
+                                ? styles.cartIssue
+                                : styles.cartChangeMessage
+                            }
+                          >
+                            {validation.message}
+                          </small>
+                        ) : null}
+                      </td>
+                      <td>
+                        {item.offer?.supplier?.organization?.displayName ??
+                          "Поставщик"}
+                      </td>
+                      <td>
+                        <strong>{item.quantity}</strong>
+                        <small
+                          className={
+                            stockChanged ? styles.cartChangeMessage : undefined
+                          }
+                        >
+                          Остаток:{" "}
+                          {validation?.previous.availableQuantity ?? "—"}
+                          {stockChanged || unavailable
+                            ? ` → ${current?.availableQuantity ?? "0"}`
+                            : ""}
+                        </small>
+                      </td>
+                      <td>
+                        <div className={styles.cartValueChange}>
+                          {priceChanged ? (
+                            <del>
+                              {formatMoney(
+                                validation?.previous.unitPriceMinor ??
+                                  item.unitPriceMinor,
+                                validation?.previous.currency ?? item.currency,
+                              )}
+                            </del>
+                          ) : null}
+                          <strong>
+                            {formatMoney(
+                              current?.unitPriceMinor ?? item.unitPriceMinor,
+                              current?.currency ?? item.currency,
+                            )}
+                          </strong>
+                        </div>
+                      </td>
+                      <td>
+                        <div className={styles.cartValueChange}>
+                          {priceChanged ? (
+                            <del>
+                              {formatMoney(
+                                validation?.previous.totalPriceMinor ??
+                                  item.totalPriceMinor,
+                                validation?.previous.currency ?? item.currency,
+                              )}
+                            </del>
+                          ) : null}
+                          <strong>
+                            {formatMoney(
+                              current?.totalPriceMinor ?? item.totalPriceMinor,
+                              current?.currency ?? item.currency,
+                            )}
+                          </strong>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -2798,19 +3019,42 @@ export default function BuyerWorkspace({ searchParams: _searchParams }: BuyerWor
               <strong>
                 {formatMoney(
                   activeCart.items.reduce(
-                    (sum, item) => sum + Number(item.totalPriceMinor),
+                    (sum, item) =>
+                      sum +
+                      Number(
+                        cartValidationByItem.get(item.id)?.current
+                          ?.totalPriceMinor ?? item.totalPriceMinor,
+                      ),
                     0,
                   ),
                   activeCart.currency,
                 )}
               </strong>
             </span>
+            {cartValidation?.hasChanges ? (
+              <Button
+                appearance={
+                  cartValidation.requiresAcceptance ? "primary" : "secondary"
+                }
+                icon={<ArrowSync24Regular />}
+                onClick={() => void acceptCartChanges()}
+                disabled={busy === "reprice" || cartValidationLoading}
+              >
+                {busy === "reprice"
+                  ? "Применяем изменения"
+                  : "Принять новые цены и остатки"}
+              </Button>
+            ) : null}
             <Button
               appearance="primary"
               size="large"
               icon={<ShoppingBag24Regular />}
               onClick={() => void checkout()}
-              disabled={busy === "checkout"}
+              disabled={
+                busy === "checkout" ||
+                cartValidationLoading ||
+                !cartValidation?.canCheckout
+              }
             >
               {busy === "checkout" ? "Резервируем" : "Оформить заказ"}
             </Button>
