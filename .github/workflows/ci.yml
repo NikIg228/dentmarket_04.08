@@ -58,7 +58,6 @@ jobs:
       - run: pnpm --filter @marketplace/api exec prisma validate
       - run: pnpm typecheck
       - run: pnpm test
-      - run: RUN_TESTCONTAINERS=1 pnpm --filter @marketplace/api test -- postgres-concurrency.testcontainers.spec.ts
       - run: pnpm build
       - run: pnpm verify:runtime-split
       - run: pnpm verify:core-contract
@@ -92,3 +91,30 @@ jobs:
             playwright-report/
           if-no-files-found: ignore
           retention-days: 14
+
+  postgres-integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: marketplace
+          POSTGRES_USER: marketplace
+          POSTGRES_PASSWORD: marketplace
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U marketplace -d marketplace"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      POSTGRES_TEST_DATABASE_URL: postgresql://marketplace:marketplace@localhost:5432/marketplace?schema=public
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.9.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm verify:postgres

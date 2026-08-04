@@ -103,14 +103,11 @@ pnpm verify:security
 pnpm verify:onboarding-agreement
 pnpm verify:trust-geo
 pnpm verify:production-config
+pnpm verify:postgres
 pnpm verify:web
 ```
 
-Опциональный PostgreSQL concurrency test через Testcontainers:
-
-```bash
-pnpm test:containers
-```
+`pnpm verify:postgres` — обязательный integration gate на локальной PostgreSQL. Он применяет миграции, создаёт изолированные по идентификаторам fixtures, проверяет rollback, конкурентный checkout, идемпотентность и tenant isolation, затем удаляет тестовые данные. Docker и внешние сервисы для локального запуска не требуются.
 
 ## Backup и restore
 

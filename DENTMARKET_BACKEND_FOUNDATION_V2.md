@@ -67,7 +67,7 @@ DentMarket — B2B-маркетплейс стоматологических т�
 | HTTP operations в OpenAPI  |                                          287 |
 | Сервисные файлы            |                                           73 |
 | API spec-файлы             |                                           32 |
-| Тесты API в текущем suite  | 99, один Docker-тест пропускается без Docker |
+| Тесты API в текущем suite  |       104, без условно пропущенных DB-тестов |
 | Плановые задачи внутри API |                                            6 |
 | Пилотный каталог           |                        500 активных карточек |
 | Покупаемая часть           |                      50 товаров, 500 офферов |
@@ -210,7 +210,7 @@ Gate намеренно разрешён только для локальной 
 
 ### P1. Тесты смещены в unit-уровень
 
-99 API-тестов — хороший задел, но большая часть проверяет изолированные правила. Самая рискованная логика находится на границах:
+104 API-теста проверяют изолированные правила, а обязательный B0.4 gate дополнительно покрывает реальные PostgreSQL-границы:
 
 - параллельное создание активной корзины;
 - два одновременных checkout;
@@ -220,7 +220,7 @@ Gate намеренно разрешён только для локальной 
 - повтор worker-задачи;
 - tenant isolation.
 
-PostgreSQL concurrency test существует, но пропускается без Docker. Нужен обязательный integration-suite против отдельной PostgreSQL test database. Docker может быть одним из способов, но не должен быть единственным способом локальной проверки на Windows.
+`pnpm verify:postgres` теперь проверяет checkout concurrency, rollback, idempotency и tenant isolation без Docker. В CI этот же gate выполняется отдельным job на свежем PostgreSQL 17; локально он создаёт собственные fixtures в текущей test-базе и доказывает их полное удаление.
 
 ### P1. Seed смешивает базовую платформу и пилот
 
@@ -335,7 +335,7 @@ PostgreSQL concurrency test существует, но пропускается 
 | [x]    | B0.1 | Живой pilot backend flow     | Динамический тест покупки                                       | `pnpm verify:pilot-backend` |
 | [x]    | B0.2 | Core API contract            | Полные schemas для catalog/compare/cart/checkout/orders         | `pnpm verify:core-contract` |
 | [x]    | B0.3 | Runtime split                | API не запускает worker jobs; worker имеет отдельный entrypoint | `pnpm verify:runtime-split` |
-| [ ]    | B0.4 | PostgreSQL integration suite | Concurrency, rollback, idempotency, tenant isolation            | обязательный CI job         |
+| [x]    | B0.4 | PostgreSQL integration suite | Concurrency, rollback, idempotency, tenant isolation            | `pnpm verify:postgres`      |
 | [ ]    | B0.5 | Seed profiles                | reference/operator/pilot/test разделены                         | manifest/count assertions   |
 | [ ]    | B0.6 | Outbox ADR                   | Однозначные delivery/status/retry правила                       | dispatcher tests            |
 
@@ -363,7 +363,18 @@ PostgreSQL concurrency test существует, но пропускается 
 - [x] Process-level gate проверяет capability matrix, entrypoint guards и production-запрет `all`.
 - [x] Gate добавлен в GitHub CI.
 
-Текущий статус: **B0.1, B0.2 и B0.3 реализованы и проходят**. Следующая задача: **B0.4 PostgreSQL integration suite**.
+Выполнено в B0.4:
+
+- [x] Реальный HTTP/NestJS/Prisma gate на PostgreSQL вместо искусственной таблицы Testcontainers.
+- [x] Проверка tenant isolation между двумя клиниками через защищённые cart endpoints.
+- [x] Принудительная ошибка внутри checkout-транзакции и доказательство полного rollback.
+- [x] Два конкурентных checkout-запроса с одним idempotency key создают один checkout, заказ и резерв.
+- [x] Две клиники конкурируют за остаток 5 единиц: один checkout завершается, второй компенсируется, остаток неотрицательный.
+- [x] Временные товары, офферы, клиники, корзины и SQL trigger удаляются с zero-residue assertion.
+- [x] Docker/Testcontainers не требуются для локального запуска.
+- [x] Отдельный обязательный `postgres-integration` job запускает gate на свежем PostgreSQL 17 в GitHub CI.
+
+Текущий статус: **B0.1–B0.4 реализованы и проходят**. Следующая задача: **B0.5 Seed profiles**.
 
 ### B1 — покупка клиникой
 
@@ -452,17 +463,16 @@ Definition of Done: наблюдаемый итог, а не список фай
 
 ## 11. Ближайший следующий шаг
 
-Реализован **B0.3 Runtime split** без перехода на микросервисы:
+Реализован **B0.4 PostgreSQL integration suite**:
 
-- [x] Изолировать pilot search от повторного появления legacy fixtures после фоновой проекции.
-- [x] Ввести явную роль процесса `api | worker | all`.
-- [x] Запретить cron и queue consumers в роли `api`.
-- [x] Создать отдельный worker entrypoint из того же NestJS-приложения.
-- [x] Оставить `all` только для удобного локального запуска.
-- [x] Сделать readiness зависимым от роли процесса.
-- [x] Добавить process-level smoke test, доказывающий, какие фоновые службы запускаются в каждой роли.
+- [x] Concurrency: условное резервирование не допускает отрицательный остаток.
+- [x] Rollback: ошибка внутри checkout-транзакции не оставляет частичных данных.
+- [x] Idempotency: конкурентный повтор не создаёт дубликаты checkout/order/reservation.
+- [x] Tenant isolation: чужая клиника получает `403` и не может прочитать или изменить корзину.
+- [x] Cleanup: временные fixtures и SQL trigger гарантированно удаляются.
+- [x] CI: отдельный PostgreSQL 17 job выполняет `pnpm verify:postgres`.
 
-Результат следующего этапа: несколько API-инстансов можно масштабировать без дублирования cron-циклов, а worker можно перезапускать независимо от HTTP API.
+Следующий этап — **B0.5 Seed profiles**: разделить reference, operator, pilot и test данные и добавить manifest/count assertions.
 
 ## 12. Команды локальной проверки
 
@@ -471,6 +481,7 @@ pnpm db:prepare-pilot
 pnpm typecheck
 pnpm test
 pnpm verify:runtime-split
+pnpm verify:postgres
 pnpm verify:core-contract
 pnpm verify:pilot-backend
 pnpm build

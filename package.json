@@ -36,6 +36,7 @@
     "verify:search-commerce": "node scripts/verify-search-commerce.mjs",
     "verify:core-contract": "pnpm --filter @marketplace/schemas build && pnpm --filter @marketplace/api build && node scripts/verify-pilot-backend.mjs --contract-only",
     "verify:runtime-split": "pnpm --filter @marketplace/api build && node scripts/verify-runtime-split.mjs",
+    "verify:postgres": "pnpm --filter @marketplace/schemas build && pnpm --filter @marketplace/api build && node scripts/verify-postgres-integration.mjs",
     "verify:pilot-backend": "pnpm --filter @marketplace/schemas build && pnpm --filter @marketplace/api build && node scripts/verify-pilot-backend.mjs",
     "verify:trust-geo": "node scripts/verify-trust-geo.mjs",
     "verify:onboarding-agreement": "node scripts/verify-onboarding-agreement.mjs",
@@ -46,8 +47,7 @@
     "load-test:search": "node scripts/load-test-search.mjs",
     "load-test:handoff": "node scripts/load-test-handoff.mjs",
     "verify:release": "pnpm typecheck && pnpm test && pnpm build && pnpm verify:production-config",
-    "verify:web": "pnpm --filter @marketplace/e2e e2e",
-    "test:containers": "RUN_TESTCONTAINERS=1 pnpm --filter @marketplace/api test -- postgres-concurrency.testcontainers.spec.ts"
+    "verify:web": "pnpm --filter @marketplace/e2e e2e"
   },
   "devDependencies": {
     "@playwright/test": "^1.61.1",
