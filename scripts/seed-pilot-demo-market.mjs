@@ -11,9 +11,16 @@ const catalog = JSON.parse(
   ),
 );
 const prisma = new PrismaClient();
-const normalize = (value) => String(value ?? "").replace(/\s+/g, " ").trim();
+const normalize = (value) =>
+  String(value ?? "")
+    .replace(/\s+/g, " ")
+    .trim();
 const uuid = (key) => {
-  const hex = crypto.createHash("sha256").update(key).digest("hex").slice(0, 32);
+  const hex = crypto
+    .createHash("sha256")
+    .update(key)
+    .digest("hex")
+    .slice(0, 32);
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-8${hex.slice(17, 20)}-${hex.slice(20)}`;
 };
 const canonicalKey = (product) =>
@@ -31,7 +38,9 @@ if (catalog.catalogMode !== "PILOT" || catalog.total !== 500) {
   throw new Error("Expected the active 500-card PILOT catalog");
 }
 if (demoProducts.length !== 50) {
-  throw new Error(`Expected 50 demo-priced products, received ${demoProducts.length}`);
+  throw new Error(
+    `Expected 50 demo-priced products, received ${demoProducts.length}`,
+  );
 }
 
 try {
@@ -42,7 +51,9 @@ try {
     where: { OR: [{ code: "piece" }, { symbol: "шт" }, { symbol: "шт." }] },
   });
   if (!city || !saleUnit) {
-    throw new Error("Reference city or piece unit is missing; run the main seed first");
+    throw new Error(
+      "Reference city or piece unit is missing; run the main seed first",
+    );
   }
   const operatorCapability = await prisma.organizationCapability.findFirst({
     where: { capability: "MARKETPLACE_OPERATOR" },
@@ -54,7 +65,9 @@ try {
     },
   });
   if (!operatorCapability || !agreementTemplate) {
-    throw new Error("Operator organization or marketplace agreement template is missing");
+    throw new Error(
+      "Operator organization or marketplace agreement template is missing",
+    );
   }
 
   const buyers = [];
@@ -118,11 +131,19 @@ try {
       where: { organizationId: organization.id },
       update: {
         status: "ACTIVE",
-        regulatoryDetails: { demo: true, officialDistributor: index <= 3, supplierWarranty: true },
+        regulatoryDetails: {
+          demo: true,
+          officialDistributor: index <= 3,
+          supplierWarranty: true,
+        },
       },
       create: {
         organizationId: organization.id,
-        regulatoryDetails: { demo: true, officialDistributor: index <= 3, supplierWarranty: true },
+        regulatoryDetails: {
+          demo: true,
+          officialDistributor: index <= 3,
+          supplierWarranty: true,
+        },
       },
     });
     const warehouse = await prisma.warehouse.upsert({
@@ -132,7 +153,11 @@ try {
           code: "DEMO-01",
         },
       },
-      update: { name: `Демо-склад ${number}`, cityId: city.id, status: "ACTIVE" },
+      update: {
+        name: `Демо-склад ${number}`,
+        cityId: city.id,
+        status: "ACTIVE",
+      },
       create: {
         id: uuid(`pilot-warehouse-${number}`),
         supplierOrganizationId: organization.id,
@@ -198,7 +223,6 @@ try {
     suppliers.push({ organization, warehouse });
   }
 
-  await prisma.supplierOffer.deleteMany({ where: { externalId: { startsWith: "pilot-demo:" } } });
   let offersCreated = 0;
   for (const productInput of demoProducts) {
     const product = await prisma.product.findUnique({
@@ -206,7 +230,9 @@ try {
       include: { variants: { orderBy: { createdAt: "asc" }, take: 1 } },
     });
     if (!product?.variants[0]) {
-      throw new Error(`Synced product or variant is missing for ${productInput.id}`);
+      throw new Error(
+        `Synced product or variant is missing for ${productInput.id}`,
+      );
     }
     const variant = product.variants[0];
     await prisma.product.update({
@@ -222,9 +248,25 @@ try {
     const prices = [];
     for (const [supplierIndex, supplier] of suppliers.entries()) {
       const sourceOffer = productInput.offers[supplierIndex];
-      const offerId = uuid(`pilot-offer-${productInput.id}-${supplierIndex + 1}`);
-      const offer = await prisma.supplierOffer.create({
-        data: {
+      const offerId = uuid(
+        `pilot-offer-${productInput.id}-${supplierIndex + 1}`,
+      );
+      const offer = await prisma.supplierOffer.upsert({
+        where: {
+          supplierOrganizationId_productVariantId_saleUnitId: {
+            supplierOrganizationId: supplier.organization.id,
+            productVariantId: variant.id,
+            saleUnitId: saleUnit.id,
+          },
+        },
+        update: {
+          supplierSku: sourceOffer.supplierSku,
+          confirmationMode: sourceOffer.confirmationMode,
+          sourceType: "MANUAL",
+          externalId: `pilot-demo:${productInput.id}:${supplierIndex + 1}`,
+          status: "ACTIVE",
+        },
+        create: {
           id: offerId,
           supplierOrganizationId: supplier.organization.id,
           productVariantId: variant.id,
@@ -236,16 +278,33 @@ try {
           status: "ACTIVE",
         },
       });
-      await prisma.offerPublication.create({
-        data: {
+      await prisma.offerPublication.upsert({
+        where: { offerId: offer.id },
+        update: {
+          status: "PUBLISHED",
+          marketplaceVisible: true,
+          publishedAt: new Date(),
+        },
+        create: {
           offerId: offer.id,
           status: "PUBLISHED",
           marketplaceVisible: true,
           publishedAt: new Date(),
         },
       });
-      await prisma.offerPrice.create({
-        data: {
+      await prisma.offerPrice.upsert({
+        where: {
+          id: uuid(`pilot-price-${productInput.id}-${supplierIndex + 1}`),
+        },
+        update: {
+          offerId: offer.id,
+          amountMinor: sourceOffer.priceMinor,
+          currency: "KZT",
+          source: "MANUAL",
+          status: "ACTIVE",
+          freshnessExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60_000),
+        },
+        create: {
           id: uuid(`pilot-price-${productInput.id}-${supplierIndex + 1}`),
           offerId: offer.id,
           amountMinor: sourceOffer.priceMinor,
@@ -288,9 +347,24 @@ try {
         },
       });
       for (const method of ["CARRIER", "PICKUP"]) {
-        await prisma.offerDeliveryOption.create({
-          data: {
-            id: uuid(`pilot-delivery-${productInput.id}-${supplierIndex + 1}-${method}`),
+        await prisma.offerDeliveryOption.upsert({
+          where: {
+            offerId_warehouseId_method: {
+              offerId: offer.id,
+              warehouseId: supplier.warehouse.id,
+              method,
+            },
+          },
+          update: {
+            priceType: method === "PICKUP" ? "FREE" : "FIXED",
+            fixedAmountMinor: method === "CARRIER" ? 250000 : null,
+            minLeadTimeHours: method === "PICKUP" ? 2 : 24,
+            maxLeadTimeHours: method === "PICKUP" ? 8 : 72,
+          },
+          create: {
+            id: uuid(
+              `pilot-delivery-${productInput.id}-${supplierIndex + 1}-${method}`,
+            ),
             offerId: offer.id,
             warehouseId: supplier.warehouse.id,
             method,
@@ -322,14 +396,20 @@ try {
     });
   }
 
-  console.log(JSON.stringify({
-    ok: true,
-    catalogCards: catalog.total,
-    demoBuyers: buyers.length,
-    demoSuppliers: suppliers.length,
-    productsWithOffers: demoProducts.length,
-    offersCreated,
-  }, null, 2));
+  console.log(
+    JSON.stringify(
+      {
+        ok: true,
+        catalogCards: catalog.total,
+        demoBuyers: buyers.length,
+        demoSuppliers: suppliers.length,
+        productsWithOffers: demoProducts.length,
+        offersCreated,
+      },
+      null,
+      2,
+    ),
+  );
 } finally {
   await prisma.$disconnect();
 }

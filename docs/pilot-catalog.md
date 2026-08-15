@@ -35,13 +35,19 @@ repository history is intentionally compacted.
 Use PostgreSQL with the `DATABASE_URL` from `.env.example`, then run:
 
 1. `pnpm --filter @marketplace/api exec prisma migrate deploy --schema prisma/schema.prisma`
-2. `pnpm db:seed`
+2. `pnpm db:seed` (reference + operator profiles)
 3. `pnpm catalog:sync-production:apply`
-4. `pnpm db:seed-pilot`
+4. `pnpm db:seed-pilot` (pilot profile and manifest assertion)
 
 On the prepared Windows workstation, `pnpm db:prepare-pilot` runs this sequence
 idempotently. Use `pnpm dev:local` to start the local pilot profile without manually
 setting environment variables. PostgreSQL must already be running.
+
+The seed profiles have distinct responsibilities: `db:seed:reference` creates
+system dictionaries and permissions; `db:seed:operator` creates the local
+marketplace operator; `db:seed:test` adds only a deterministic test clinic; and
+`db:seed:pilot` creates and verifies the 10×10 pilot market. Run
+`pnpm verify:seed-profiles` only after the pilot catalog has been synced.
 
 The last command creates 10 demo clinic organizations, 10 demo supplier organizations,
 their warehouses, and 500 published demo offers. It is local fixture data, not a source

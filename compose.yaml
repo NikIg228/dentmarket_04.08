@@ -172,7 +172,7 @@ services:
     build:
       context: .
       target: api
-    command: ["pnpm", "--filter", "@marketplace/api", "prisma:seed"]
+    command: ["pnpm", "db:seed"]
     depends_on:
       api:
         condition: service_healthy

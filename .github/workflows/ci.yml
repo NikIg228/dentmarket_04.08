@@ -51,10 +51,13 @@ jobs:
       - run: pnpm db:generate
       - run: pnpm --filter @marketplace/api exec prisma migrate deploy
       - run: pnpm db:seed
+      - name: Assert test profile is isolated from pilot data
+        run: SEED_PROFILE_ASSERT_NO_PILOT=true pnpm db:seed:test
       - name: Prepare deterministic pilot market
         run: |
           pnpm catalog:sync-production:apply
           pnpm db:seed-pilot
+          pnpm verify:seed-profiles
       - run: pnpm --filter @marketplace/api exec prisma validate
       - run: pnpm typecheck
       - run: pnpm test

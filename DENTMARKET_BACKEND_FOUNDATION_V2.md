@@ -336,7 +336,7 @@ Gate намеренно разрешён только для локальной 
 | [x]    | B0.2 | Core API contract            | Полные schemas для catalog/compare/cart/checkout/orders         | `pnpm verify:core-contract` |
 | [x]    | B0.3 | Runtime split                | API не запускает worker jobs; worker имеет отдельный entrypoint | `pnpm verify:runtime-split` |
 | [x]    | B0.4 | PostgreSQL integration suite | Concurrency, rollback, idempotency, tenant isolation            | `pnpm verify:postgres`      |
-| [ ]    | B0.5 | Seed profiles                | reference/operator/pilot/test разделены                         | manifest/count assertions   |
+| [x]    | B0.5 | Seed profiles                | reference/operator/pilot/test разделены                         | `pnpm verify:seed-profiles` |
 | [ ]    | B0.6 | Outbox ADR                   | Однозначные delivery/status/retry правила                       | dispatcher tests            |
 
 Выполнено в B0.2:
@@ -369,12 +369,22 @@ Gate намеренно разрешён только для локальной 
 - [x] Проверка tenant isolation между двумя клиниками через защищённые cart endpoints.
 - [x] Принудительная ошибка внутри checkout-транзакции и доказательство полного rollback.
 - [x] Два конкурентных checkout-запроса с одним idempotency key создают один checkout, заказ и резерв.
-- [x] Две клиники конкурируют за остаток 5 единиц: один checkout завершается, второй компенсируется, остаток неотрицательный.
+- [x] Две клиники конкурируют за остаток 5 единиц: один checkout завершается, второй получает контролируемый конфликт (с компенсацией, если checkout уже был создан), остаток неотрицательный.
 - [x] Временные товары, офферы, клиники, корзины и SQL trigger удаляются с zero-residue assertion.
 - [x] Docker/Testcontainers не требуются для локального запуска.
 - [x] Отдельный обязательный `postgres-integration` job запускает gate на свежем PostgreSQL 17 в GitHub CI.
 
-Текущий статус: **B0.1–B0.4 реализованы и проходят**. Следующая задача: **B0.5 Seed profiles**.
+Выполнено в B0.5:
+
+- [x] Отдельные idempotent-команды `db:seed:reference`, `db:seed:operator`, `db:seed:test` и `db:seed:pilot`.
+- [x] Reference profile создаёт словари, единицы, права, feature flags и шаблон договора; operator profile создаёт единственного локального оператора с membership.
+- [x] Test profile добавляет только минимальную детерминированную тестовую клинику; `verify:postgres` использует именно его вместо смешанного legacy seed.
+- [x] CI содержит отдельную проверку на чистой PostgreSQL базе: test profile не должен создавать pilot organizations или offers до синхронизации каталога.
+- [x] Pilot profile проверяет 10 клиник, 10 поставщиков, 500 offers и 50 позиций с десятью сравниваемыми offers.
+- [x] Повторный pilot seed обновляет свои записи через upsert и не удаляет offers, на которые уже ссылаются carts или orders.
+- [x] `pnpm verify:seed-profiles` добавлен в CI после синхронизации каталога.
+
+Текущий статус: **B0.1–B0.5 реализованы и проходят**. Следующая задача: **B0.6 Outbox ADR**.
 
 ### B1 — покупка клиникой
 

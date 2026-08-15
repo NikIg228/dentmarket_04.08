@@ -20,7 +20,11 @@ For a deliberate pilot-data refresh, retrieve the password from Keychain, set a
 session-scoped `DATABASE_URL`, and run:
 
 ```sh
-ALLOW_PRODUCTION_SEED=true pnpm --filter @marketplace/api prisma:seed
+ALLOW_PRODUCTION_SEED=true pnpm db:seed
+
+The historical mixed seed is available only as
+`pnpm --filter @marketplace/api prisma:seed:legacy` for forensic comparison.
+Do not use it for a new local, test or pilot environment.
 ```
 
 Do not run the seed command against a live customer database.

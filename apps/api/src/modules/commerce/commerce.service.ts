@@ -797,7 +797,7 @@ export class CommerceService {
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === "P2002"
+        ["P2002", "P2034"].includes(error.code)
       ) {
         const raced = await this.prisma.checkout.findUnique({
           where: { cartId },
@@ -806,6 +806,9 @@ export class CommerceService {
           return this.getCheckout(raced.id, context);
         if (raced)
           throw new ConflictException("Cart was checked out concurrently");
+        throw new ConflictException(
+          "Checkout conflicted with a concurrent transaction; retry the request",
+        );
       }
       throw error;
     }
