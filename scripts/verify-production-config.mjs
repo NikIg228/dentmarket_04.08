@@ -9,7 +9,7 @@ const requiredFiles = [
   "scripts/restore.sh",
   "scripts/backup-production.sh",
   "scripts/restore-production.sh",
-  "docs/production-deployment.md",
+  "actual_docs/operations/production-deployment.md",
   ".github/workflows/release.yml",
   ".github/workflows/security.yml",
 ];

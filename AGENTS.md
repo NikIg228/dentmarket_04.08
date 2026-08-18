@@ -8,14 +8,14 @@
 
 При конфликте документов используйте следующий порядок:
 
-1. `DENTMARKET_PRODUCT_V2.md` — целевой продукт, границы пилота и
+1. `actual_docs/product/DENTMARKET_PRODUCT_V2.md` — целевой продукт, границы пилота и
    бизнес-правила.
-2. `DENTMARKET_BACKEND_FOUNDATION_V2.md` — техническая последовательность
+2. `actual_docs/backend/DENTMARKET_BACKEND_FOUNDATION_V2.md` — техническая последовательность
    работ и backend Definition of Done.
-3. `docs/adr/` — уже принятые архитектурные решения.
+3. `actual_docs/architecture/adr/` — уже принятые архитектурные решения.
 4. Контракты в `packages/schemas`, API client и OpenAPI — исполняемое
    описание границы frontend/backend.
-5. `PROJECT_ACCEPTANCE_MATRIX.md` — статус и доказательства; исторические
+5. `actual_docs/governance/PROJECT_ACCEPTANCE_MATRIX.md` — статус и доказательства; исторические
    записи не являются гарантией текущего состояния.
 
 Код или старый документ не расширяет пилот автоматически. AI assistant,
@@ -44,7 +44,7 @@ trust/reputation, billing/tariffs и advanced recommendations остаются �
 4. Делайте минимальный связный change set. Не смешивайте рефакторинг,
    редизайн, удаление данных и новую бизнес-функцию в одном коммите.
 5. Добавьте или обновите тест на риск, который устраняет задача.
-6. Выполните проверки из `docs/DEVELOPMENT_WORKFLOW.md`, соответствующие
+6. Выполните проверки из `actual_docs/governance/DEVELOPMENT_WORKFLOW.md`, соответствующие
    затронутой области.
 7. Обновите документацию, если изменились контракт, бизнес-правило, команда,
    эксплуатационный процесс или архитектурное решение.
@@ -84,7 +84,7 @@ trust/reputation, billing/tariffs и advanced recommendations остаются �
 
 ## 6. Frontend, UI и UX
 
-Полный стандарт находится в `docs/UI_UX_IMPLEMENTATION_STANDARD.md`.
+Полный стандарт находится в `actual_docs/ui-ux/UI_UX_IMPLEMENTATION_STANDARD.md`.
 
 - Кабинеты покупателя, поставщика и оператора используют Fluent UI v9 и
   общие примитивы из `packages/ui`. Не вводите второй design system или
@@ -150,8 +150,9 @@ git diff --check
 ## 10. Обязательные project playbooks
 
 Для **каждой** задачи исполнитель использует этот `AGENTS.md` и
-`docs/DEVELOPMENT_WORKFLOW.md`. Если затронут интерфейс, дополнительно
-обязателен `docs/UI_UX_IMPLEMENTATION_STANDARD.md`.
+`actual_docs/governance/DEVELOPMENT_WORKFLOW.md`. Если затронут интерфейс,
+дополнительно обязателен
+`actual_docs/ui-ux/UI_UX_IMPLEMENTATION_STANDARD.md`.
 
 Внешние материалы являются обязательным набором профессиональных практик, а
 не набором инструкций, которые нужно бездумно складывать в один prompt:

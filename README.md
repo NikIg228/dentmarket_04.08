@@ -87,9 +87,9 @@ x-organization-id: 00000000-0000-4000-8000-000000000030
 - structured JSON logging, request/correlation/trace IDs, OpenTelemetry, Sentry, Helmet и rate limiting;
 - quarantine + magic-byte/OOXML validation и ClamAV INSTREAM-проверка загружаемых импортов, документов и сертификатов.
 
-Актуальное ТЗ Trust/Geo/AI: [`Dental_Marketplace_Technical_Plan_v2_Trust_Geo_AI.docx`](/Users/maksim/Desktop/Dental_Marketplace_Technical_Plan_v2_Trust_Geo_AI.docx). Карта реализации: [`docs/trust-geo-ai.md`](docs/trust-geo-ai.md).
+Единый индекс актуальной технической документации: [`actual_docs/README.md`](actual_docs/README.md). Историческая карта Trust/Geo/AI: [`actual_docs/history/trust-geo-ai.md`](actual_docs/history/trust-geo-ai.md).
 
-Матрица покрытия ТЗ: [`docs/traceability.md`](docs/traceability.md). Эксплуатация: [`docs/operations.md`](docs/operations.md). Модель безопасности: [`docs/security.md`](docs/security.md).
+Историческая матрица покрытия ТЗ: [`actual_docs/history/traceability.md`](actual_docs/history/traceability.md). Эксплуатация: [`actual_docs/operations/operations.md`](actual_docs/operations/operations.md). Модель безопасности: [`actual_docs/security/security.md`](actual_docs/security/security.md).
 
 ## Проверки
 
@@ -118,4 +118,4 @@ RESTORE_CONFIRM=20260717T000000Z ./scripts/restore.sh /absolute/path/to/backups/
 
 Скрипты сохраняют PostgreSQL custom dump, объектный bucket и manifest с количеством применённых миграций.
 
-Production deployment, immutable image release, managed-service backup and rollback: [`docs/production-deployment.md`](docs/production-deployment.md).
+Production deployment, immutable image release, managed-service backup and rollback: [`actual_docs/operations/production-deployment.md`](actual_docs/operations/production-deployment.md).

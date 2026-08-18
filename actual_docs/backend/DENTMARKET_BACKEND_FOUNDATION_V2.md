@@ -399,8 +399,8 @@ Gate намеренно разрешён только для локальной 
 - [x] Миграция `20260818130000_outbox_delivery_semantics` применена как 29-я;
   dispatcher tests, PostgreSQL regression и runtime split прошли.
 
-Текущий статус: **B0.1–B0.6, B1.1–B1.2 и B2.1 реализованы и проходят**.
-Следующая задача: **B2.2 — доказать смену статуса отгрузки, уведомление клиники и audit trail**.
+Текущий статус: **B0.1–B0.6, B1.1–B1.2 и B2.1–B2.2 реализованы и проходят**.
+Следующая задача: **B2.3 — доказать минимальный комплект документов заказа и отгрузки**.
 
 ### B1 — покупка клиникой
 
@@ -446,7 +446,8 @@ Gate: одна клиника оформляет заказы у одного и
 | Готово | ID   | Задача | Gate |
 | ------ | ---- | ------ | ---- |
 | [x] | B2.1 | Полное/частичное подтверждение supplier order | `pnpm verify:flow-b2` |
-| [ ] | B2.2 | Статус отгрузки, уведомление клиники и audit trail | PostgreSQL + Playwright |
+| [x] | B2.2 | Статус отгрузки, уведомление клиники и audit trail | `pnpm verify:flow-b2` |
+| [ ] | B2.3 | Минимальные документы заказа и отгрузки | PostgreSQL + Playwright |
 
 1. список новых заказов;
 2. подтверждение полного или частичного количества;
@@ -478,8 +479,33 @@ Gate: одна клиника оформляет заказы у одного и
 
 Ограничение B2.1: частичное освобождение внешнего резерва намеренно получает
 контролируемый конфликт до отдельной orchestration-задачи интеграционного
-коннектора. Локальный pilot-flow полностью проверен; B2.2 сохраняет статус
-`[ ]` до browser-проверки shipment, уведомления и документов.
+коннектора.
+
+Выполнено в B2.2:
+
+- [x] Общие Zod-схемы, OpenAPI и `@marketplace/api-client` описывают создание,
+  чтение и versioned transition отгрузки; buyer/supplier order responses
+  возвращают склад, позиции и текущие отгрузки.
+- [x] Поставщик через production-сборку supplier-web создаёт отгрузку только
+  для оплаченного подтверждённого заказа и проходит ручной путь
+  `DRAFT → PLANNED → PACKING → READY → DISPATCHED`.
+- [x] Каждый переход атомарно обновляет shipment и supplier order, записывает
+  `shipment.status_changed` audit и `ShipmentStatusChanged` outbox event.
+- [x] Event содержит buyer/supplier tenant, номера заказа и отгрузки, старый и
+  новый статус, перевозчика и tracking; transactional outbox создаёт
+  идемпотентное in-app уведомление клиники.
+- [x] Buyer через production-сборку видит статус, склад, перевозчика и tracking
+  внутри заказа, а затем видит отдельное уведомление с теми же данными.
+- [x] Tenant isolation возвращает `403` чужому поставщику, а stale version
+  возвращает `409` без второго перехода или лишнего audit/outbox evidence.
+- [x] `pnpm verify:flow-b2` проходит 3/3, `pnpm verify:web` — 13/13; сценарий
+  включает viewport 390 px, проверку отсутствия page overflow и zero-residue
+  очистку shipment/notification/audit/outbox fixtures.
+
+Ограничение B2.2: payment settlement является начальным условием сценария и
+не подменяется shipment-логикой. Закрытие доставки, proof of delivery и
+минимальный комплект invoice/specification/waybill остаются B2.3; внешний
+email-провайдер остаётся отдельным production-readiness gate.
 
 ### B3 — catalog operations
 

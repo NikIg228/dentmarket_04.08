@@ -100,4 +100,4 @@ spacing, tokens, компоненты, только после этого — н
 - [ ] Использованы общий Fluent UI / `packages/ui`, без второго design system.
 - [ ] Состояния и ограничения backend не замаскированы оптимистичным UI.
 - [ ] Добавлен или обновлён unit/e2e test для критического поведения.
-- [ ] Выполнены команды из `DEVELOPMENT_WORKFLOW.md`.
+- [ ] Выполнены команды из `../governance/DEVELOPMENT_WORKFLOW.md`.
