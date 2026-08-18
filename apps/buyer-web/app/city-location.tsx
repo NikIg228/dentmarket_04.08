@@ -86,7 +86,7 @@ export function CityLocation() {
       }
     }
     void fetch(
-      `${process.env.NEXT_PUBLIC_API_URL ?? "https://dentmarket-api.vercel.app/api"}/catalog/cities`,
+      `${process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:4012/api"}/catalog/cities`,
       { cache: "no-store", signal: AbortSignal.timeout(2500) },
     )
       .then((response) =>

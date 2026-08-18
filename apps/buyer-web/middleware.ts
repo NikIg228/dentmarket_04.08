@@ -14,6 +14,7 @@ export function middleware(request: NextRequest) {
   requestHeaders.set("Content-Security-Policy", contentSecurityPolicy);
   const response = NextResponse.next({ request: { headers: requestHeaders } });
   response.headers.set("Content-Security-Policy", contentSecurityPolicy);
+  response.headers.set("Permissions-Policy", "geolocation=(self)");
   return response;
 }
 

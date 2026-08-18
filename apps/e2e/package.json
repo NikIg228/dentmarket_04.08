@@ -4,11 +4,13 @@
   "private": true,
   "scripts": {
     "e2e": "playwright test",
+    "e2e:flow-a": "playwright test tests/flow-a.spec.ts --config playwright.flow-a.config.ts",
     "typecheck": "tsc --noEmit",
     "lint": "tsc --noEmit"
   },
   "devDependencies": {
     "@playwright/test": "^1.61.1",
+    "@prisma/client": "^6.19.0",
     "@types/node": "^24.0.0",
     "typescript": "^5.9.3"
   }

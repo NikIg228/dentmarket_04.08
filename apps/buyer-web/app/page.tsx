@@ -79,6 +79,7 @@ import {
 
 const BUYER_ID = "00000000-0000-4000-8000-000000000030";
 const BUYER_USER_ID = "00000000-0000-4000-8000-000000000500";
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:4012/api";
 type SessionHandoff = SessionHandoffEnvelope;
 const SESSION_KEY = "dentmarket:buyer-session";
 const SEARCH_HISTORY_KEY = "dentmarket:search-history";
@@ -219,9 +220,7 @@ const mediaSource = (media: SearchMedia | undefined) => {
     return null;
   if (media.securePath?.startsWith("/catalog/")) return media.securePath;
   if (media.securePath) {
-    const apiUrl =
-      process.env.NEXT_PUBLIC_API_URL ??
-      "https://dentmarket-api.vercel.app/api";
+    const apiUrl = API_URL;
     return `${apiUrl}${media.securePath}`;
   }
   return media.sourceUrl;
@@ -473,8 +472,7 @@ async function fetchPublicCatalogSearch(
       /* legacy plain-text city selection */
     }
   }
-  const apiUrl =
-    process.env.NEXT_PUBLIC_API_URL ?? "https://dentmarket-api.vercel.app/api";
+  const apiUrl = API_URL;
   const response = await fetch(
     `${apiUrl}/catalog/search?${params.toString()}`,
     {
@@ -702,12 +700,7 @@ export default function BuyerWorkspace({
     [handoff],
   );
   const api = useMemo(
-    () =>
-      new MarketplaceApiClient(
-        process.env.NEXT_PUBLIC_API_URL ??
-          "https://dentmarket-api.vercel.app/api",
-        apiContext,
-      ),
+    () => new MarketplaceApiClient(API_URL, apiContext),
     [apiContext],
   );
   useEffect(() => {
@@ -719,14 +712,11 @@ export default function BuyerWorkspace({
       }
       let resolved = next;
       if (next.handoffCode && !next.accessToken) {
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL ?? "https://dentmarket-api.vercel.app/api"}/auth/handoff/exchange`,
-          {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ handoffCode: next.handoffCode }),
-          },
-        );
+        const response = await fetch(`${API_URL}/auth/handoff/exchange`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ handoffCode: next.handoffCode }),
+        });
         if (!response.ok) {
           setHandoffChecked(true);
           return;
@@ -1244,9 +1234,7 @@ export default function BuyerWorkspace({
   }, [loadSearch, query, sort]);
 
   const logout = useCallback(async () => {
-    const apiUrl =
-      process.env.NEXT_PUBLIC_API_URL ??
-      "https://dentmarket-api.vercel.app/api";
+    const apiUrl = API_URL;
     if (handoff?.sessionId && handoff.actorId && handoff.accessToken) {
       try {
         await fetch(`${apiUrl}/auth/sessions/${handoff.sessionId}/revoke`, {

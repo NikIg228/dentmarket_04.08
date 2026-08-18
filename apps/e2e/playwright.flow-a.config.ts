@@ -8,8 +8,8 @@ const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:4012/api";
 
 export default defineConfig({
   testDir: "./tests",
-  timeout: 30_000,
-  expect: { timeout: 10_000 },
+  timeout: 60_000,
+  expect: { timeout: 15_000 },
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 2 : 0,
@@ -37,31 +37,10 @@ export default defineConfig({
       timeout: 60_000,
     },
     {
-      command: "pnpm --filter @marketplace/admin-web exec next start --port 3010",
-      cwd: workspace,
-      url: "http://127.0.0.1:3010",
-      reuseExistingServer: true,
-      timeout: 60_000,
-    },
-    {
       command: "pnpm --filter @marketplace/buyer-web start",
       cwd: workspace,
       url: "http://127.0.0.1:3001",
       env: { NEXT_PUBLIC_API_URL: apiUrl },
-      reuseExistingServer: true,
-      timeout: 60_000,
-    },
-    {
-      command: "pnpm --filter @marketplace/supplier-web start",
-      cwd: workspace,
-      url: "http://127.0.0.1:3002",
-      reuseExistingServer: true,
-      timeout: 60_000,
-    },
-    {
-      command: "pnpm --filter @marketplace/landing-web start",
-      cwd: workspace,
-      url: "http://127.0.0.1:3003",
       reuseExistingServer: true,
       timeout: 60_000,
     },

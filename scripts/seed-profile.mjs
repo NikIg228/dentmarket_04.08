@@ -424,6 +424,7 @@ async function manifest(name) {
     pilotBuyers,
     pilotSuppliers,
     pilotOffers,
+    pilotCompliantOffers,
     pilotComparableGroups,
   ] = await Promise.all([
     prisma.country.count({ where: { code: "KZ" } }),
@@ -462,6 +463,17 @@ async function manifest(name) {
     prisma.supplierOffer.count({
       where: { externalId: { startsWith: "pilot-demo:" } },
     }),
+    prisma.complianceCheck.findMany({
+      where: {
+        offer: { externalId: { startsWith: "pilot-demo:" } },
+        status: "PASSED",
+        decision: "ALLOWED",
+        riskLevel: "GREEN",
+        validUntil: { gt: new Date() },
+      },
+      distinct: ["offerId"],
+      select: { offerId: true },
+    }),
     prisma.supplierOffer.groupBy({
       by: ["productVariantId"],
       where: { externalId: { startsWith: "pilot-demo:" } },
@@ -485,6 +497,7 @@ async function manifest(name) {
       pilotBuyers === 0 &&
         pilotSuppliers === 0 &&
         pilotOffers === 0 &&
+        pilotCompliantOffers.length === 0 &&
         pilotComparableGroups.length === 0,
       "Test profile created or inherited pilot market data",
     );
@@ -494,6 +507,7 @@ async function manifest(name) {
       pilotBuyers === 10 &&
         pilotSuppliers === 10 &&
         pilotOffers === 500 &&
+        pilotCompliantOffers.length === 500 &&
         pilotComparableGroups.length === 50 &&
         pilotComparableGroups.every((group) => group._count._all === 10),
       "Pilot manifest failed",
@@ -510,6 +524,7 @@ async function manifest(name) {
           buyers: pilotBuyers,
           suppliers: pilotSuppliers,
           offers: pilotOffers,
+          compliantOffers: pilotCompliantOffers.length,
           comparableProducts: pilotComparableGroups.length,
         },
       },

@@ -53,6 +53,7 @@
     "load-test:search": "node scripts/load-test-search.mjs",
     "load-test:handoff": "node scripts/load-test-handoff.mjs",
     "verify:release": "pnpm typecheck && pnpm test && pnpm build && pnpm verify:production-config",
+    "verify:flow-a": "pnpm --filter @marketplace/schemas build && pnpm --filter @marketplace/api build && pnpm --filter @marketplace/buyer-web build && pnpm --filter @marketplace/e2e e2e:flow-a",
     "verify:web": "pnpm --filter @marketplace/e2e e2e"
   },
   "devDependencies": {

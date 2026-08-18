@@ -1,16 +1,122 @@
+import { MarketplaceApiClient } from "@marketplace/api-client";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { cache } from "react";
 import catalog from "../../data/public-catalog-fallback.json";
 import mediaCatalog from "../../data/public-catalog-media.json";
 import styles from "./page.module.css";
 import ProductOfferActions from "./product-offer-actions";
 
 type CatalogProduct = (typeof catalog.products)[number];
+type PublicComparison = Awaited<
+  ReturnType<MarketplaceApiClient["comparePublicOffers"]>
+>;
+type DetailProduct = {
+  id: string;
+  name: string;
+  description: string | null;
+  brand: string | null;
+  manufacturer: string | null;
+  category: string | null;
+  sourceUrl: string | null;
+  attributes: Array<readonly [string, string]>;
+  isAvailable: boolean;
+  offers: Array<{
+    supplier: { id: string; name: string };
+    supplierSku: string | null;
+    priceMinor: string | null;
+    currency: string;
+    packaging?: { name: string };
+    available: boolean;
+    deliveryMethods: string[];
+    verifiedDocuments: boolean;
+    officialDistributor: boolean;
+  }>;
+};
 
-function getProduct(id: string): CatalogProduct | undefined {
-  return catalog.products.find((item) => item.id === id);
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:4012/api";
+
+function displayAttribute(value: unknown): string {
+  if (value == null) return "—";
+  if (typeof value === "string" || typeof value === "number")
+    return String(value);
+  if (typeof value === "boolean") return value ? "Да" : "Нет";
+  return JSON.stringify(value);
 }
+
+function fromFallback(product: CatalogProduct): DetailProduct {
+  return {
+    id: product.id,
+    name: product.name,
+    description: product.description,
+    brand: product.brand,
+    manufacturer: product.manufacturer,
+    category: product.category,
+    sourceUrl: product.sourceUrl,
+    attributes: product.attributes.map(([name, value]) => [name, value]),
+    isAvailable: product.isAvailable,
+    offers: product.offers.map((offer) => ({
+      supplier: offer.supplier,
+      supplierSku: offer.supplierSku,
+      priceMinor: offer.priceMinor,
+      currency: offer.currency,
+      packaging: offer.packaging,
+      available: offer.available,
+      deliveryMethods: offer.deliveryMethods,
+      verifiedDocuments: offer.verifiedDocuments,
+      officialDistributor: offer.officialDistributor,
+    })),
+  };
+}
+
+function fromComparison(comparison: PublicComparison): DetailProduct {
+  return {
+    id: comparison.product.id,
+    name: comparison.product.name,
+    description: null,
+    brand: comparison.product.brand,
+    manufacturer: comparison.product.manufacturer,
+    category: null,
+    sourceUrl: null,
+    attributes: comparison.comparisonAttributes.map((attribute) => [
+      attribute.name,
+      displayAttribute(attribute.value),
+    ]),
+    isAvailable: comparison.offers.some((offer) =>
+      offer.availability.some(
+        ({ quantityAvailable }) => Number(quantityAvailable) > 0,
+      ),
+    ),
+    offers: comparison.offers.map((offer) => ({
+      supplier: {
+        id: offer.supplier.organizationId,
+        name: offer.supplier.name,
+      },
+      supplierSku: offer.supplierSku,
+      priceMinor: offer.price.amountMinor,
+      currency: offer.price.currency,
+      packaging: { name: offer.packaging.name },
+      available: offer.availability.some(
+        ({ quantityAvailable }) => Number(quantityAvailable) > 0,
+      ),
+      deliveryMethods: offer.delivery.map(({ method }) => method),
+      verifiedDocuments: offer.markers.verifiedDocuments,
+      officialDistributor: offer.markers.officialDistributor,
+    })),
+  };
+}
+
+const getProduct = cache(async (id: string): Promise<DetailProduct | null> => {
+  try {
+    const api = new MarketplaceApiClient(API_URL, {});
+    return fromComparison(await api.comparePublicOffers(id, { quantity: 1 }));
+  } catch {
+    const fallback = catalog.products.find((item) => item.id === id);
+    return fallback ? fromFallback(fallback) : null;
+  }
+});
 
 function formatPrice(
   minor: number | string | null | undefined,
@@ -30,7 +136,7 @@ export async function generateMetadata({
   params: Promise<{ id: string }>;
 }): Promise<Metadata> {
   const { id } = await params;
-  const product = getProduct(decodeURIComponent(id));
+  const product = await getProduct(decodeURIComponent(id));
   return product
     ? {
         title: `${product.name} | DentMarket`,
@@ -45,7 +151,7 @@ export default async function ProductPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const product = getProduct(decodeURIComponent(id));
+  const product = await getProduct(decodeURIComponent(id));
   if (!product) notFound();
 
   const media = product.sourceUrl

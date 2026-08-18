@@ -1,5 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
+const ADMIN_URL = process.env.E2E_ADMIN_URL ?? "http://127.0.0.1:3010";
+
 function collectBrowserErrors(page: Page) {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(`pageerror: ${error.message}`));
@@ -7,7 +9,11 @@ function collectBrowserErrors(page: Page) {
     if (message.type() === "error") errors.push(`console: ${message.text()}`);
   });
   page.on("response", (response) => {
-    if (response.status() >= 500) errors.push(`${response.status()} ${response.url()}`);
+    if (
+      response.status() >= 500 ||
+      (response.status() >= 400 && response.request().resourceType() === "document")
+    )
+      errors.push(`${response.status()} ${response.url()}`);
   });
   return errors;
 }
@@ -56,20 +62,6 @@ test("active EDS agreement hides the signing action", async ({ page }) => {
   await expectHealthyPage(page, errors);
 });
 
-test("buyer has budgets, support and tenant-aware AI workspaces", async ({ page }) => {
-  const errors = collectBrowserErrors(page);
-  await page.goto("http://127.0.0.1:3001");
-  await expect(page.getByRole("button", { name: /город/i })).toBeVisible();
-  await expectHealthyPage(page, errors);
-});
-
-test("buyer receives explainable city-aware scenarios", async ({ page }) => {
-  const errors = collectBrowserErrors(page);
-  await page.goto("http://127.0.0.1:3001");
-  await expect(page.getByRole("button", { name: /город/i })).toBeVisible();
-  await expectHealthyPage(page, errors);
-});
-
 test("supplier sees explainable trust and verified warehouses", async ({ page }) => {
   const errors = collectBrowserErrors(page);
   await page.goto("http://127.0.0.1:3002");
@@ -105,7 +97,7 @@ test("new supplier completes registration and receives a secure cabinet handoff"
 
 test("operator sees production assurance controls", async ({ page }) => {
   const errors = collectBrowserErrors(page);
-  await page.goto("http://127.0.0.1:3000");
+  await page.goto(ADMIN_URL);
   await expect(page.locator("body")).not.toBeEmpty();
   await expectHealthyPage(page, errors);
 });

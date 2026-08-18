@@ -292,6 +292,50 @@ try {
           publishedAt: new Date(),
         },
       });
+      await prisma.complianceCheck.upsert({
+        where: {
+          id: uuid(
+            `pilot-compliance-${productInput.id}-${supplierIndex + 1}`,
+          ),
+        },
+        update: {
+          sellerOrganizationId: supplier.organization.id,
+          offerId: offer.id,
+          status: "PASSED",
+          decision: "ALLOWED",
+          riskLevel: "GREEN",
+          evaluatedAt: new Date(),
+          validUntil: new Date(Date.now() + 30 * 24 * 60 * 60_000),
+          inputSnapshot: {
+            source: "pilot_seed",
+            offerId: offer.id,
+            supplierOrganizationId: supplier.organization.id,
+          },
+          ruleSnapshot: [],
+          reasons: ["pilot_supplier_documents_verified"],
+          missingCredentials: [],
+        },
+        create: {
+          id: uuid(
+            `pilot-compliance-${productInput.id}-${supplierIndex + 1}`,
+          ),
+          sellerOrganizationId: supplier.organization.id,
+          offerId: offer.id,
+          status: "PASSED",
+          decision: "ALLOWED",
+          riskLevel: "GREEN",
+          evaluatedAt: new Date(),
+          validUntil: new Date(Date.now() + 30 * 24 * 60 * 60_000),
+          inputSnapshot: {
+            source: "pilot_seed",
+            offerId: offer.id,
+            supplierOrganizationId: supplier.organization.id,
+          },
+          ruleSnapshot: [],
+          reasons: ["pilot_supplier_documents_verified"],
+          missingCredentials: [],
+        },
+      });
       await prisma.offerPrice.upsert({
         where: {
           id: uuid(`pilot-price-${productInput.id}-${supplierIndex + 1}`),
