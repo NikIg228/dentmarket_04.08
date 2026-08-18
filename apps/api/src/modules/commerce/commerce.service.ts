@@ -910,6 +910,10 @@ export class CommerceService {
               },
             },
             paymentAllocation: true,
+            documents: {
+              where: { kind: { in: ["ORDER_SPECIFICATION", "INVOICE", "WAYBILL"] }, shipmentId: { not: null } },
+              orderBy: [{ kind: "asc" }, { version: "desc" }],
+            },
           },
         },
         paymentIntent: {
@@ -962,6 +966,10 @@ export class CommerceService {
           },
           orderBy: { createdAt: "desc" },
         },
+        documents: {
+          where: { kind: { in: ["ORDER_SPECIFICATION", "INVOICE", "WAYBILL"] }, shipmentId: { not: null } },
+          orderBy: [{ kind: "asc" }, { version: "desc" }],
+        },
       },
       orderBy: { createdAt: "desc" },
     });
@@ -994,6 +1002,10 @@ export class CommerceService {
             fulfillmentSteps: { orderBy: { sequence: "asc" } },
           },
           orderBy: { createdAt: "desc" },
+        },
+        documents: {
+          where: { kind: { in: ["ORDER_SPECIFICATION", "INVOICE", "WAYBILL"] }, shipmentId: { not: null } },
+          orderBy: [{ kind: "asc" }, { version: "desc" }],
         },
       },
       orderBy: { createdAt: "desc" },

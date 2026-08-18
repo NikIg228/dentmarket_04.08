@@ -1,7 +1,7 @@
 "use client";
 
 import { Button, Field, Input, Select, Spinner } from "@fluentui/react-components";
-import type { MarketplaceApiClient } from "@marketplace/api-client";
+import type { MarketplaceApiClient, OrderDocumentResponse } from "@marketplace/api-client";
 import { StatusTag, errorMessage, formatDate, formatStatus } from "@marketplace/ui";
 import { useMemo, useState } from "react";
 import styles from "./shipment-panel.module.css";
@@ -46,6 +46,7 @@ export type ShipmentOrder = {
     offer: { productVariant: { product: { canonicalName: string } } };
   }>;
   shipments?: ShipmentRecord[];
+  documents?: OrderDocumentResponse[];
 };
 
 const nextStatus: Record<string, { status: string; label: string }> = {
@@ -79,6 +80,7 @@ export function ShipmentPanel({
   );
   const [warehouseId, setWarehouseId] = useState(warehouses[0]?.[0] ?? "");
   const [recipientName, setRecipientName] = useState(order.buyer.displayName);
+  const [recipientAddress, setRecipientAddress] = useState("");
   const [carrierName, setCarrierName] = useState("");
   const [trackingByShipment, setTrackingByShipment] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<string | null>(null);
@@ -108,6 +110,7 @@ export function ShipmentPanel({
         warehouseId,
         method: "CARRIER",
         recipientName: recipientName.trim(),
+        destinationAddress: recipientAddress.trim() ? { line1: recipientAddress.trim() } : null,
         carrierName: carrierName.trim() || null,
         items: remainingItems.map(({ item, quantity }) => ({ supplierOrderItemId: item.id, quantity })),
         fulfillmentSteps: [],
@@ -189,6 +192,7 @@ export function ShipmentPanel({
         <div className={styles.form}>
           <Field label="Склад"><Select value={warehouseId} onChange={(_, data) => setWarehouseId(data.value)}>{warehouses.map(([id, warehouse]) => <option value={id} key={id}>{warehouse?.name ?? `Склад ${id.slice(0, 8)}`}</option>)}</Select></Field>
           <Field label="Получатель"><Input value={recipientName} onChange={(_, data) => setRecipientName(data.value)} /></Field>
+          <Field label="Адрес доставки"><Input value={recipientAddress} onChange={(_, data) => setRecipientAddress(data.value)} /></Field>
           <Field label="Перевозчик (необязательно)"><Input value={carrierName} onChange={(_, data) => setCarrierName(data.value)} /></Field>
           <Button appearance="primary" disabled={busy !== null || !recipientName.trim()} onClick={() => void createShipment()}>{busy === "create" ? <Spinner size="tiny" label="Создаём" /> : "Создать отгрузку"}</Button>
         </div>

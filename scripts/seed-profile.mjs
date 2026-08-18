@@ -230,6 +230,52 @@ async function ensureReference() {
       templateBody: "Договор поставщика с платформой DentMarket KZ",
     },
   });
+  for (const template of [
+    {
+      code: "ORDER_SPECIFICATION_RU",
+      kind: "ORDER_SPECIFICATION",
+      name: "Спецификация к заказу",
+      format: "PDF",
+      requiredSignatureCount: 1,
+      templateBody: "СПЕЦИФИКАЦИЯ № {{order.number}}\n\nПоставщик: {{supplier.name}}\nБИН поставщика: {{supplier.bin}}\nПокупатель: {{buyer.name}}\nБИН покупателя: {{buyer.bin}}\nСумма: {{order.total}} {{order.currency}}\n\nСостав заказа:\n{{order.items}}\n\nДокумент сформирован DentMarket KZ из подтверждённого заказа.",
+    },
+    {
+      code: "INVOICE_RU",
+      kind: "INVOICE",
+      name: "Счёт на оплату",
+      format: "PDF",
+      requiredSignatureCount: 0,
+      templateBody: "СЧЁТ № {{invoice.number}}\n\nПоставщик: {{supplier.name}}\nБИН поставщика: {{supplier.bin}}\nПокупатель: {{buyer.name}}\nБИН покупателя: {{buyer.bin}}\nИтого к оплате: {{invoice.total}} {{invoice.currency}}.\n\nОснование: заказ {{order.number}}.",
+    },
+    {
+      code: "WAYBILL_RU",
+      kind: "WAYBILL",
+      name: "Накладная",
+      format: "DOCX",
+      requiredSignatureCount: 2,
+      templateBody: "НАКЛАДНАЯ № {{shipment.number}}\n\nПоставщик: {{supplier.name}}\nПолучатель: {{recipient.name}}\nАдрес доставки: {{recipient.address}}\nТрек-номер: {{shipment.trackingNumber}}\n\nТовары:\n{{shipment.items}}",
+    },
+  ]) {
+    await prisma.documentTemplate.upsert({
+      where: { code_version: { code: template.code, version: 1 } },
+      update: {
+        kind: template.kind,
+        name: template.name,
+        format: template.format,
+        locale: "ru-KZ",
+        requiredSignatureCount: template.requiredSignatureCount,
+        signatureMethods: ["MOCK", "EDS", "EGOV_QR"],
+        templateBody: template.templateBody,
+        status: "ACTIVE",
+      },
+      create: {
+        ...template,
+        version: 1,
+        locale: "ru-KZ",
+        signatureMethods: ["MOCK", "EDS", "EGOV_QR"],
+      },
+    });
+  }
 }
 
 async function ensureOperator() {
@@ -417,7 +463,7 @@ async function manifest(name) {
     cities,
     units,
     permissions,
-    template,
+    templates,
     operator,
     membership,
     testOrganization,
@@ -447,7 +493,10 @@ async function manifest(name) {
     }),
     prisma.permission.count({ where: { code: { in: permissionCodes } } }),
     prisma.documentTemplate.count({
-      where: { code: "MARKETPLACE_SUPPLIER_AGREEMENT_RU", version: 1 },
+      where: {
+        code: { in: ["MARKETPLACE_SUPPLIER_AGREEMENT_RU", "ORDER_SPECIFICATION_RU", "INVOICE_RU", "WAYBILL_RU"] },
+        version: 1,
+      },
     }),
     prisma.organization.count({ where: { bin: "000000000001" } }),
     prisma.organizationMembership.count({
@@ -485,7 +534,7 @@ async function manifest(name) {
       cities >= 5 &&
       units === 8 &&
       permissions === permissionCodes.length &&
-      template === 1,
+      templates === 4,
     "Reference manifest failed",
   );
   if (["operator", "test", "pilot"].includes(name))
@@ -517,7 +566,7 @@ async function manifest(name) {
       {
         profile: name,
         status: "passed",
-        reference: { country, cities, units, permissions, templates: template },
+        reference: { country, cities, units, permissions, templates },
         operator: { organizations: operator, memberships: membership },
         test: { organizations: testOrganization },
         pilot: {

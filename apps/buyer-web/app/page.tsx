@@ -67,6 +67,8 @@ import styles from "./page.module.css";
 import { BuyerServicesPanel } from "./buyer-services-panel";
 import { OrderDecisionDetails } from "./order-decision-details";
 import { OrderShipments, type BuyerShipment } from "./order-shipments";
+import { OrderDocuments } from "./order-documents";
+import type { OrderDocumentResponse } from "@marketplace/api-client";
 import { SmartCommercePanel } from "./smart-commerce-panel";
 import publicCatalogData from "./data/public-catalog-fallback.json";
 import publicCatalogMedia from "./data/public-catalog-media.json";
@@ -595,6 +597,7 @@ type SupplierOrder = {
   createdAt: string;
   supplier: { displayName: string };
   shipments?: BuyerShipment[];
+  documents?: OrderDocumentResponse[];
   items: Array<{
     id: string;
     quantity: string;
@@ -1107,7 +1110,7 @@ export default function BuyerWorkspace({
         api.get<Cart[]>(`/buyers/${buyerId}/carts`),
         api.get<SupplierOrder[]>(`/buyers/${buyerId}/orders`),
         api.get<DocumentRecord[]>(
-          `/documents?ownerOrganizationId=${buyerId}&limit=100`,
+          "/documents?limit=100",
         ),
         api.get<NotificationRecord[]>(
           `/notifications/organizations/${buyerId}?limit=100`,
@@ -3157,6 +3160,13 @@ export default function BuyerWorkspace({
                       <tr>
                         <td colSpan={6}>
                           <OrderShipments shipments={order.shipments} />
+                        </td>
+                      </tr>
+                    ) : null}
+                    {order.documents?.length ? (
+                      <tr>
+                        <td colSpan={6}>
+                          <OrderDocuments orderNumber={order.orderNumber} documents={order.documents} api={api} />
                         </td>
                       </tr>
                     ) : null}

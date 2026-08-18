@@ -464,6 +464,41 @@ export const shipmentResponseSchema = z
 
 export const shipmentListResponseSchema = z.array(shipmentResponseSchema);
 
+export const orderDocumentKindSchema = z.enum([
+  "ORDER_SPECIFICATION",
+  "INVOICE",
+  "WAYBILL",
+]);
+
+export const generateOrderDocumentPackSchema = z.object({
+  shipmentId: z.uuid(),
+});
+
+export const orderDocumentResponseSchema = z
+  .object({
+    id: z.uuid(),
+    supplierOrderId: z.uuid(),
+    shipmentId: z.uuid(),
+    kind: orderDocumentKindSchema,
+    format: z.enum(["PDF", "DOCX"]),
+    status: z.string(),
+    title: z.string(),
+    documentNumber: z.string(),
+    version: z.number().int().positive(),
+    fileName: z.string().nullable(),
+    checksumSha256: z.string().nullable(),
+    generatedAt: nullableDateTimeSchema,
+    createdAt: dateTimeSchema,
+    updatedAt: dateTimeSchema,
+  })
+  .passthrough();
+
+export const orderDocumentPackResponseSchema = z.object({
+  supplierOrderId: z.uuid(),
+  shipmentId: z.uuid(),
+  documents: z.array(orderDocumentResponseSchema).length(3),
+});
+
 export const supplierOrderResponseSchema = z
   .object({
     id: z.uuid(),
@@ -481,6 +516,7 @@ export const supplierOrderResponseSchema = z
     buyer: organizationSummarySchema.optional(),
     items: z.array(supplierOrderItemResponseSchema),
     shipments: z.array(shipmentResponseSchema).optional(),
+    documents: z.array(orderDocumentResponseSchema).optional(),
     createdAt: dateTimeSchema,
     updatedAt: dateTimeSchema,
   })
@@ -520,3 +556,10 @@ export type CartValidationResponse = z.infer<
 export type CheckoutResponse = z.infer<typeof checkoutResponseSchema>;
 export type SupplierOrderResponse = z.infer<typeof supplierOrderResponseSchema>;
 export type ShipmentResponse = z.infer<typeof shipmentResponseSchema>;
+export type GenerateOrderDocumentPackRequest = z.input<
+  typeof generateOrderDocumentPackSchema
+>;
+export type OrderDocumentResponse = z.infer<typeof orderDocumentResponseSchema>;
+export type OrderDocumentPackResponse = z.infer<
+  typeof orderDocumentPackResponseSchema
+>;

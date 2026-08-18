@@ -42,4 +42,24 @@ describe("core marketplace API client", () => {
       }),
     );
   });
+
+  it("generates an order document pack from a persisted shipment", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response(JSON.stringify({ documents: [] }), { status: 201 }));
+    const api = new MarketplaceApiClient("http://localhost:4012/api", {
+      actorId: "supplier-user",
+      organizationId: "supplier-org",
+    });
+
+    await api.generateOrderDocumentPack("order-1", { shipmentId: "00000000-0000-4000-8000-000000000071" });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:4012/api/supplier-orders/order-1/document-pack",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ shipmentId: "00000000-0000-4000-8000-000000000071" }),
+      }),
+    );
+  });
 });

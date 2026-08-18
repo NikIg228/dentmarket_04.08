@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { addCartItemSchema, approveProductCandidateSchema, captureMockPaymentSchema, capturePaymentSchema, checkoutCartSchema, compareOffersSchema, confirmSupplierOrderSchema, createApprovalPolicySchema, createComplianceRuleSchema, createContractPriceSchema, createDataOverrideSchema, createDeliveryRuleSchema, createDocumentTemplateSchema, createImportBatchSchema, createIntegrationBindingSchema, createIntegrationConnectionSchema, createInventoryLotSchema, createInventoryReservationSchema, createInvitationSchema, createNotificationSchema, createOfferPriceTierSchema, createOrganizationCredentialSchema, createOrganizationSchema, createPaymentIntentSchema, createProductPackagingSchema, createProductSchema, createRefundSchema, createRoleSchema, createShipmentSchema, enqueueIntegrationJobSchema, evaluateApprovalSchema, ledgerQuerySchema, resolveOfferPriceSchema, searchCatalogSchema, setAttributeValueSchema, setInventoryBalanceSchema, updateProductSchema, upsertCategoryAttributeRuleSchema, upsertIntegrationMappingSchema } from "./index.js";
 import { createRegistrationIntentSchema, mfaCodeSchema, socialExchangeSchema, updateConnectorReadinessSchema } from "./index.js";
 import { decideProductCorrectionSchema, submitProductCorrectionSchema } from "./index.js";
+import { generateOrderDocumentPackSchema } from "./index.js";
 
 describe("createOrganizationSchema", () => {
   it("accepts a multi-capability Kazakhstan organization", () => {
@@ -230,6 +231,11 @@ describe("iteration 1A schemas", () => {
     expect(createDocumentTemplateSchema.safeParse({ code: "ORDER.SPEC", version: 1, kind: "ORDER_SPECIFICATION", name: "Спецификация", templateBody: "Заказ {{order.number}}", requiredSignatureCount: 2 }).success).toBe(true);
     expect(createDocumentTemplateSchema.safeParse({ code: "bad code", version: 0, kind: "INVOICE", name: "Счёт", templateBody: "" }).success).toBe(false);
     expect(createOrganizationCredentialSchema.safeParse({ type: "MEDICAL_LICENSE", number: "L-1", fileName: "license.pdf" }).success).toBe(false);
+  });
+
+  it("requires a shipment when generating the immutable order document pack", () => {
+    expect(generateOrderDocumentPackSchema.safeParse({ shipmentId: "00000000-0000-4000-8000-000000000071" }).success).toBe(true);
+    expect(generateOrderDocumentPackSchema.safeParse({}).success).toBe(false);
   });
 
   it("requires dated versioned compliance rules", () => {

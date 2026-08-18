@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { unlink } from "node:fs/promises";
+import { resolve, sep } from "node:path";
 import {
   expect,
   test,
@@ -18,6 +20,7 @@ const databaseUrl =
 process.env.DATABASE_URL = databaseUrl;
 
 const prisma = new PrismaClient();
+const localStorageRoot = resolve(process.cwd(), "../..", ".local-storage");
 const buyerPermissionCodes = [
   "organization.view",
   "catalog.product.view",
@@ -58,6 +61,18 @@ type CheckoutPayload = {
   }>;
 };
 
+type OrderDocumentPackPayload = {
+  supplierOrderId: string;
+  shipmentId: string;
+  documents: Array<{
+    id: string;
+    kind: "ORDER_SPECIFICATION" | "INVOICE" | "WAYBILL";
+    format: "PDF" | "DOCX";
+    documentNumber: string;
+    checksumSha256: string;
+  }>;
+};
+
 type OrderFixture = {
   checkoutId: string;
   orderId: string;
@@ -70,6 +85,7 @@ type OrderFixture = {
   reservationId: string;
   balanceId: string;
   lotId: string | null;
+  warehouseId: string;
   balanceAvailableBeforeConfirmation: number;
   balanceReservedBeforeConfirmation: number;
   lotAvailableBeforeConfirmation: number | null;
@@ -335,6 +351,7 @@ async function createOrder(
     reservationId: item.reservation!.id,
     balanceId: item.reservation!.inventoryBalanceId,
     lotId: item.reservation!.inventoryLotId,
+    warehouseId: item.warehouseId,
     balanceAvailableBeforeConfirmation: Number(
       item.reservation!.inventoryBalance.quantityAvailable,
     ),
@@ -392,7 +409,7 @@ async function openSupplierOrder(page: Page, orderNumber: string) {
   await expect(
     page.getByRole("heading", { name: "Заказы покупателей" }),
   ).toBeVisible();
-  const row = page.getByRole("row").filter({ hasText: orderNumber });
+  const row = page.getByRole("row").filter({ hasText: orderNumber }).first();
   await expect(row).toBeVisible();
   return row;
 }
@@ -455,6 +472,10 @@ async function restoreInventoryAndDeleteFixtures() {
     where: { supplierOrderId: { in: orders.map(({ id }) => id) } },
     select: { id: true },
   });
+  const documents = await prisma.document.findMany({
+    where: { supplierOrderId: { in: orders.map(({ id }) => id) } },
+    select: { id: true, storageKey: true },
+  });
   const reservations = await prisma.inventoryReservation.findMany({
     where: {
       supplierOrderItem: {
@@ -470,6 +491,7 @@ async function restoreInventoryAndDeleteFixtures() {
   const cartIds = carts.map(({ id }) => id);
   const orderIds = orders.map(({ id }) => id);
   const shipmentIds = shipments.map(({ id }) => id);
+  const documentIds = documents.map(({ id }) => id);
   const reservationIds = reservations.map(({ id }) => id);
   const complianceCheckIds = complianceChecks.map(({ id }) => id);
 
@@ -503,6 +525,7 @@ async function restoreInventoryAndDeleteFixtures() {
         OR: [
           { recipientOrganizationId: buyer.organizationId },
           { aggregateId: { in: [...orderIds, ...shipmentIds] } },
+          { aggregateId: { in: documentIds } },
         ],
       },
     });
@@ -513,6 +536,7 @@ async function restoreInventoryAndDeleteFixtures() {
             ...checkoutIds,
             ...orderIds,
             ...shipmentIds,
+            ...documentIds,
             ...reservationIds,
             ...complianceCheckIds,
           ],
@@ -532,6 +556,7 @@ async function restoreInventoryAndDeleteFixtures() {
                 ...shipmentIds,
                 ...cartIds,
                 ...reservationIds,
+                ...documentIds,
               ],
             },
           },
@@ -544,6 +569,7 @@ async function restoreInventoryAndDeleteFixtures() {
     await tx.complianceCheck.deleteMany({
       where: { id: { in: complianceCheckIds } },
     });
+    await tx.document.deleteMany({ where: { id: { in: documentIds } } });
     await tx.shipment.deleteMany({
       where: { id: { in: shipmentIds } },
     });
@@ -566,6 +592,15 @@ async function restoreInventoryAndDeleteFixtures() {
     await tx.user.delete({ where: { id: buyer.userId } });
   });
 
+  for (const document of documents) {
+    if (!document.storageKey) continue;
+    const path = resolve(localStorageRoot, document.storageKey);
+    if (!path.startsWith(`${localStorageRoot}${sep}`)) throw new Error("Unsafe Flow B2 storage cleanup path");
+    await unlink(path).catch((error: NodeJS.ErrnoException) => {
+      if (error.code !== "ENOENT") throw error;
+    });
+  }
+
   expect(
     await prisma.supplierOrder.count({
       where: { buyerOrganizationId: buyer.organizationId },
@@ -581,6 +616,7 @@ async function restoreInventoryAndDeleteFixtures() {
       where: { aggregateId: { in: [...orderIds, ...shipmentIds] } },
     }),
   ).toBe(0);
+  expect(await prisma.document.count({ where: { id: { in: documentIds } } })).toBe(0);
 }
 
 test.describe.serial("@flow-b2 supplier order confirmation", () => {
@@ -606,7 +642,7 @@ test.describe.serial("@flow-b2 supplier order confirmation", () => {
     foreignSupplier = await createSupplierActor(
       anotherSupplier.id,
       "foreign",
-      false,
+      true,
     );
   });
 
@@ -879,6 +915,143 @@ test.describe.serial("@flow-b2 supplier order confirmation", () => {
     await expect(notification).toContainText("Статус доставки изменён");
     await expect(notification).toContainText(readyShipment.shipmentNumber);
     await expect(notification).toContainText(order.orderNumber);
+    expect(errors).toEqual([]);
+  });
+
+  test("supplier generates an idempotent order document pack and buyer downloads the same evidence", async ({
+    page,
+    request,
+  }) => {
+    const errors = collectBrowserErrors(page);
+    const order = await createOrder(request, "documents");
+    await responseJson(
+      await request.post(`${API_URL}/supplier-orders/${order.orderId}/confirm`, {
+        headers: identityHeaders(supplier),
+        data: { decisions: [{ itemId: order.itemId, acceptedQuantity: order.quantity }] },
+      }),
+    );
+    await prisma.supplierOrder.update({
+      where: { id: order.orderId },
+      data: { paymentStatus: "PAID", status: "PAID", version: { increment: 1 } },
+    });
+
+    let shipment = await responseJson<{
+      id: string;
+      version: number;
+      status: string;
+      shipmentNumber: string;
+    }>(
+      await request.post(`${API_URL}/supplier-orders/${order.orderId}/shipments`, {
+        headers: identityHeaders(supplier),
+        data: {
+          warehouseId: order.warehouseId,
+          method: "CARRIER",
+          recipientName: buyer.displayName,
+          destinationAddress: { line1: "г. Алматы, ул. Тестовая, 10" },
+          carrierName: "Flow B2 Documents Carrier",
+          items: [{ supplierOrderItemId: order.itemId, quantity: order.quantity }],
+          fulfillmentSteps: [],
+        },
+      }),
+    );
+    for (const status of ["PLANNED", "PACKING", "READY", "DISPATCHED"] as const) {
+      shipment = await responseJson(
+        await request.post(`${API_URL}/shipments/${shipment.id}/transitions`, {
+          headers: identityHeaders(supplier),
+          data: {
+            version: shipment.version,
+            status,
+            carrierName: "Flow B2 Documents Carrier",
+            trackingNumber: status === "DISPATCHED" ? `DOC-${Date.now()}` : undefined,
+          },
+        }),
+      );
+    }
+
+    const forbidden = await request.post(
+      `${API_URL}/supplier-orders/${order.orderId}/document-pack`,
+      { headers: identityHeaders(foreignSupplier), data: { shipmentId: shipment.id } },
+    );
+    expect(forbidden.status()).toBe(403);
+
+    await openSupplierOrder(page, order.orderNumber);
+    const supplierPanel = page.getByRole("region", {
+      name: `Документы заказа ${order.orderNumber}`,
+    });
+    await expect(supplierPanel).toContainText("Комплект ещё не сформирован");
+    await supplierPanel.getByRole("button", { name: "Сформировать документы" }).click();
+    await expect(supplierPanel).toContainText("3/3");
+    await expect(supplierPanel).toContainText("Спецификация");
+    await expect(supplierPanel).toContainText("Счёт");
+    await expect(supplierPanel).toContainText("Накладная");
+
+    const repeated = await responseJson<OrderDocumentPackPayload>(
+      await request.post(`${API_URL}/supplier-orders/${order.orderId}/document-pack`, {
+        headers: identityHeaders(supplier),
+        data: { shipmentId: shipment.id },
+      }),
+    );
+    expect(repeated.documents).toHaveLength(3);
+
+    const persisted = await prisma.document.findMany({
+      where: { supplierOrderId: order.orderId, shipmentId: shipment.id },
+      orderBy: { kind: "asc" },
+    });
+    expect(persisted).toHaveLength(3);
+    expect(persisted.map(({ id }) => id).sort()).toEqual(repeated.documents.map(({ id }) => id).sort());
+    expect(persisted.map(({ kind }) => kind).sort()).toEqual(["INVOICE", "ORDER_SPECIFICATION", "WAYBILL"]);
+    for (const document of persisted) {
+      expect(document.ownerOrganizationId).toBe(supplier.organizationId);
+      expect(document.checkoutId).toBe(order.checkoutId);
+      expect(document.checksumSha256).toMatch(/^[a-f0-9]{64}$/);
+      expect(document.immutableAt).not.toBeNull();
+      expect(document.storageKey).toContain(`documents/${supplier.organizationId}/`);
+      expect(document.dataSnapshot).toMatchObject({
+        order: { number: order.orderNumber, currency: "KZT" },
+        recipient: { address: "г. Алматы, ул. Тестовая, 10" },
+      });
+    }
+    expect(
+      await prisma.auditLog.count({
+        where: { action: "document.generated", entityType: "Document", entityId: { in: persisted.map(({ id }) => id) } },
+      }),
+    ).toBe(3);
+    expect(
+      await prisma.outboxEvent.count({
+        where: { aggregateType: "Document", aggregateId: { in: persisted.map(({ id }) => id) }, eventType: "DocumentGenerated" },
+      }),
+    ).toBe(3);
+
+    const invoice = persisted.find(({ kind }) => kind === "INVOICE")!;
+    const invoiceDownload = await request.get(`${API_URL}/documents/${invoice.id}/download`, {
+      headers: identityHeaders(buyer),
+    });
+    expect(invoiceDownload.ok()).toBe(true);
+    expect(invoiceDownload.headers().etag).toBe(invoice.checksumSha256);
+    expect((await invoiceDownload.body()).subarray(0, 4).toString()).toBe("%PDF");
+    const waybill = persisted.find(({ kind }) => kind === "WAYBILL")!;
+    const waybillDownload = await request.get(`${API_URL}/documents/${waybill.id}/download`, {
+      headers: identityHeaders(buyer),
+    });
+    expect(waybillDownload.ok()).toBe(true);
+    expect((await waybillDownload.body()).subarray(0, 2).toString()).toBe("PK");
+
+    await openBuyerOrders(page);
+    const buyerPanel = page.getByRole("region", {
+      name: `Документы заказа ${order.orderNumber}`,
+    });
+    await expect(buyerPanel).toContainText("3/3");
+    await expect(buyerPanel).toContainText("Спецификация");
+    await expect(buyerPanel).toContainText("Счёт");
+    await expect(buyerPanel).toContainText("Накладная");
+    const downloadPromise = page.waitForEvent("download");
+    await buyerPanel.locator("article").filter({ hasText: "Счёт" }).getByRole("button", { name: "Скачать" }).click();
+    const browserDownload = await downloadPromise;
+    expect(browserDownload.suggestedFilename()).toContain(`INV-${order.orderNumber}`);
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(buyerPanel).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     expect(errors).toEqual([]);
   });
 });

@@ -55,6 +55,7 @@ import {
   type OrderConfirmationDecision,
 } from "./order-confirmation-panel";
 import { ShipmentPanel, type ShipmentOrder as Order } from "./shipment-panel";
+import { OrderDocumentPanel } from "./order-document-panel";
 
 const OPERATOR_ID = "00000000-0000-4000-8000-000000000002";
 const OPERATOR_ORG_ID = "00000000-0000-4000-8000-000000000001";
@@ -1124,6 +1125,7 @@ export default function SupplierWorkspace() {
                     <tr>
                       <td colSpan={6}>
                         <ShipmentPanel order={order} api={api} onChanged={() => refresh(true)} />
+                        <OrderDocumentPanel order={order} api={api} onChanged={() => refresh(true)} />
                       </td>
                     </tr>
                   ) : null}

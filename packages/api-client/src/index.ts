@@ -8,7 +8,9 @@ import type {
   CheckoutResponse,
   CompareOffersRequest,
   ConfirmSupplierOrderRequest,
+  GenerateOrderDocumentPackRequest,
   CreateShipmentRequest,
+  OrderDocumentPackResponse,
   CreateCartRequest,
   OfferComparisonResponse,
   SearchCatalogRequest,
@@ -16,6 +18,8 @@ import type {
   ShipmentResponse,
   TransitionShipmentRequest,
 } from "@marketplace/schemas";
+
+export type { OrderDocumentResponse } from "@marketplace/schemas";
 
 export type ApiContext = {
   actorId?: string;
@@ -258,6 +262,16 @@ export class MarketplaceApiClient {
   ) {
     return this.post<ShipmentResponse>(
       `/shipments/${shipmentId}/transitions`,
+      input,
+    );
+  }
+
+  generateOrderDocumentPack(
+    orderId: string,
+    input: GenerateOrderDocumentPackRequest,
+  ) {
+    return this.post<OrderDocumentPackResponse>(
+      `/supplier-orders/${orderId}/document-pack`,
       input,
     );
   }

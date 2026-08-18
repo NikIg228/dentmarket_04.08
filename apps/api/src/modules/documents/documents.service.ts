@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
-import type { CompleteDocumentSignatureInput, CreateDocumentTemplateInput, CreateDocumentVersionInput, CreateGeneratedDocumentInput, CreateSignatureSessionInput, DocumentQueryInput, UploadDocumentInput } from "@marketplace/schemas";
+import type { CompleteDocumentSignatureInput, CreateDocumentTemplateInput, CreateDocumentVersionInput, CreateGeneratedDocumentInput, CreateSignatureSessionInput, DocumentQueryInput, GenerateOrderDocumentPackRequest, UploadDocumentInput } from "@marketplace/schemas";
 import { Prisma } from "@prisma/client";
 import { createHash } from "node:crypto";
 import { PrismaService } from "../../platform/prisma/prisma.service";
@@ -8,6 +8,43 @@ import type { SupplierActorContext } from "../suppliers/supplier-access.service"
 import { DocumentRendererService } from "./document-renderer.service";
 import { SignatureAdapterRegistry } from "./signature-adapter-registry.service";
 import { FileUploadPolicyService } from "../../platform/security/file-upload-policy.service";
+
+const orderDocumentDefinitions = [
+  {
+    kind: "ORDER_SPECIFICATION",
+    templateCode: "ORDER_SPECIFICATION_RU",
+    number: (orderNumber: string, _shipmentNumber: string) => `SPEC-${orderNumber}`,
+    title: (orderNumber: string) => `Спецификация к заказу ${orderNumber}`,
+  },
+  {
+    kind: "INVOICE",
+    templateCode: "INVOICE_RU",
+    number: (orderNumber: string, _shipmentNumber: string) => `INV-${orderNumber}`,
+    title: (orderNumber: string) => `Счёт по заказу ${orderNumber}`,
+  },
+  {
+    kind: "WAYBILL",
+    templateCode: "WAYBILL_RU",
+    number: (_orderNumber: string, shipmentNumber: string) => `WB-${shipmentNumber}`,
+    title: (orderNumber: string) => `Накладная по заказу ${orderNumber}`,
+  },
+] as const;
+
+function formatMinorUnits(value: { toString(): string }) {
+  const minor = BigInt(value.toString());
+  const sign = minor < 0n ? "-" : "";
+  const absolute = minor < 0n ? -minor : minor;
+  return `${sign}${absolute / 100n}.${(absolute % 100n).toString().padStart(2, "0")}`;
+}
+
+function formatDestinationAddress(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const address = value as Record<string, unknown>;
+  const parts = [address.postalCode, address.city, address.region, address.line1, address.line2]
+    .filter((part): part is string => typeof part === "string" && part.trim().length > 0)
+    .map((part) => part.trim());
+  return parts.length ? parts.join(", ") : null;
+}
 
 @Injectable()
 export class DocumentsService {
@@ -139,6 +176,107 @@ export class DocumentsService {
       await tx.uploadAsset.update({ where: { id: asset.id }, data: { metadata: { documentId: document.id, documentKind: document.kind } } });
       return document;
     });
+  }
+
+  async generateOrderDocumentPack(orderId: string, input: GenerateOrderDocumentPackRequest, context: SupplierActorContext) {
+    const order = await this.prisma.supplierOrder.findUnique({
+      where: { id: orderId },
+      include: {
+        supplier: true,
+        buyer: true,
+        items: { include: { offer: { include: { productVariant: { include: { product: true } } } } } },
+        shipments: { where: { id: input.shipmentId }, include: { items: true, warehouse: true } },
+      },
+    });
+    if (!order) throw new NotFoundException("Supplier order not found");
+    if (order.supplierOrganizationId !== context.organizationId && !(await this.isOperator(context.organizationId))) {
+      throw new ForbiddenException("Only the order supplier or operator can generate order documents");
+    }
+    if (order.paymentStatus !== "PAID") throw new ConflictException("Order documents require confirmed payment");
+    const shipment = order.shipments[0];
+    if (!shipment) throw new BadRequestException("Shipment does not belong to this supplier order");
+    if (!["DISPATCHED", "IN_TRANSIT", "PARTIALLY_DELIVERED", "DELIVERED"].includes(shipment.status)) {
+      throw new ConflictException("Shipment must be dispatched before generating the document pack");
+    }
+    const destinationAddress = formatDestinationAddress(shipment.destinationAddress);
+    if (!destinationAddress) throw new ConflictException("Shipment destination address is required for the waybill");
+
+    const templates = await this.prisma.documentTemplate.findMany({
+      where: {
+        code: { in: orderDocumentDefinitions.map(({ templateCode }) => templateCode) },
+        status: "ACTIVE",
+        effectiveFrom: { lte: new Date() },
+        OR: [{ effectiveTo: null }, { effectiveTo: { gte: new Date() } }],
+      },
+      orderBy: { version: "desc" },
+    });
+    const templateByCode = new Map(templates.map((template) => [template.code, template]));
+    const missingTemplates = orderDocumentDefinitions.filter(({ templateCode }) => !templateByCode.has(templateCode));
+    if (missingTemplates.length) {
+      throw new ConflictException(`Active document templates are missing: ${missingTemplates.map(({ templateCode }) => templateCode).join(", ")}`);
+    }
+
+    const orderItemById = new Map(order.items.map((item) => [item.id, item]));
+    const orderItems = order.items.map((item, index) => {
+      const quantity = item.acceptedQuantity.toString();
+      return `${index + 1}. ${item.offer.productVariant.product.canonicalName} — ${quantity} × ${formatMinorUnits(item.unitPriceMinor)} = ${formatMinorUnits(item.totalPriceMinor)} ${item.currency}`;
+    }).join("\n");
+    const shipmentItems = shipment.items.map((item, index) => {
+      const orderItem = orderItemById.get(item.supplierOrderItemId);
+      return `${index + 1}. ${orderItem?.offer.productVariant.product.canonicalName ?? "Товар"} — ${item.quantity.toString()}`;
+    }).join("\n");
+    const total = formatMinorUnits(order.subtotalAmountMinor);
+
+    const generated = [];
+    for (const definition of orderDocumentDefinitions) {
+      const template = templateByCode.get(definition.templateCode)!;
+      const documentNumber = definition.number(order.orderNumber, shipment.shipmentNumber);
+      const existing = await this.prisma.document.findFirst({
+        where: {
+          ownerOrganizationId: order.supplierOrganizationId,
+          supplierOrderId: order.id,
+          shipmentId: shipment.id,
+          kind: definition.kind,
+          documentNumber,
+          status: { notIn: ["FAILED", "SUPERSEDED", "ARCHIVED"] },
+        },
+        orderBy: { version: "desc" },
+      });
+      if (existing) {
+        generated.push(existing);
+        continue;
+      }
+
+      const data = {
+        order: { number: order.orderNumber, total, currency: order.currency, items: orderItems },
+        invoice: { number: documentNumber, total, currency: order.currency },
+        shipment: { number: shipment.shipmentNumber, items: shipmentItems, trackingNumber: shipment.trackingNumber },
+        supplier: { name: order.supplier.legalName, bin: order.supplier.bin },
+        buyer: { name: order.buyer.legalName, bin: order.buyer.bin },
+        recipient: { name: shipment.recipientName, address: destinationAddress },
+        warehouse: { name: shipment.warehouse.name, address: shipment.warehouse.addressLine },
+      };
+      try {
+        generated.push(await this.generate({
+          ownerOrganizationId: order.supplierOrganizationId,
+          templateId: template.id,
+          checkoutId: order.checkoutId,
+          supplierOrderId: order.id,
+          shipmentId: shipment.id,
+          title: definition.title(order.orderNumber),
+          documentNumber,
+          data,
+          metadata: { purpose: "ORDER_DOCUMENT_PACK", snapshotVersion: 1 },
+        }, context));
+      } catch (error) {
+        if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2002") throw error;
+        generated.push(await this.prisma.document.findFirstOrThrow({
+          where: { ownerOrganizationId: order.supplierOrganizationId, documentNumber, version: 1 },
+        }));
+      }
+    }
+
+    return { supplierOrderId: order.id, shipmentId: shipment.id, documents: generated };
   }
 
   async createVersion(documentId: string, input: CreateDocumentVersionInput, context: SupplierActorContext) {

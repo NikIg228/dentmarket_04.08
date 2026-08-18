@@ -3,6 +3,7 @@ import { DocumentRendererService } from "./document-renderer.service";
 import { DocumentsController } from "./documents.controller";
 import { DocumentsService } from "./documents.service";
 import { SignatureAdapterRegistry } from "./signature-adapter-registry.service";
+import { OrderDocumentsController } from "./order-documents.controller";
 
-@Module({ controllers: [DocumentsController], providers: [DocumentsService, DocumentRendererService, SignatureAdapterRegistry], exports: [DocumentsService] })
+@Module({ controllers: [DocumentsController, OrderDocumentsController], providers: [DocumentsService, DocumentRendererService, SignatureAdapterRegistry], exports: [DocumentsService] })
 export class DocumentsModule {}

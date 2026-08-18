@@ -399,8 +399,8 @@ Gate намеренно разрешён только для локальной 
 - [x] Миграция `20260818130000_outbox_delivery_semantics` применена как 29-я;
   dispatcher tests, PostgreSQL regression и runtime split прошли.
 
-Текущий статус: **B0.1–B0.6, B1.1–B1.2 и B2.1–B2.2 реализованы и проходят**.
-Следующая задача: **B2.3 — доказать минимальный комплект документов заказа и отгрузки**.
+Текущий статус: **B0.1–B0.6, B1.1–B1.2 и B2.1–B2.3 реализованы и проходят**.
+Следующая задача: **B3.1 — доказать CSV staging → validation → matching**.
 
 ### B1 — покупка клиникой
 
@@ -447,7 +447,7 @@ Gate: одна клиника оформляет заказы у одного и
 | ------ | ---- | ------ | ---- |
 | [x] | B2.1 | Полное/частичное подтверждение supplier order | `pnpm verify:flow-b2` |
 | [x] | B2.2 | Статус отгрузки, уведомление клиники и audit trail | `pnpm verify:flow-b2` |
-| [ ] | B2.3 | Минимальные документы заказа и отгрузки | PostgreSQL + Playwright |
+| [x] | B2.3 | Минимальные документы заказа и отгрузки | PostgreSQL + Playwright |
 
 1. список новых заказов;
 2. подтверждение полного или частичного количества;
@@ -498,14 +498,44 @@ Gate: одна клиника оформляет заказы у одного и
   внутри заказа, а затем видит отдельное уведомление с теми же данными.
 - [x] Tenant isolation возвращает `403` чужому поставщику, а stale version
   возвращает `409` без второго перехода или лишнего audit/outbox evidence.
-- [x] `pnpm verify:flow-b2` проходит 3/3, `pnpm verify:web` — 13/13; сценарий
+- [x] После B2.3 `pnpm verify:flow-b2` проходит 4/4, `pnpm verify:web` — 14/14; сценарий
   включает viewport 390 px, проверку отсутствия page overflow и zero-residue
   очистку shipment/notification/audit/outbox fixtures.
 
 Ограничение B2.2: payment settlement является начальным условием сценария и
-не подменяется shipment-логикой. Закрытие доставки, proof of delivery и
-минимальный комплект invoice/specification/waybill остаются B2.3; внешний
+не подменяется shipment-логикой. Закрытие доставки и proof of delivery
+остаются отдельными задачами; document pack закрыт в B2.3 ниже, а внешний
 email-провайдер остаётся отдельным production-readiness gate.
+
+Выполнено в B2.3:
+
+- [x] Общие Zod-схемы, OpenAPI и `@marketplace/api-client` описывают
+  `POST /supplier-orders/:orderId/document-pack` и три документа ответа:
+  спецификацию, счёт и накладную.
+- [x] Комплект формируется только поставщиком заказа или оператором для
+  оплаченного заказа и уже отправленной отгрузки с адресом доставки; чужой
+  supplier tenant получает `403`, неверное состояние — `409`.
+- [x] Денежные значения и состав документов строятся сервером из persisted
+  order/shipment snapshot в PostgreSQL, без доверия произвольным данным UI;
+  деньги форматируются без JavaScript `number`.
+- [x] Reference seed детерминированно создаёт четыре шаблона, включая
+  `ORDER_SPECIFICATION_RU`, `INVOICE_RU` и `WAYBILL_RU`; все seed profiles
+  проходят с 10 клиниками, 10 поставщиками и 500 pilot offers.
+- [x] Повторное формирование идемпотентно возвращает те же три `Document` и не
+  создаёт дополнительные `document.generated` audit или `DocumentGenerated`
+  outbox events.
+- [x] Supplier и Buyer видят один и тот же комплект внутри заказа, скачивают
+  PDF/DOCX с checksum evidence; интерфейс имеет empty/error/success/busy
+  состояния и проходит viewport 390 px без page overflow.
+- [x] `pnpm verify:flow-b2` проходит 4/4, `pnpm verify:web` — 14/14; PostgreSQL
+  проверяет связи checkout/order/shipment, immutable snapshot, checksum,
+  audit/outbox, tenant isolation и zero-residue очистку файлов и записей.
+- [x] `pnpm typecheck`, `pnpm test`, `pnpm verify:core-contract`,
+  `pnpm verify:postgres` и `pnpm verify:seed-profiles` проходят.
+
+Ограничение B2.3: квалифицированная ЭЦП, внешний email, налоговый ЭСФ,
+production object storage и proof of delivery остаются отдельными
+production/legal gates и не имитируются локальным комплектом.
 
 ### B3 — catalog operations
 
@@ -578,7 +608,7 @@ Definition of Done: наблюдаемый итог, а не список фай
 
 Нельзя одновременно брать новую backend-функцию, редизайн трёх кабинетов и новую интеграцию. Это разные задачи и разные acceptance gates.
 
-## 11. Ближайший следующий шаг
+## 11. Зафиксированный результат B0.6
 
 Реализован **B0.6 Transactional Outbox**:
 
@@ -588,9 +618,8 @@ Definition of Done: наблюдаемый итог, а не список фай
 - [x] Notifications и payment order export подключены через handler registry.
 - [x] ADR, migration, CI gate и эксплуатационные правила обновлены вместе с кодом.
 
-Следующий этап — **B1.2 Flow A**: pilot clinic проходит поиск, карточку,
-сравнение, корзину, reprice, checkout и видит сохранённый заказ; тест проверяет
-результат в UI и PostgreSQL.
+B1.2 и B2.1–B2.3 после этого этапа также закрыты. Текущая следующая задача
+зафиксирована в разделе 8: **B3.1 — CSV staging → validation → matching**.
 
 ## 12. Команды локальной проверки
 
