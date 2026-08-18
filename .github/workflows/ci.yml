@@ -61,6 +61,7 @@ jobs:
       - run: pnpm --filter @marketplace/api exec prisma validate
       - run: pnpm typecheck
       - run: pnpm test
+      - run: pnpm verify:outbox
       - run: pnpm build
       - run: pnpm verify:runtime-split
       - run: pnpm verify:core-contract

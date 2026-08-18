@@ -337,7 +337,7 @@ Gate намеренно разрешён только для локальной 
 | [x]    | B0.3 | Runtime split                | API не запускает worker jobs; worker имеет отдельный entrypoint | `pnpm verify:runtime-split` |
 | [x]    | B0.4 | PostgreSQL integration suite | Concurrency, rollback, idempotency, tenant isolation            | `pnpm verify:postgres`      |
 | [x]    | B0.5 | Seed profiles                | reference/operator/pilot/test разделены                         | `pnpm verify:seed-profiles` |
-| [ ]    | B0.6 | Outbox ADR                   | Однозначные delivery/status/retry правила                       | dispatcher tests            |
+| [x]    | B0.6 | Outbox ADR                   | Однозначные delivery/status/retry правила                       | `pnpm verify:outbox`        |
 
 Выполнено в B0.2:
 
@@ -384,11 +384,32 @@ Gate намеренно разрешён только для локальной 
 - [x] Повторный pilot seed обновляет свои записи через upsert и не удаляет offers, на которые уже ссылаются carts или orders.
 - [x] `pnpm verify:seed-profiles` добавлен в CI после синхронизации каталога.
 
-Текущий статус: **B0.1–B0.5 реализованы и проходят**. Следующая задача: **B0.6 Outbox ADR**.
+Выполнено в B0.6:
+
+- [x] ADR 005 фиксирует at-least-once delivery, статусы, claim lease, retry,
+  dead-letter и требования идемпотентности.
+- [x] Все события обрабатываются единым dispatcher, а не остаются бессрочно
+  `PENDING` вне `PaymentCaptured`.
+- [x] Conditional claim защищает от двух одновременных worker; просроченный
+  `PROCESSING` lease восстанавливается.
+- [x] Retry использует exponential backoff до одного часа; постоянная ошибка
+  или исчерпание `maxAttempts` переводит событие в `DEAD_LETTER`.
+- [x] Проекция уведомлений и `PaymentCaptured -> ORDER_EXPORT` зарегистрированы
+  как идемпотентные handlers.
+- [x] Миграция `20260818130000_outbox_delivery_semantics` применена как 29-я;
+  dispatcher tests, PostgreSQL regression и runtime split прошли.
+
+Текущий статус: **B0.1–B0.6 реализованы и проходят; фундамент B0 закрыт**.
+Следующая задача: **B1.2 — доказать Flow A в браузере на pilot fixture**.
 
 ### B1 — покупка клиникой
 
-Зафиксировать один безусловно рабочий путь:
+| Готово | ID   | Задача                         | Gate |
+| ------ | ---- | ------------------------------ | ---- |
+| [x]    | B1.1 | Актуализация корзины            | `pnpm verify:postgres` |
+| [ ]    | B1.2 | Flow A: поиск → сохранённый заказ | Playwright + DB assertion |
+
+B1.2 должен зафиксировать один безусловно рабочий путь:
 
 1. поиск;
 2. карточка;
@@ -402,6 +423,11 @@ Gate: одна клиника оформляет заказы у одного и
 
 ### B2 — исполнение поставщиком
 
+| Готово | ID   | Задача | Gate |
+| ------ | ---- | ------ | ---- |
+| [ ] | B2.1 | Полное/частичное подтверждение supplier order | PostgreSQL + Playwright |
+| [ ] | B2.2 | Статус отгрузки, уведомление клиники и audit trail | PostgreSQL + Playwright |
+
 1. список новых заказов;
 2. подтверждение полного или частичного количества;
 3. корректировка резерва;
@@ -410,6 +436,12 @@ Gate: одна клиника оформляет заказы у одного и
 6. audit trail.
 
 ### B3 — catalog operations
+
+| Готово | ID   | Задача | Gate |
+| ------ | ---- | ------ | ---- |
+| [ ] | B3.1 | CSV staging → validation → matching | integration test |
+| [ ] | B3.2 | Operator review → publication → Buyer visibility | PostgreSQL + Playwright |
+| [ ] | B3.3 | Откат ошибочного batch без потери raw/evidence | integration test |
 
 1. импорт поставщика в staging;
 2. validation report;
@@ -420,17 +452,20 @@ Gate: одна клиника оформляет заказы у одного и
 
 ### B4 — эксплуатационный минимум
 
-- metrics и alerts;
-- backup/restore rehearsal;
-- dead-letter operations;
-- rate limiting;
-- production auth runbook;
-- security and dependency scan;
-- нагрузочный профиль каталога и checkout.
+- [ ] B4.1 — metrics и alerts;
+- [ ] B4.2 — backup/restore rehearsal;
+- [ ] B4.3 — dead-letter operations и защищённый replay;
+- [ ] B4.4 — rate limiting и production auth runbook;
+- [ ] B4.5 — security/dependency scan;
+- [ ] B4.6 — нагрузочный профиль каталога и checkout.
 
 ### B5 — frontend unification
 
 Начинать после B0.2 и стабильного B1. Общая дизайн-система должна использовать общий типизированный API client, общие состояния loading/error/empty и одинаковую терминологию. Marketplace, кабинет клиники, поставщика и оператора сохраняют разные задачи, но не разные визуальные языки.
+
+- [ ] B5.1 — Buyer V2 routes и feature-компоненты поверх подтверждённого B1.
+- [ ] B5.2 — Supplier journey без монолитного route-файла.
+- [ ] B5.3 — Operator P0/P1 work queue и единый visual language.
 
 ## 9. Как ставить задачи Codex партнёру
 
@@ -473,16 +508,17 @@ Definition of Done: наблюдаемый итог, а не список фай
 
 ## 11. Ближайший следующий шаг
 
-Реализован **B0.4 PostgreSQL integration suite**:
+Реализован **B0.6 Transactional Outbox**:
 
-- [x] Concurrency: условное резервирование не допускает отрицательный остаток.
-- [x] Rollback: ошибка внутри checkout-транзакции не оставляет частичных данных.
-- [x] Idempotency: конкурентный повтор не создаёт дубликаты checkout/order/reservation.
-- [x] Tenant isolation: чужая клиника получает `403` и не может прочитать или изменить корзину.
-- [x] Cleanup: временные fixtures и SQL trigger гарантированно удаляются.
-- [x] CI: отдельный PostgreSQL 17 job выполняет `pnpm verify:postgres`.
+- [x] Статусы `PENDING → PROCESSING → PUBLISHED/FAILED/DEAD_LETTER` однозначны.
+- [x] Conditional claim и lease recovery покрыты тестами.
+- [x] Retry/backoff, permanent error и max-attempt DLQ покрыты тестами.
+- [x] Notifications и payment order export подключены через handler registry.
+- [x] ADR, migration, CI gate и эксплуатационные правила обновлены вместе с кодом.
 
-Следующий этап — **B0.5 Seed profiles**: разделить reference, operator, pilot и test данные и добавить manifest/count assertions.
+Следующий этап — **B1.2 Flow A**: pilot clinic проходит поиск, карточку,
+сравнение, корзину, reprice, checkout и видит сохранённый заказ; тест проверяет
+результат в UI и PostgreSQL.
 
 ## 12. Команды локальной проверки
 
@@ -491,6 +527,7 @@ pnpm db:prepare-pilot
 pnpm typecheck
 pnpm test
 pnpm verify:runtime-split
+pnpm verify:outbox
 pnpm verify:postgres
 pnpm verify:core-contract
 pnpm verify:pilot-backend

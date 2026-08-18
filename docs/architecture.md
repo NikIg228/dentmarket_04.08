@@ -15,29 +15,32 @@
 
 ## Доменные границы
 
-| Модуль | Ответственность |
-| --- | --- |
-| identity | Пользователь, аутентификация, 2FA, сессии |
-| organizations | Организации, capabilities, memberships, филиалы |
-| access-control | Role, Permission, assignments, permission evaluation |
-| approvals | ApprovalPolicy, условия и решения согласующих |
-| geography | Страны, регионы, города и адреса |
-| industries | Отрасли и конфигурация вертикалей |
-| catalog | Категории, бренды, производители, товары, варианты и атрибуты |
-| suppliers | Профили поставщиков, склады и источники данных |
-| imports | Файлы, batches, raw rows и column mapping |
-| matching | Нормализация, кандидаты и объяснимый score |
-| pricing | Публикации, цены, история, tiers и contract pricing |
-| inventory | Balances, lots, reservations, FEFO и recalls |
-| orders | Cart, Checkout, SupplierOrder и state machines |
-| payments | Intents, allocations, ledger, refunds и reconciliation |
-| integrations | Connections, bindings, mappings, adapters, jobs, webhooks и external reservations |
-| audit | Неизменяемый журнал критических действий |
+| Модуль         | Ответственность                                                                   |
+| -------------- | --------------------------------------------------------------------------------- |
+| identity       | Пользователь, аутентификация, 2FA, сессии                                         |
+| organizations  | Организации, capabilities, memberships, филиалы                                   |
+| access-control | Role, Permission, assignments, permission evaluation                              |
+| approvals      | ApprovalPolicy, условия и решения согласующих                                     |
+| geography      | Страны, регионы, города и адреса                                                  |
+| industries     | Отрасли и конфигурация вертикалей                                                 |
+| catalog        | Категории, бренды, производители, товары, варианты и атрибуты                     |
+| suppliers      | Профили поставщиков, склады и источники данных                                    |
+| imports        | Файлы, batches, raw rows и column mapping                                         |
+| matching       | Нормализация, кандидаты и объяснимый score                                        |
+| pricing        | Публикации, цены, история, tiers и contract pricing                               |
+| inventory      | Balances, lots, reservations, FEFO и recalls                                      |
+| orders         | Cart, Checkout, SupplierOrder и state machines                                    |
+| payments       | Intents, allocations, ledger, refunds и reconciliation                            |
+| integrations   | Connections, bindings, mappings, adapters, jobs, webhooks и external reservations |
+| audit          | Неизменяемый журнал критических действий                                          |
 
 ## Сквозные механизмы
 
 - PostgreSQL является источником истины.
-- Transactional outbox записывается в транзакции с доменным изменением.
+- Transactional outbox записывается в транзакции с доменным изменением и
+  доставляется по правилам [ADR 005](adr/005-transactional-outbox-delivery.md):
+  conditional claim, lease recovery, idempotent handlers, retry/backoff и
+  terminal `DEAD_LETTER`.
 - Все повторяемые write-операции используют сохранённый idempotency key.
 - Конкурентное резервирование использует row lock или conditional update.
 - Изменяемые агрегаты имеют optimistic `version`.

@@ -101,6 +101,7 @@ enum OutboxStatus {
   PROCESSING
   PUBLISHED
   FAILED
+  DEAD_LETTER
 }
 
 enum SupplierDataSourceType {
@@ -4029,7 +4030,10 @@ model OutboxEvent {
   payload       Json
   status        OutboxStatus @default(PENDING)
   attempts      Int          @default(0)
+  maxAttempts   Int          @default(10)
   availableAt   DateTime     @default(now())
+  lockedAt      DateTime?
+  lockedBy      String?
   publishedAt   DateTime?
   lastError     String?
   createdAt     DateTime     @default(now())

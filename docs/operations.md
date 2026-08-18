@@ -9,7 +9,10 @@ PostgreSQL остаётся source of truth. Redis/BullMQ выполняет ф�
 - API liveness: `GET /api/health`.
 - API readiness: `GET /api/health/ready` проверяет PostgreSQL, обязательную очередь и object storage; только этот endpoint следует использовать для снятия pod из traffic.
 - Все ответы содержат `x-request-id`; логи включают correlation ID, trace ID, actor и organization.
-- BullMQ failed jobs сохраняются с exponential backoff, а DB-level jobs переходят в dead-letter status после исчерпания попыток.
+- BullMQ только будит обработчики. `OutboxEvent` хранит durable lifecycle в
+  PostgreSQL: retryable-ошибка получает exponential backoff, постоянная ошибка
+  или исчерпание `maxAttempts` переводит событие в `DEAD_LETTER`, а
+  просроченный `PROCESSING` lease может быть безопасно reclaimed.
 - Sentry включается только при наличии `SENTRY_DSN`.
 
 Scheduler `MarketplaceAgreementsService.processRenewals` ежедневно закрывает истёкшие договоры либо переносит активный AUTO_ANNUAL договор на следующий год. После длительного простоя он догоняет все пропущенные годовые периоды за один idempotent transaction. Новая версия обязательного шаблона переводит договор в `SUPERSEDED` и требует повторной ЭЦП.
@@ -49,3 +52,8 @@ Production backup/restore, immutable release and rollback описаны в [`pr
 3. Проверить outbox, integration jobs, notification attempts и reconciliation.
 4. Не изменять ledger и signed documents вручную; использовать compensating operation/version.
 5. После устранения выполнить targeted retry и записать incident decision в audit/operations log.
+
+До B4.3 ручной replay `OutboxEvent.DEAD_LETTER` не является штатной кнопкой:
+нельзя менять payload или статус напрямую без отдельной проверяемой процедуры.
+При диагностике фиксируются event ID, `eventType`, `attempts`, `lastError`,
+`lockedBy` и связанный aggregate.
