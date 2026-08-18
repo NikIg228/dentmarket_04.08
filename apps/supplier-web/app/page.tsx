@@ -43,7 +43,7 @@ import {
   formatStatus,
   type NavigationItem,
 } from "@marketplace/ui";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import styles from "./page.module.css";
 import { PromotionsPanel } from "./promotions-panel";
 import { SupplierTrustPanel } from "./supplier-trust-panel";
@@ -54,6 +54,7 @@ import {
   OrderConfirmationPanel,
   type OrderConfirmationDecision,
 } from "./order-confirmation-panel";
+import { ShipmentPanel, type ShipmentOrder as Order } from "./shipment-panel";
 
 const OPERATOR_ID = "00000000-0000-4000-8000-000000000002";
 const OPERATOR_ORG_ID = "00000000-0000-4000-8000-000000000001";
@@ -150,25 +151,6 @@ type Balance = {
     expirationDate: string | null;
     quantityAvailable: string;
     status: string;
-  }>;
-};
-type Order = {
-  id: string;
-  supplierOrganizationId: string;
-  orderNumber: string;
-  status: string;
-  subtotalAmountMinor: string;
-  currency: string;
-  createdAt: string;
-  buyer: { displayName: string };
-  items: Array<{
-    id: string;
-    quantity: string;
-    acceptedQuantity: string | null;
-    decisionReason: string | null;
-    unitPriceMinor: string;
-    status: string;
-    offer: { productVariant: { product: { canonicalName: string } } };
   }>;
 };
 type Integration = {
@@ -382,9 +364,9 @@ export default function SupplierWorkspace() {
     (check) => check.sellerOrganizationId === supplierId,
   );
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (silent = false) => {
     if (!handoffChecked) return;
-    setLoading(true);
+    if (!silent) setLoading(true);
     setError(null);
     try {
       const [
@@ -458,7 +440,7 @@ export default function SupplierWorkspace() {
     } catch (cause) {
       setError(errorMessage(cause));
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [api, handoffChecked, supplierId]);
 
@@ -942,7 +924,7 @@ export default function SupplierWorkspace() {
                   `/suppliers/${supplierId}/inventory/freshness/recompute`,
                   { staleAfterMinutes: 1440 },
                 )
-                .then(refresh)
+                .then(() => refresh())
             }
           >
             Пересчитать
@@ -1102,7 +1084,8 @@ export default function SupplierWorkspace() {
               </thead>
               <tbody>
                 {supplierOrders.map((order) => (
-                  <tr key={order.id}>
+                  <Fragment key={order.id}>
+                  <tr>
                     <td>
                       <strong>{order.orderNumber}</strong>
                       <small>{formatDate(order.createdAt, true)}</small>
@@ -1137,6 +1120,14 @@ export default function SupplierWorkspace() {
                       )}
                     </td>
                   </tr>
+                  {order.status !== "AWAITING_CONFIRMATION" && order.status !== "REJECTED" ? (
+                    <tr>
+                      <td colSpan={6}>
+                        <ShipmentPanel order={order} api={api} onChanged={() => refresh(true)} />
+                      </td>
+                    </tr>
+                  ) : null}
+                  </Fragment>
                 ))}
               </tbody>
             </table>

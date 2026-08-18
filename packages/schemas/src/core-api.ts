@@ -5,6 +5,20 @@ const dateTimeSchema = z.iso.datetime();
 const nullableDateTimeSchema = dateTimeSchema.nullable();
 const currencySchema = z.string().regex(/^[A-Z]{3}$/);
 
+export const shipmentStatusSchema = z.enum([
+  "DRAFT",
+  "PLANNED",
+  "PACKING",
+  "READY",
+  "DISPATCHED",
+  "IN_TRANSIT",
+  "PARTIALLY_DELIVERED",
+  "DELIVERED",
+  "FAILED",
+  "CANCELLED",
+  "RETURNED",
+]);
+
 export const errorResponseSchema = z
   .object({
     statusCode: z.number().int(),
@@ -373,6 +387,11 @@ export const supplierOrderItemResponseSchema = z
     totalPriceMinor: decimalStringSchema,
     currency: currencySchema,
     status: z.string(),
+    warehouseId: z.uuid(),
+    warehouse: z
+      .object({ id: z.uuid(), name: z.string(), code: z.string() })
+      .passthrough()
+      .optional(),
     reservation: inventoryReservationResponseSchema.nullable().optional(),
     offer: z
       .object({
@@ -388,6 +407,62 @@ export const supplierOrderItemResponseSchema = z
       .optional(),
   })
   .passthrough();
+
+export const fulfillmentStepResponseSchema = z
+  .object({
+    id: z.uuid(),
+    shipmentId: z.uuid(),
+    type: z.string(),
+    status: z.string(),
+    sequence: z.number().int().positive(),
+    scheduledAt: nullableDateTimeSchema,
+    startedAt: nullableDateTimeSchema,
+    completedAt: nullableDateTimeSchema,
+    notes: z.string().nullable(),
+  })
+  .passthrough();
+
+export const shipmentItemResponseSchema = z
+  .object({
+    id: z.uuid(),
+    shipmentId: z.uuid(),
+    supplierOrderItemId: z.uuid(),
+    quantity: decimalStringSchema,
+    deliveredQuantity: decimalStringSchema,
+  })
+  .passthrough();
+
+export const shipmentResponseSchema = z
+  .object({
+    id: z.uuid(),
+    supplierOrderId: z.uuid(),
+    warehouseId: z.uuid(),
+    shipmentNumber: z.string(),
+    method: z.string(),
+    status: shipmentStatusSchema,
+    trackingNumber: z.string().nullable(),
+    carrierName: z.string().nullable(),
+    pickup: z.boolean(),
+    deliveryWindowStart: nullableDateTimeSchema,
+    deliveryWindowEnd: nullableDateTimeSchema,
+    recipientName: z.string(),
+    recipientPhone: z.string().nullable(),
+    dispatchedAt: nullableDateTimeSchema,
+    deliveredAt: nullableDateTimeSchema,
+    failureReason: z.string().nullable(),
+    version: z.number().int().positive(),
+    warehouse: z
+      .object({ id: z.uuid(), name: z.string(), code: z.string() })
+      .passthrough()
+      .optional(),
+    items: z.array(shipmentItemResponseSchema),
+    fulfillmentSteps: z.array(fulfillmentStepResponseSchema),
+    createdAt: dateTimeSchema,
+    updatedAt: dateTimeSchema,
+  })
+  .passthrough();
+
+export const shipmentListResponseSchema = z.array(shipmentResponseSchema);
 
 export const supplierOrderResponseSchema = z
   .object({
@@ -405,6 +480,7 @@ export const supplierOrderResponseSchema = z
     supplier: organizationSummarySchema.optional(),
     buyer: organizationSummarySchema.optional(),
     items: z.array(supplierOrderItemResponseSchema),
+    shipments: z.array(shipmentResponseSchema).optional(),
     createdAt: dateTimeSchema,
     updatedAt: dateTimeSchema,
   })
@@ -443,3 +519,4 @@ export type CartValidationResponse = z.infer<
 >;
 export type CheckoutResponse = z.infer<typeof checkoutResponseSchema>;
 export type SupplierOrderResponse = z.infer<typeof supplierOrderResponseSchema>;
+export type ShipmentResponse = z.infer<typeof shipmentResponseSchema>;

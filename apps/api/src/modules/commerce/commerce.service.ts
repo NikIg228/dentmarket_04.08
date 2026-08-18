@@ -947,12 +947,21 @@ export class CommerceService {
         items: {
           include: {
             reservation: { include: { externalReservation: true } },
+            warehouse: true,
             offer: {
               include: { productVariant: { include: { product: true } } },
             },
           },
         },
         paymentAllocation: true,
+        shipments: {
+          include: {
+            warehouse: true,
+            items: true,
+            fulfillmentSteps: { orderBy: { sequence: "asc" } },
+          },
+          orderBy: { createdAt: "desc" },
+        },
       },
       orderBy: { createdAt: "desc" },
     });
@@ -971,12 +980,21 @@ export class CommerceService {
         items: {
           include: {
             reservation: { include: { externalReservation: true } },
+            warehouse: true,
             offer: {
               include: { productVariant: { include: { product: true } } },
             },
           },
         },
         paymentAllocation: true,
+        shipments: {
+          include: {
+            warehouse: true,
+            items: true,
+            fulfillmentSteps: { orderBy: { sequence: "asc" } },
+          },
+          orderBy: { createdAt: "desc" },
+        },
       },
       orderBy: { createdAt: "desc" },
     });

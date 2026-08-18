@@ -8,10 +8,13 @@ import type {
   CheckoutResponse,
   CompareOffersRequest,
   ConfirmSupplierOrderRequest,
+  CreateShipmentRequest,
   CreateCartRequest,
   OfferComparisonResponse,
   SearchCatalogRequest,
   SupplierOrderResponse,
+  ShipmentResponse,
+  TransitionShipmentRequest,
 } from "@marketplace/schemas";
 
 export type ApiContext = {
@@ -232,6 +235,29 @@ export class MarketplaceApiClient {
   confirmSupplierOrder(orderId: string, input: ConfirmSupplierOrderRequest) {
     return this.post<SupplierOrderResponse>(
       `/supplier-orders/${orderId}/confirm`,
+      input,
+    );
+  }
+
+  listOrderShipments(orderId: string) {
+    return this.get<ShipmentResponse[]>(
+      `/supplier-orders/${orderId}/shipments`,
+    );
+  }
+
+  createShipment(orderId: string, input: CreateShipmentRequest) {
+    return this.post<ShipmentResponse>(
+      `/supplier-orders/${orderId}/shipments`,
+      input,
+    );
+  }
+
+  transitionShipment(
+    shipmentId: string,
+    input: TransitionShipmentRequest,
+  ) {
+    return this.post<ShipmentResponse>(
+      `/shipments/${shipmentId}/transitions`,
       input,
     );
   }

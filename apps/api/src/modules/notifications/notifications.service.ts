@@ -439,6 +439,15 @@ export class NotificationsService implements OnModuleInit {
   }
 
   private bodyFor(eventType: string, payload: Record<string, unknown>) {
+    if (eventType === "ShipmentStatusChanged") {
+      const shipment = typeof payload.shipmentNumber === "string" ? payload.shipmentNumber : "отгрузка";
+      const order = typeof payload.orderNumber === "string" ? ` по заказу ${payload.orderNumber}` : "";
+      const previous = typeof payload.previousStatus === "string" ? payload.previousStatus : null;
+      const current = typeof payload.status === "string" ? payload.status : null;
+      const transition = previous && current ? `${previous} → ${current}` : (current ?? "изменён");
+      const tracking = typeof payload.trackingNumber === "string" && payload.trackingNumber ? ` Трек-номер: ${payload.trackingNumber}.` : "";
+      return `Отгрузка ${shipment}${order}: ${transition}.${tracking}`.trim();
+    }
     const status =
       typeof payload.status === "string" ? ` Статус: ${payload.status}.` : "";
     const reasons = Array.isArray(payload.reasons)

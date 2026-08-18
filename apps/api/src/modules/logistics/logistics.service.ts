@@ -286,8 +286,8 @@ export class LogisticsService {
         await tx.supplierOrder.update({ where: { id: shipment.supplierOrderId }, data: { status: orderStatus, version: { increment: 1 } } });
       }
       const updated = await tx.shipment.findUniqueOrThrow({ where: { id: shipmentId }, include: { items: { include: { supplierOrderItem: true } }, fulfillmentSteps: { orderBy: { sequence: "asc" } }, warehouse: true } });
-      await tx.auditLog.create({ data: { ...context, action: "shipment.status_changed", entityType: "Shipment", entityId: shipment.id, before: { status: shipment.status, version: shipment.version }, after: { status: updated.status, version: updated.version } } });
-      await tx.outboxEvent.create({ data: { aggregateType: "Shipment", aggregateId: shipment.id, eventType: "ShipmentStatusChanged", payload: { shipmentId: shipment.id, supplierOrderId: shipment.supplierOrderId, previousStatus: shipment.status, status: updated.status, trackingNumber: updated.trackingNumber } } });
+      await tx.auditLog.create({ data: { ...context, action: "shipment.status_changed", entityType: "Shipment", entityId: shipment.id, before: { status: shipment.status, version: shipment.version }, after: { status: updated.status, version: updated.version, supplierOrderId: shipment.supplierOrderId, trackingNumber: updated.trackingNumber } } });
+      await tx.outboxEvent.create({ data: { aggregateType: "Shipment", aggregateId: shipment.id, eventType: "ShipmentStatusChanged", payload: { shipmentId: shipment.id, shipmentNumber: updated.shipmentNumber, supplierOrderId: shipment.supplierOrderId, orderNumber: shipment.supplierOrder.orderNumber, supplierOrganizationId: shipment.supplierOrder.supplierOrganizationId, buyerOrganizationId: shipment.supplierOrder.buyerOrganizationId, previousStatus: shipment.status, status: updated.status, trackingNumber: updated.trackingNumber, carrierName: updated.carrierName } } });
       return updated;
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   }

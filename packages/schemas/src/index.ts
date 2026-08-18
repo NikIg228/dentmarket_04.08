@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { shipmentStatusSchema } from "./core-api.js";
 
 export * from "./commercial.js";
 export * from "./trust-commerce.js";
@@ -708,7 +709,7 @@ export const createShipmentSchema = z.object({
 
 export const transitionShipmentSchema = z.object({
   version: z.number().int().positive(),
-  status: z.enum(["PLANNED", "PACKING", "READY", "DISPATCHED", "IN_TRANSIT", "PARTIALLY_DELIVERED", "DELIVERED", "FAILED", "CANCELLED", "RETURNED"]),
+  status: shipmentStatusSchema.exclude(["DRAFT"]),
   trackingNumber: z.string().trim().max(160).nullable().optional(),
   carrierName: z.string().trim().max(160).nullable().optional(),
   failureReason: z.string().trim().max(1_000).nullable().optional(),
@@ -729,6 +730,8 @@ export type UpdateDeliveryRuleInput = z.infer<typeof updateDeliveryRuleSchema>;
 export type DeliveryQuoteInput = z.infer<typeof deliveryQuoteSchema>;
 export type CreateShipmentInput = z.infer<typeof createShipmentSchema>;
 export type TransitionShipmentInput = z.infer<typeof transitionShipmentSchema>;
+export type CreateShipmentRequest = z.input<typeof createShipmentSchema>;
+export type TransitionShipmentRequest = z.input<typeof transitionShipmentSchema>;
 export type TransitionFulfillmentStepInput = z.infer<typeof transitionFulfillmentStepSchema>;
 
 export const documentKindSchema = z.enum(["MARKETPLACE_SUPPLIER_AGREEMENT", "MARKETPLACE_BUYER_TERMS", "FRAMEWORK_SUPPLY_AGREEMENT", "ORDER_SPECIFICATION", "ORDER_CONFIRMATION", "INVOICE", "WAYBILL", "ACCOMPANYING_DOCUMENT", "TAX_CLOSING_DOCUMENT", "INSTALLATION_ACT", "TRAINING_ACT", "WARRANTY", "COMMISSIONING_ACT", "REGISTRATION_CERTIFICATE", "LICENSE", "CERTIFICATE", "OTHER"]);

@@ -4,8 +4,11 @@ import { ApiTags } from "@nestjs/swagger";
 import { PermissionsGuard } from "../access-control/permissions.guard";
 import { RequirePermissions } from "../access-control/require-permissions.decorator";
 import { LogisticsService } from "./logistics.service";
+import { ApiCoreBody, ApiCoreErrors, ApiCoreProtected, ApiCoreResponse, ApiUuidParam } from "../../platform/openapi/core-openapi";
 
 @ApiTags("logistics")
+@ApiCoreProtected()
+@ApiCoreErrors()
 @UseGuards(PermissionsGuard)
 @Controller()
 export class LogisticsController {
@@ -66,12 +69,17 @@ export class LogisticsController {
   }
 
   @Get("supplier-orders/:orderId/shipments")
+  @ApiUuidParam("orderId", "Supplier order identifier")
+  @ApiCoreResponse("ShipmentListResponse")
   @RequirePermissions("delivery.view")
   shipments(@Param("orderId") orderId: string, @Headers("x-user-id") actorId: string, @Headers("x-organization-id") organizationId: string) {
     return this.logistics.shipments(orderId, this.context(actorId, organizationId));
   }
 
   @Post("supplier-orders/:orderId/shipments")
+  @ApiUuidParam("orderId", "Supplier order identifier")
+  @ApiCoreBody("CreateShipmentRequest")
+  @ApiCoreResponse("ShipmentResponse", 201)
   @RequirePermissions("shipment.manage")
   createShipment(@Param("orderId") orderId: string, @Body() body: unknown, @Headers("x-user-id") actorId: string, @Headers("x-organization-id") organizationId: string) {
     const parsed = createShipmentSchema.safeParse(body); if (!parsed.success) throw new BadRequestException(parsed.error.flatten());
@@ -79,6 +87,9 @@ export class LogisticsController {
   }
 
   @Post("shipments/:shipmentId/transitions")
+  @ApiUuidParam("shipmentId", "Shipment identifier")
+  @ApiCoreBody("TransitionShipmentRequest")
+  @ApiCoreResponse("ShipmentResponse", 201)
   @RequirePermissions("shipment.manage")
   transitionShipment(@Param("shipmentId") shipmentId: string, @Body() body: unknown, @Headers("x-user-id") actorId: string, @Headers("x-organization-id") organizationId: string) {
     const parsed = transitionShipmentSchema.safeParse(body); if (!parsed.success) throw new BadRequestException(parsed.error.flatten());

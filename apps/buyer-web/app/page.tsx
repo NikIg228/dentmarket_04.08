@@ -66,6 +66,7 @@ import {
 import styles from "./page.module.css";
 import { BuyerServicesPanel } from "./buyer-services-panel";
 import { OrderDecisionDetails } from "./order-decision-details";
+import { OrderShipments, type BuyerShipment } from "./order-shipments";
 import { SmartCommercePanel } from "./smart-commerce-panel";
 import publicCatalogData from "./data/public-catalog-fallback.json";
 import publicCatalogMedia from "./data/public-catalog-media.json";
@@ -593,6 +594,7 @@ type SupplierOrder = {
   currency: string;
   createdAt: string;
   supplier: { displayName: string };
+  shipments?: BuyerShipment[];
   items: Array<{
     id: string;
     quantity: string;
@@ -3148,6 +3150,13 @@ export default function BuyerWorkspace({
                       <tr>
                         <td colSpan={6}>
                           <OrderDecisionDetails order={order} />
+                        </td>
+                      </tr>
+                    ) : null}
+                    {order.shipments?.length ? (
+                      <tr>
+                        <td colSpan={6}>
+                          <OrderShipments shipments={order.shipments} />
                         </td>
                       </tr>
                     ) : null}

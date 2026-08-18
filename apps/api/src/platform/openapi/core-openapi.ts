@@ -27,6 +27,7 @@ import {
   checkoutResponseSchema,
   compareOffersSchema,
   confirmSupplierOrderSchema,
+  createShipmentSchema,
   createCartSchema,
   errorResponseSchema,
   healthResponseSchema,
@@ -36,6 +37,9 @@ import {
   searchCatalogSchema,
   supplierOrderListResponseSchema,
   supplierOrderResponseSchema,
+  shipmentListResponseSchema,
+  shipmentResponseSchema,
+  transitionShipmentSchema,
 } from "@marketplace/schemas";
 import { z, type ZodType } from "zod";
 
@@ -65,6 +69,8 @@ const coreZodSchemas = {
   AddCartItemRequest: addCartItemSchema,
   CheckoutCartRequest: checkoutCartSchema,
   ConfirmSupplierOrderRequest: confirmSupplierOrderSchema,
+  CreateShipmentRequest: createShipmentSchema,
+  TransitionShipmentRequest: transitionShipmentSchema,
   CatalogSearchResponse: catalogSearchResponseSchema,
   OfferComparisonResponse: offerComparisonResponseSchema,
   CartResponse: cartResponseSchema,
@@ -74,6 +80,8 @@ const coreZodSchemas = {
   CheckoutResponse: checkoutResponseSchema,
   SupplierOrderResponse: supplierOrderResponseSchema,
   SupplierOrderListResponse: supplierOrderListResponseSchema,
+  ShipmentResponse: shipmentResponseSchema,
+  ShipmentListResponse: shipmentListResponseSchema,
 } satisfies Record<string, ZodType>;
 
 export type CoreOpenApiSchemaName = keyof typeof coreZodSchemas;

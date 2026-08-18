@@ -1,0 +1,6 @@
+.panel { display: grid; gap: 10px; padding: 12px 14px; border: 1px solid var(--colorNeutralStroke2); border-radius: 8px; background: var(--colorNeutralBackground2); }
+.list { display: grid; gap: 8px; }
+.item { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 10px 12px; border: 1px solid var(--colorNeutralStroke3); border-radius: 6px; background: var(--colorNeutralBackground1); }
+.item p { margin: 4px 0; color: var(--colorNeutralForeground3); font-size: 12px; line-height: 1.45; }
+.item small { color: var(--colorNeutralForeground3); }
+@media (max-width: 650px) { .item { flex-direction: column; } }

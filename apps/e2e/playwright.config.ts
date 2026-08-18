@@ -30,11 +30,12 @@ export default defineConfig({
         API_PORT: "4012",
         AUTH_MODE: "development",
         DEPLOYMENT_PROFILE: "pilot",
+        PROCESS_ROLE: "all",
         BACKGROUND_QUEUE_ENABLED: "false",
         OBJECT_STORAGE_DRIVER: "local",
       },
       reuseExistingServer: true,
-      timeout: 60_000,
+      timeout: 120_000,
     },
     {
       command: "pnpm --filter @marketplace/admin-web exec next start --port 3010",

@@ -363,6 +363,13 @@ function collectBrowserErrors(page: Page) {
   return errors;
 }
 
+async function openNavigationIfCollapsed(page: Page) {
+  if ((page.viewportSize()?.width ?? 1_280) > 650) return;
+  const trigger = page.getByRole("button", { name: "Открыть меню" });
+  await expect(trigger).toBeVisible();
+  await trigger.click();
+}
+
 async function openSupplierOrder(page: Page, orderNumber: string) {
   const handoff = encodeURIComponent(
     JSON.stringify({
@@ -377,7 +384,11 @@ async function openSupplierOrder(page: Page, orderNumber: string) {
   await expect(
     page.getByRole("combobox", { name: "Организация поставщика" }),
   ).toHaveValue(supplier.organizationId);
-  await page.getByRole("button", { name: /^Заказы/ }).click();
+  await openNavigationIfCollapsed(page);
+  await page
+    .getByRole("navigation")
+    .getByRole("button", { name: /^Заказы/ })
+    .click();
   await expect(
     page.getByRole("heading", { name: "Заказы покупателей" }),
   ).toBeVisible();
@@ -418,7 +429,11 @@ async function openBuyerOrders(page: Page) {
     }),
   );
   await page.goto(`${BUYER_URL}/#session=${handoff}`);
-  await page.getByRole("button", { name: /^Заказы/ }).click();
+  await openNavigationIfCollapsed(page);
+  await page
+    .getByRole("navigation")
+    .getByRole("button", { name: /^Заказы/ })
+    .click();
   await expect(page.getByRole("heading", { name: "Заказы" })).toBeVisible();
 }
 
@@ -436,6 +451,10 @@ async function restoreInventoryAndDeleteFixtures() {
     where: { buyerOrganizationId: buyer.organizationId },
     select: { id: true },
   });
+  const shipments = await prisma.shipment.findMany({
+    where: { supplierOrderId: { in: orders.map(({ id }) => id) } },
+    select: { id: true },
+  });
   const reservations = await prisma.inventoryReservation.findMany({
     where: {
       supplierOrderItem: {
@@ -450,6 +469,7 @@ async function restoreInventoryAndDeleteFixtures() {
   const checkoutIds = checkouts.map(({ id }) => id);
   const cartIds = carts.map(({ id }) => id);
   const orderIds = orders.map(({ id }) => id);
+  const shipmentIds = shipments.map(({ id }) => id);
   const reservationIds = reservations.map(({ id }) => id);
   const complianceCheckIds = complianceChecks.map(({ id }) => id);
 
@@ -478,12 +498,21 @@ async function restoreInventoryAndDeleteFixtures() {
     await tx.inventoryReservation.deleteMany({
       where: { id: { in: reservationIds } },
     });
+    await tx.notification.deleteMany({
+      where: {
+        OR: [
+          { recipientOrganizationId: buyer.organizationId },
+          { aggregateId: { in: [...orderIds, ...shipmentIds] } },
+        ],
+      },
+    });
     await tx.outboxEvent.deleteMany({
       where: {
         aggregateId: {
           in: [
             ...checkoutIds,
             ...orderIds,
+            ...shipmentIds,
             ...reservationIds,
             ...complianceCheckIds,
           ],
@@ -497,7 +526,13 @@ async function restoreInventoryAndDeleteFixtures() {
           { actorId: { in: [supplier.userId, foreignSupplier.userId] } },
           {
             entityId: {
-              in: [...checkoutIds, ...orderIds, ...cartIds, ...reservationIds],
+              in: [
+                ...checkoutIds,
+                ...orderIds,
+                ...shipmentIds,
+                ...cartIds,
+                ...reservationIds,
+              ],
             },
           },
         ],
@@ -508,6 +543,9 @@ async function restoreInventoryAndDeleteFixtures() {
     });
     await tx.complianceCheck.deleteMany({
       where: { id: { in: complianceCheckIds } },
+    });
+    await tx.shipment.deleteMany({
+      where: { id: { in: shipmentIds } },
     });
     await tx.supplierOrder.deleteMany({
       where: { buyerOrganizationId: buyer.organizationId },
@@ -536,6 +574,11 @@ async function restoreInventoryAndDeleteFixtures() {
   expect(
     await prisma.inventoryReservation.count({
       where: { id: { in: reservationIds } },
+    }),
+  ).toBe(0);
+  expect(
+    await prisma.notification.count({
+      where: { aggregateId: { in: [...orderIds, ...shipmentIds] } },
     }),
   ).toBe(0);
 }
@@ -702,6 +745,140 @@ test.describe.serial("@flow-b2 supplier order confirmation", () => {
     await expect(page.getByText("Подтверждено: 2 из 4")).toBeVisible();
     await expect(page.getByText(`Причина: ${reason}`)).toBeVisible();
     await expect(page.getByText(`Новый итог:`)).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+
+  test("supplier dispatches a paid order and buyer sees shipment notification with audit evidence", async ({
+    page,
+    request,
+  }) => {
+    const errors = collectBrowserErrors(page);
+    const order = await createOrder(request, "shipment");
+    const decisions = [{ itemId: order.itemId, acceptedQuantity: order.quantity }];
+    await responseJson(
+      await request.post(`${API_URL}/supplier-orders/${order.orderId}/confirm`, {
+        headers: identityHeaders(supplier),
+        data: { decisions },
+      }),
+    );
+    await prisma.supplierOrder.update({
+      where: { id: order.orderId },
+      data: { paymentStatus: "PAID", status: "PAID", version: { increment: 1 } },
+    });
+
+    await openSupplierOrder(page, order.orderNumber);
+    const shipmentPanel = page.getByRole("region", {
+      name: `Отгрузки заказа ${order.orderNumber}`,
+    });
+    await expect(shipmentPanel).toContainText("Отгрузка ещё не создана");
+    await shipmentPanel.getByRole("textbox", { name: "Перевозчик (необязательно)" }).fill("Flow B2 Carrier");
+    await shipmentPanel.getByRole("button", { name: "Создать отгрузку" }).click();
+    await expect(shipmentPanel).toContainText("Отгрузка создана");
+
+    await shipmentPanel.getByRole("button", { name: "Запланировать" }).click();
+    await expect(shipmentPanel).toContainText("Запланировано");
+    await shipmentPanel.getByRole("button", { name: "Начать сборку" }).click();
+    await expect(shipmentPanel).toContainText("Собирается");
+    await shipmentPanel.getByRole("button", { name: "Готово к отправке" }).click();
+    await expect(shipmentPanel.getByText("Готово", { exact: true })).toBeVisible();
+
+    const readyShipment = await prisma.shipment.findFirstOrThrow({
+      where: { supplierOrderId: order.orderId },
+    });
+    const forbidden = await request.post(
+      `${API_URL}/shipments/${readyShipment.id}/transitions`,
+      {
+        headers: identityHeaders(foreignSupplier),
+        data: {
+          version: readyShipment.version,
+          status: "DISPATCHED",
+          trackingNumber: "FORBIDDEN-TRACK",
+        },
+      },
+    );
+    expect(forbidden.status()).toBe(403);
+
+    const trackingNumber = `B2-${Date.now()}`;
+    await shipmentPanel.getByRole("textbox", { name: new RegExp(`Трек-номер: ${readyShipment.shipmentNumber}`) }).fill(trackingNumber);
+    await shipmentPanel.getByRole("button", { name: "Передать перевозчику" }).click();
+    await expect(shipmentPanel).toContainText("Передано перевозчику");
+    await expect(shipmentPanel).toContainText(trackingNumber);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(shipmentPanel).toBeVisible();
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+    ).toBe(true);
+
+    const stale = await request.post(
+      `${API_URL}/shipments/${readyShipment.id}/transitions`,
+      {
+        headers: identityHeaders(supplier),
+        data: { version: readyShipment.version, status: "IN_TRANSIT" },
+      },
+    );
+    expect(stale.status()).toBe(409);
+
+    const persisted = await prisma.shipment.findUniqueOrThrow({
+      where: { id: readyShipment.id },
+      include: { supplierOrder: true },
+    });
+    expect(persisted.status).toBe("DISPATCHED");
+    expect(persisted.trackingNumber).toBe(trackingNumber);
+    expect(persisted.supplierOrder.status).toBe("SHIPPED");
+    expect(
+      await prisma.auditLog.count({
+        where: {
+          entityType: "Shipment",
+          entityId: persisted.id,
+          action: "shipment.status_changed",
+        },
+      }),
+    ).toBe(4);
+    expect(
+      await prisma.outboxEvent.count({
+        where: {
+          aggregateType: "Shipment",
+          aggregateId: persisted.id,
+          eventType: "ShipmentStatusChanged",
+        },
+      }),
+    ).toBe(4);
+
+    await expect
+      .poll(
+        () =>
+          prisma.notification.count({
+            where: {
+              recipientOrganizationId: buyer.organizationId,
+              aggregateId: persisted.id,
+              eventType: "ShipmentStatusChanged",
+              body: { contains: trackingNumber },
+            },
+          }),
+        { timeout: 20_000 },
+      )
+      .toBe(1);
+
+    await openBuyerOrders(page);
+    const buyerOrder = page.getByRole("row").filter({ hasText: order.orderNumber }).first();
+    await expect(buyerOrder).toContainText("Отправлено");
+    const buyerShipment = page.getByRole("region", { name: "Статусы отгрузок" });
+    await expect(buyerShipment).toContainText(readyShipment.shipmentNumber);
+    await expect(buyerShipment).toContainText("Передано перевозчику");
+    await expect(buyerShipment).toContainText(trackingNumber);
+
+    await openNavigationIfCollapsed(page);
+    await page
+      .getByRole("navigation")
+      .getByRole("button", { name: /^Уведомления/ })
+      .click();
+    await expect(page.getByRole("heading", { name: "Уведомления" })).toBeVisible();
+    const notification = page.locator("article").filter({ hasText: trackingNumber });
+    await expect(notification).toContainText("Статус доставки изменён");
+    await expect(notification).toContainText(readyShipment.shipmentNumber);
+    await expect(notification).toContainText(order.orderNumber);
     expect(errors).toEqual([]);
   });
 });
