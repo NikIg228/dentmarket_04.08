@@ -52,10 +52,10 @@
 | История изменений и откат | `INTEGRATION_VERIFIED` | Remote `NikIg228/dentmarket_04.08`, ветка `recovery/gate-0`; изменения публикуются отдельными conventional commits                                  | Branch protection/PR gate ещё не подтверждены                                                          | Настроить protected main и обязательный CI через PR                                   |
 | Node.js и pnpm            | `INTEGRATION_VERIFIED` | Node `24.18.0`, pnpm `11.9.0`; `pnpm install --frozen-lockfile` успешно восстановил все 10 workspace-проектов                                       | Offline-store не содержал четыре записи, поэтому полностью автономная установка пока не доказана       | Использовать frozen lockfile; отдельно подготовить CI/cache, если нужен offline build |
 | Локальная инфраструктура  | `BLOCKED`              | `compose.yaml` описывает PostgreSQL, Redis, MinIO и ClamAV                                                                                          | Команда `docker` на текущей машине отсутствует                                                         | Установить Docker Desktop либо явно утвердить локальный режим без Docker              |
-| PostgreSQL-схема          | `INTEGRATION_VERIFIED` | 29 миграций применены через `prisma migrate deploy`; `prisma validate` и `pnpm verify:postgres` прошли 2026-08-18                                   | Fresh CI run для новой миграции ожидает push/PR; Docker локально отсутствует                            | Сохранять migration deploy и PostgreSQL gate обязательными                            |
-| Backend API               | `E2E_VERIFIED`         | B0.1–B0.6 проходят; `pnpm verify:flow-a` доказал Buyer search → compare → cart → checkout → orders с DB assertion                                 | Browser Flow B/C и supplier confirmation ещё не доказаны                                               | Следующая задача B2.1 — подтверждение supplier order                                  |
+| PostgreSQL-схема          | `INTEGRATION_VERIFIED` | 30 миграций применены через `prisma migrate deploy`; `prisma validate` и `pnpm verify:postgres` прошли 2026-08-18                                   | Fresh CI run для новой миграции ожидает push/PR; Docker локально отсутствует                            | Сохранять migration deploy и PostgreSQL gate обязательными                            |
+| Backend API               | `E2E_VERIFIED`         | B0.1–B0.6 проходят; Flow A и B2.1 проверяют checkout, supplier confirmation, tenant isolation, totals и резервы в PostgreSQL                      | Supplier import Flow B и shipment/documents slice Flow C ещё не доказаны                               | Следующая задача B2.2 — shipment, уведомление и audit trail                            |
 | Transactional outbox      | `UNIT_VERIFIED`        | ADR 005, status/lease/retry/DLQ migration; `pnpm verify:outbox` — 8/8; runtime split и PostgreSQL regression проходят                              | Нет operator replay/dashboard и production metrics                                                    | Закрыть в B4.1/B4.3                                                                  |
-| Автоматические тесты      | `E2E_VERIFIED`         | `pnpm test`: 112 API, 36 schema, 4 api-client, 5 Buyer и 1 Supplier; `pnpm verify:web` — 10/10, Flow A — 2/2; PostgreSQL gate проходит             | Admin/Landing UI без unit coverage; Browser Flow B/C не пройдены                                       | Добавлять по одному детерминированному E2E на следующий критический journey           |
+| Автоматические тесты      | `E2E_VERIFIED`         | `pnpm test`: 113 API, 36 schema, 4 api-client, 5 Buyer и 1 Supplier; `pnpm verify:web` — 12/12, Flow A — 2/2, B2.1 — 2/2; PostgreSQL gate проходит | Admin/Landing UI без unit coverage; Flow B и оставшаяся часть Flow C не пройдены                        | Добавлять по одному детерминированному E2E на следующий критический journey           |
 | Typecheck и build         | `UNIT_VERIFIED`        | `pnpm typecheck`: 12/12 задач; `pnpm build`: 8/8 задач, API и четыре web-приложения собраны                                                         | Общая сборка заняла 7:46, Buyer — около 6 минут; Next предупреждает о deprecated middleware convention | Сделать merge-gate и отдельно оптимизировать Buyer bundle/build                       |
 | Настоящий lint            | `SPEC_ONLY`            | `lint` во фронтендах и API фактически запускает только `tsc --noEmit`                                                                               | Нет ESLint/Biome-проверок качества и опасных паттернов                                                 | После стабилизации подключить ESLint или Biome отдельной задачей                      |
 
@@ -164,8 +164,8 @@
 | Цена и упаковка                     | `CODED`         | Price resolver, packaging API, правила количества                                        | Только 10,3% fallback-карточек имеют цену                                           | Для пилота принимать только подтверждённую цену и дату обновления           |
 | Остаток и свежесть                  | `CODED`         | Inventory balances, freshness policies, reservations                                     | Только 0,7% fallback-карточек доступны; нет live connector                          | Запретить «в наличии» без timestamp и политики устаревания                  |
 | Корзина                             | `E2E_VERIFIED`  | Построчный reprice и Flow A browser gate защищают checkout                               | Mobile остаётся частью общего Buyer V2 QA                                           | Сохранять `verify:postgres` и `verify:flow-a`                               |
-| Checkout и разбиение по поставщикам | `E2E_VERIFIED`  | Flow A создаёт заказы одному и двум поставщикам; DB проверяет checkout/orders/reservations | Supplier confirmation и production payment остаются отдельными этапами             | Следующая задача B2.1                                                       |
-| Подтверждение заказа поставщиком    | `CODED`         | Supplier order confirm API и supplier UI                                                 | Нет E2E и реального SLA                                                             | Проверить accept/reject/partial сценарии                                    |
+| Checkout и разбиение по поставщикам | `E2E_VERIFIED`  | Flow A создаёт заказы одному и двум поставщикам; DB проверяет checkout/orders/reservations | Production payment остаётся отдельным этапом                                        | Сохранять Flow A и переходить к B2.2                                        |
+| Подтверждение заказа поставщиком    | `E2E_VERIFIED`  | `verify:flow-b2` 2/2: full/partial UI, tenant 403, idempotency, reason, totals, reservation, audit/outbox и Buyer-visible diff | Partial release внешнего резерва ждёт connector orchestration; shipment/documents не входят в B2.1 | Следующая задача B2.2                                                       |
 | Доставка и статусы                  | `CODED`         | Delivery zones/options, shipment и fulfillment state machine                             | Нет реального перевозчика и сквозного сценария                                      | В пилоте оставить ручное обновление статуса                                 |
 | Документы по заказу                 | `CODED`         | Генерация PDF/DOCX, upload, versioning, signature sessions                               | Нет E2E генерации документа из реального заказа                                     | В пилоте проверить invoice/specification; ЭЦП вынести за отдельный gate     |
 | Платёж                              | `CODED`         | Payment domain и mock/external adapters существуют                                       | Реальный PSP не подтверждён; продукт V2 допускает оплату вне платформы              | Для пилота зафиксировать manual/off-platform, не блокировать запуск PSP     |
@@ -184,8 +184,8 @@
 ### Flow A — клиника покупает товар
 
 Статус core purchase slice: **`E2E_VERIFIED`** (`pnpm verify:flow-a`, 2/2).
-Регистрация/production auth и подтверждение заказа поставщиком остаются
-самостоятельными acceptance-сценариями и этим gate не закрываются.
+Регистрация/production auth остаётся самостоятельным acceptance-сценарием;
+подтверждение заказа отдельно доказано gate B2.1.
 
 1. Клиника регистрируется и входит.
 2. Находит SKU из пилотного whitelist.
@@ -206,6 +206,10 @@
 
 ### Flow C — поставщик исполняет заказ
 
+Статус confirmation slice: **`E2E_VERIFIED`** (`pnpm verify:flow-b2`, 2/2).
+Shipment, уведомление и минимальные документы остаются в B2.2, поэтому весь
+Flow C и пункт P0.5 пока не закрыты.
+
 1. Поставщик получает новый supplier order.
 2. Подтверждает или отклоняет позиции.
 3. Обновляет статус отгрузки.
@@ -222,13 +226,13 @@ Gate 0 считается закрытым только при одноврем�
 - [x] Рабочая ветка `recovery/gate-0` создана без ошибок; baseline был чистым перед проверками.
 - [x] Выполнена установка зависимостей по `pnpm-lock.yaml` командой `pnpm install --frozen-lockfile`.
 - [ ] Выбран и задокументирован способ запуска PostgreSQL/Redis/storage/ClamAV.
-- [x] Все 28 Prisma migrations применяются к пустой PostgreSQL.
+- [x] Все 30 Prisma migrations применяются к пустой PostgreSQL.
 - [x] Основной seed и pilot seed завершаются; созданы reference-данные, 10 клиник, 10 поставщиков, 500 pilot-карточек и 500 demo-офферов.
 - [x] API стартует, `/api/health` возвращает `ok`, `/api/catalog/search?inStock=true` возвращает 50 товаров и 500 предложений.
 - [x] `pnpm typecheck` проходит: 12/12 Turbo-задач.
-- [x] `pnpm test` проходит: 11/11 Turbo-задач; PostgreSQL testcontainers-тест отдельно ожидает Docker.
+- [x] `pnpm test` проходит: 11/11 Turbo-задач; отдельный `verify:postgres` проходит на локальной PostgreSQL без Docker/Testcontainers.
 - [x] `pnpm build` проходит: 8/8 Turbo-задач, включая API и четыре web-приложения.
-- [ ] Playwright smoke открывает landing, Buyer, Supplier и Admin без критических console errors.
+- [x] `pnpm verify:web` открывает landing, Buyer, Supplier и Admin и проходит 12/12 browser-сценариев без критических ошибок.
 - [ ] В отдельном файле зафиксированы известные исключения, а не скрыты как успешная проверка.
 
 ## 9. P0 после Gate 0
@@ -261,4 +265,4 @@ Gate 0 считается закрытым только при одноврем�
 
 ## 11. Следующее действие
 
-Следующая реализационная задача — **B2.1: доказать полное и частичное подтверждение supplier order через PostgreSQL + Playwright**. Flow A закрыт локальным E2E, но production auth, Redis, production object storage, ClamAV и внешние интеграции остаются отдельными production-readiness gates.
+Следующая реализационная задача — **B2.2: доказать смену статуса отгрузки, уведомление клиники и audit trail через PostgreSQL + Playwright**. Flow A и confirmation slice B2.1 закрыты локальными E2E, но production auth, Redis, production object storage, ClamAV и внешние интеграции остаются отдельными production-readiness gates.

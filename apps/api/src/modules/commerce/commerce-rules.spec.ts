@@ -27,11 +27,21 @@ describe("commerce money and state invariants", () => {
       resolveSupplierOrderState([{ quantity: 2, acceptedQuantity: 2 }]),
     ).toBe("CONFIRMED");
     expect(
-      resolveSupplierOrderState([{ quantity: 2, acceptedQuantity: 1 }]),
+      resolveSupplierOrderState([
+        { quantity: 2, acceptedQuantity: 1, reason: "Only one is available" },
+      ]),
     ).toBe("PARTIALLY_CONFIRMED");
     expect(
-      resolveSupplierOrderState([{ quantity: 2, acceptedQuantity: 0 }]),
+      resolveSupplierOrderState([
+        { quantity: 2, acceptedQuantity: 0, reason: "Out of stock" },
+      ]),
     ).toBe("REJECTED");
+  });
+
+  it("requires a buyer-visible reason for every reduced quantity", () => {
+    expect(() =>
+      resolveSupplierOrderState([{ quantity: 2, acceptedQuantity: 1 }]),
+    ).toThrow("A reason is required when accepted quantity is reduced");
   });
 
   it("enforces minimum quantity and order increments", () => {

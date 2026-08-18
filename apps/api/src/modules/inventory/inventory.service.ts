@@ -156,40 +156,102 @@ export class InventoryService {
   }
 
   async releaseReservation(reservationId: string, context: SupplierActorContext, quantity?: number) {
-    const reservation = await this.prisma.inventoryReservation.findUnique({ where: { id: reservationId }, include: { inventoryLot: true } });
-    if (!reservation) throw new NotFoundException("Inventory reservation not found");
-    if (reservation.status !== "ACTIVE") return reservation;
-    const reservedQuantity = Number(reservation.quantity);
-    const releaseQuantity = quantity ?? reservedQuantity;
-    if (releaseQuantity <= 0 || releaseQuantity > reservedQuantity) throw new BadRequestException("Release quantity must be positive and cannot exceed the active reservation");
+    return this.prisma.$transaction(
+      (tx) =>
+        this.releaseReservationInTransaction(
+          tx,
+          reservationId,
+          context,
+          quantity,
+        ),
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
+  }
 
-    return this.prisma.$transaction(async (tx) => {
-      const current = await tx.inventoryReservation.findUniqueOrThrow({ where: { id: reservationId }, include: { inventoryLot: true } });
-      if (current.status !== "ACTIVE") return current;
-      const currentQuantity = Number(current.quantity);
-      if (releaseQuantity > currentQuantity) throw new ConflictException("Reservation quantity changed concurrently");
-      const shouldRestoreAvailability = !current.inventoryLot || current.inventoryLot.status === "ACTIVE";
-      const balance = await tx.inventoryBalance.findUniqueOrThrow({ where: { id: current.inventoryBalanceId } });
-      const nextAvailable = Number(balance.quantityAvailable) + (shouldRestoreAvailability ? releaseQuantity : 0);
-      await tx.inventoryBalance.update({ where: { id: balance.id }, data: {
+  async releaseReservationInTransaction(
+    tx: Prisma.TransactionClient,
+    reservationId: string,
+    context: SupplierActorContext,
+    quantity?: number,
+  ) {
+    const current = await tx.inventoryReservation.findUnique({
+      where: { id: reservationId },
+      include: { inventoryLot: true },
+    });
+    if (!current)
+      throw new NotFoundException("Inventory reservation not found");
+    if (current.status !== "ACTIVE") return current;
+    const currentQuantity = Number(current.quantity);
+    const releaseQuantity = quantity ?? currentQuantity;
+    if (releaseQuantity <= 0 || releaseQuantity > currentQuantity)
+      throw new BadRequestException(
+        "Release quantity must be positive and cannot exceed the active reservation",
+      );
+    const shouldRestoreAvailability =
+      !current.inventoryLot || current.inventoryLot.status === "ACTIVE";
+    const balance = await tx.inventoryBalance.findUniqueOrThrow({
+      where: { id: current.inventoryBalanceId },
+    });
+    const nextAvailable =
+      Number(balance.quantityAvailable) +
+      (shouldRestoreAvailability ? releaseQuantity : 0);
+    await tx.inventoryBalance.update({
+      where: { id: balance.id },
+      data: {
         quantityReserved: { decrement: releaseQuantity },
         quantityAvailable: nextAvailable,
         availabilityStatus: availability(nextAvailable),
         version: { increment: 1 },
-      } });
-      if (current.inventoryLotId) {
-        await tx.inventoryLot.update({ where: { id: current.inventoryLotId }, data: {
+      },
+    });
+    if (current.inventoryLotId) {
+      await tx.inventoryLot.update({
+        where: { id: current.inventoryLotId },
+        data: {
           quantityReserved: { decrement: releaseQuantity },
-          ...(shouldRestoreAvailability ? { quantityAvailable: { increment: releaseQuantity } } : {}),
+          ...(shouldRestoreAvailability
+            ? { quantityAvailable: { increment: releaseQuantity } }
+            : {}),
           version: { increment: 1 },
-        } });
-      }
-      const remaining = currentQuantity - releaseQuantity;
-      const released = await tx.inventoryReservation.update({ where: { id: reservationId }, data: remaining === 0 ? { status: "RELEASED" } : { quantity: remaining } });
-      await tx.auditLog.create({ data: { ...context, action: remaining === 0 ? "inventory.reservation.released" : "inventory.reservation.reduced", entityType: "InventoryReservation", entityId: reservationId, before: current, after: released } });
-      await tx.outboxEvent.create({ data: { aggregateType: "InventoryReservation", aggregateId: reservationId, eventType: remaining === 0 ? "InventoryReservationReleased" : "InventoryReservationReduced", payload: { supplierOrganizationId: current.supplierOrganizationId, reservationId, releasedQuantity: releaseQuantity, remainingQuantity: remaining } } });
-      return released;
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+        },
+      });
+    }
+    const remaining = currentQuantity - releaseQuantity;
+    const released = await tx.inventoryReservation.update({
+      where: { id: reservationId },
+      data:
+        remaining === 0 ? { status: "RELEASED" } : { quantity: remaining },
+    });
+    await tx.auditLog.create({
+      data: {
+        ...context,
+        action:
+          remaining === 0
+            ? "inventory.reservation.released"
+            : "inventory.reservation.reduced",
+        entityType: "InventoryReservation",
+        entityId: reservationId,
+        before: current,
+        after: released,
+      },
+    });
+    await tx.outboxEvent.create({
+      data: {
+        aggregateType: "InventoryReservation",
+        aggregateId: reservationId,
+        eventType:
+          remaining === 0
+            ? "InventoryReservationReleased"
+            : "InventoryReservationReduced",
+        payload: {
+          supplierOrganizationId: current.supplierOrganizationId,
+          reservationId,
+          releasedQuantity: releaseQuantity,
+          remainingQuantity: remaining,
+        },
+      },
+    });
+    return released;
   }
 
   async recalls(supplierOrganizationId: string, context: SupplierActorContext) {

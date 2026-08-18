@@ -65,6 +65,7 @@ import {
 } from "react";
 import styles from "./page.module.css";
 import { BuyerServicesPanel } from "./buyer-services-panel";
+import { OrderDecisionDetails } from "./order-decision-details";
 import { SmartCommercePanel } from "./smart-commerce-panel";
 import publicCatalogData from "./data/public-catalog-fallback.json";
 import publicCatalogMedia from "./data/public-catalog-media.json";
@@ -596,6 +597,7 @@ type SupplierOrder = {
     id: string;
     quantity: string;
     acceptedQuantity: string | null;
+    decisionReason: string | null;
     status: string;
     offer: { productVariant: { product: { canonicalName: string } } };
   }>;
@@ -3138,6 +3140,17 @@ export default function BuyerWorkspace({
                       </td>
                       <td>{formatDate(order.createdAt, true)}</td>
                     </tr>
+                    {order.items.some(
+                      (item) =>
+                        item.acceptedQuantity !== null &&
+                        Number(item.acceptedQuantity) < Number(item.quantity),
+                    ) ? (
+                      <tr>
+                        <td colSpan={6}>
+                          <OrderDecisionDetails order={order} />
+                        </td>
+                      </tr>
+                    ) : null}
                     {[
                       "DELIVERED",
                       "PARTIALLY_FULFILLED",

@@ -27,6 +27,7 @@ export function resolveSupplierOrderState(
   items: Array<{
     quantity: string | number;
     acceptedQuantity: string | number;
+    reason?: string | null;
   }>,
 ) {
   if (items.length === 0)
@@ -36,14 +37,18 @@ export function resolveSupplierOrderState(
   let accepted = 0;
   let fullyAccepted = 0;
   for (const item of items) {
-    const requested = Number(item.quantity);
-    const decision = Number(item.acceptedQuantity);
-    if (!Number.isFinite(decision) || decision < 0 || decision > requested)
+    const requested = new Prisma.Decimal(item.quantity);
+    const decision = new Prisma.Decimal(item.acceptedQuantity);
+    if (decision.isNegative() || decision.greaterThan(requested))
       throw new BadRequestException(
         "Accepted quantity must be between zero and requested quantity",
       );
-    if (decision > 0) accepted += 1;
-    if (decision === requested) fullyAccepted += 1;
+    if (decision.lessThan(requested) && !item.reason?.trim())
+      throw new BadRequestException(
+        "A reason is required when accepted quantity is reduced",
+      );
+    if (decision.greaterThan(0)) accepted += 1;
+    if (decision.equals(requested)) fullyAccepted += 1;
   }
   if (accepted === 0) return "REJECTED" as const;
   if (fullyAccepted === items.length) return "CONFIRMED" as const;

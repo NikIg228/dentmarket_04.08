@@ -990,6 +990,7 @@ export class CommerceService {
     const order = await this.prisma.supplierOrder.findUnique({
       where: { id: orderId },
       include: {
+        checkout: { include: { paymentIntent: true } },
         items: {
           include: { reservation: { include: { externalReservation: true } } },
         },
@@ -1002,10 +1003,7 @@ export class CommerceService {
     );
     await this.agreements.assertActive(order.supplierOrganizationId);
     const decisions = new Map(
-      input.decisions.map((decision) => [
-        decision.itemId,
-        decision.acceptedQuantity,
-      ]),
+      input.decisions.map((decision) => [decision.itemId, decision]),
     );
     if (
       decisions.size !== order.items.length ||
@@ -1014,52 +1012,39 @@ export class CommerceService {
       throw new BadRequestException(
         "A decision is required for every supplier order item",
       );
-    const normalized = order.items.map((item) => ({
-      item,
-      acceptedQuantity: decisions.get(item.id)!,
-    }));
+    const normalized = order.items.map((item) => {
+      const decision = decisions.get(item.id)!;
+      return {
+        item,
+        acceptedQuantity: decision.acceptedQuantity,
+        reason: new Prisma.Decimal(decision.acceptedQuantity).lessThan(
+          item.quantity,
+        )
+          ? (decision.reason ?? null)
+          : null,
+      };
+    });
     const status = resolveSupplierOrderState(
-      normalized.map(({ item, acceptedQuantity }) => ({
+      normalized.map(({ item, acceptedQuantity, reason }) => ({
         quantity: item.quantity.toString(),
         acceptedQuantity,
+        reason,
       })),
     );
     if (order.status !== "AWAITING_CONFIRMATION") {
       if (
         order.status === status &&
         normalized.every(
-          ({ item, acceptedQuantity }) =>
-            Number(item.acceptedQuantity) === acceptedQuantity,
+          ({ item, acceptedQuantity, reason }) =>
+            new Prisma.Decimal(item.acceptedQuantity).equals(
+              acceptedQuantity,
+            ) && item.decisionReason === reason,
         )
       )
         return order;
       throw new ConflictException(
         "Supplier order was already confirmed with another decision",
       );
-    }
-    for (const { item, acceptedQuantity } of normalized) {
-      if (
-        acceptedQuantity > 0 &&
-        item.reservation?.externalReservation &&
-        item.reservation.externalReservation.status !== "ACTIVE"
-      )
-        throw new ConflictException(
-          "External inventory reservation must be active before supplier confirmation",
-        );
-    }
-    for (const { item, acceptedQuantity } of normalized) {
-      const releaseQuantity = Number(item.quantity) - acceptedQuantity;
-      if (releaseQuantity > 0 && item.reservation) {
-        await this.externalReservations.release(
-          item.reservation.id,
-          releaseQuantity,
-        );
-        await this.inventory.releaseReservation(
-          item.reservation.id,
-          context,
-          releaseQuantity,
-        );
-      }
     }
     const subtotal = normalized.reduce(
       (sum, { item, acceptedQuantity }) =>
@@ -1068,62 +1053,203 @@ export class CommerceService {
         ),
       new Prisma.Decimal(0),
     );
-    await this.prisma.$transaction(async (tx) => {
-      for (const { item, acceptedQuantity } of normalized)
-        await tx.supplierOrderItem.update({
-          where: { id: item.id },
-          data: {
-            acceptedQuantity,
-            totalPriceMinor: calculateLineTotal(
-              item.unitPriceMinor.toString(),
-              acceptedQuantity,
-            ),
-            status: acceptedQuantity > 0 ? "CONFIRMED" : "REJECTED",
+    if (
+      !subtotal.equals(order.subtotalAmountMinor) &&
+      order.checkout.paymentIntent
+    )
+      throw new ConflictException(
+        "Supplier order quantity cannot change after payment processing starts",
+      );
+    for (const { item, acceptedQuantity } of normalized) {
+      if (
+        new Prisma.Decimal(acceptedQuantity).greaterThan(0) &&
+        item.reservation?.externalReservation &&
+        item.reservation.externalReservation.status !== "ACTIVE"
+      )
+        throw new ConflictException(
+          "External inventory reservation must be active before supplier confirmation",
+        );
+      const releaseQuantity = new Prisma.Decimal(item.quantity).minus(
+        acceptedQuantity,
+      );
+      if (
+        releaseQuantity.greaterThan(0) &&
+        item.reservation?.externalReservation
+      )
+        throw new ConflictException(
+          "Partial confirmation for externally reserved inventory requires the integration release workflow",
+        );
+    }
+    const confirm = () =>
+      this.prisma.$transaction(async (tx) => {
+        await tx.$queryRaw`
+          SELECT "id"
+          FROM "SupplierOrder"
+          WHERE "id" = ${order.id}::uuid
+          FOR UPDATE
+        `;
+        const current = await tx.supplierOrder.findUniqueOrThrow({
+          where: { id: order.id },
+          include: {
+            checkout: { include: { paymentIntent: true } },
+            items: {
+              include: {
+                reservation: { include: { externalReservation: true } },
+              },
+            },
           },
         });
-      await tx.supplierOrder.update({
-        where: { id: order.id },
-        data: {
-          status,
-          subtotalAmountMinor: subtotal,
-          version: { increment: 1 },
-        },
-      });
-      await tx.auditLog.create({
-        data: {
-          ...context,
-          action: "supplier_order.confirmed",
-          entityType: "SupplierOrder",
-          entityId: order.id,
-          before: order,
-          after: {
+        const currentNormalized = current.items.map((item) => {
+          const decision = decisions.get(item.id)!;
+          return {
+            item,
+            acceptedQuantity: decision.acceptedQuantity,
+            reason: new Prisma.Decimal(decision.acceptedQuantity).lessThan(
+              item.quantity,
+            )
+              ? (decision.reason ?? null)
+              : null,
+          };
+        });
+        if (current.status !== "AWAITING_CONFIRMATION") {
+          if (
+            current.status === status &&
+            currentNormalized.every(
+              ({ item, acceptedQuantity, reason }) =>
+                new Prisma.Decimal(item.acceptedQuantity).equals(
+                  acceptedQuantity,
+                ) && item.decisionReason === reason,
+            )
+          )
+            return current;
+          throw new ConflictException(
+            "Supplier order was already confirmed with another decision",
+          );
+        }
+        if (
+          !subtotal.equals(current.subtotalAmountMinor) &&
+          current.checkout.paymentIntent
+        )
+          throw new ConflictException(
+            "Supplier order quantity cannot change after payment processing starts",
+          );
+        for (const { item, acceptedQuantity } of currentNormalized) {
+          const releaseQuantity = new Prisma.Decimal(item.quantity).minus(
+            acceptedQuantity,
+          );
+          if (
+            new Prisma.Decimal(acceptedQuantity).greaterThan(0) &&
+            item.reservation?.externalReservation &&
+            item.reservation.externalReservation.status !== "ACTIVE"
+          )
+            throw new ConflictException(
+              "External inventory reservation must be active before supplier confirmation",
+            );
+          if (
+            releaseQuantity.greaterThan(0) &&
+            item.reservation?.externalReservation
+          )
+            throw new ConflictException(
+              "Partial confirmation for externally reserved inventory requires the integration release workflow",
+            );
+          if (releaseQuantity.greaterThan(0) && item.reservation)
+            await this.inventory.releaseReservationInTransaction(
+              tx,
+              item.reservation.id,
+              context,
+              releaseQuantity.toNumber(),
+            );
+        }
+        for (const { item, acceptedQuantity, reason } of currentNormalized)
+          await tx.supplierOrderItem.update({
+            where: { id: item.id },
+            data: {
+              acceptedQuantity,
+              decisionReason: reason,
+              totalPriceMinor: calculateLineTotal(
+                item.unitPriceMinor.toString(),
+                acceptedQuantity,
+              ),
+              status: new Prisma.Decimal(acceptedQuantity).greaterThan(0)
+                ? "CONFIRMED"
+                : "REJECTED",
+            },
+          });
+        await tx.supplierOrder.update({
+          where: { id: order.id },
+          data: {
             status,
-            subtotalAmountMinor: subtotal.toString(),
-            decisions: input.decisions,
+            subtotalAmountMinor: subtotal,
+            version: { increment: 1 },
           },
-        },
-      });
-      await tx.outboxEvent.create({
-        data: {
-          aggregateType: "SupplierOrder",
-          aggregateId: order.id,
-          eventType: "SupplierOrderConfirmed",
-          payload: {
-            supplierOrganizationId: order.supplierOrganizationId,
-            buyerOrganizationId: order.buyerOrganizationId,
-            status,
-            subtotalAmountMinor: subtotal.toString(),
+        });
+        const otherOrders = await tx.supplierOrder.aggregate({
+          where: { checkoutId: current.checkoutId, id: { not: current.id } },
+          _sum: { subtotalAmountMinor: true },
+        });
+        const checkoutTotal = subtotal.plus(
+          otherOrders._sum.subtotalAmountMinor ?? 0,
+        );
+        await tx.checkout.update({
+          where: { id: current.checkoutId },
+          data: { totalAmountMinor: checkoutTotal },
+        });
+        await tx.auditLog.create({
+          data: {
+            ...context,
+            action: "supplier_order.confirmed",
+            entityType: "SupplierOrder",
+            entityId: order.id,
+            before: current,
+            after: {
+              status,
+              subtotalAmountMinor: subtotal.toString(),
+              checkoutTotalAmountMinor: checkoutTotal.toString(),
+              decisions: input.decisions,
+            },
           },
-        },
-      });
-    });
-    return this.prisma.supplierOrder.findUniqueOrThrow({
-      where: { id: order.id },
-      include: {
-        items: {
-          include: { reservation: { include: { externalReservation: true } } },
-        },
-      },
-    });
+        });
+        await tx.outboxEvent.create({
+          data: {
+            aggregateType: "SupplierOrder",
+            aggregateId: order.id,
+            eventType: "SupplierOrderConfirmed",
+            payload: {
+              supplierOrganizationId: order.supplierOrganizationId,
+              buyerOrganizationId: order.buyerOrganizationId,
+              status,
+              subtotalAmountMinor: subtotal.toString(),
+              checkoutTotalAmountMinor: checkoutTotal.toString(),
+              decisions: input.decisions,
+            },
+          },
+        });
+        return tx.supplierOrder.findUniqueOrThrow({
+          where: { id: order.id },
+          include: {
+            items: {
+              include: {
+                reservation: { include: { externalReservation: true } },
+              },
+            },
+          },
+        });
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        return await confirm();
+      } catch (error) {
+        if (
+          !(
+            error instanceof Prisma.PrismaClientKnownRequestError &&
+            error.code === "P2034"
+          )
+        )
+          throw error;
+      }
+    }
+    throw new ConflictException(
+      "Supplier order confirmation conflicted with a concurrent transaction; retry the request",
+    );
   }
 }

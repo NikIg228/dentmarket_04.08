@@ -16,7 +16,6 @@ import {
   ArrowSync24Regular,
   Box24Regular,
   BuildingShop24Regular,
-  CheckmarkCircle24Regular,
   ClipboardTaskListLtr24Regular,
   CloudArrowUp24Regular,
   DataTrending24Regular,
@@ -51,6 +50,10 @@ import { SupplierTrustPanel } from "./supplier-trust-panel";
 import { OnboardingProgress } from "./onboarding-progress";
 import { ConnectorOnboarding } from "./connector-onboarding";
 import { ProductCorrectionsPanel } from "./product-corrections-panel";
+import {
+  OrderConfirmationPanel,
+  type OrderConfirmationDecision,
+} from "./order-confirmation-panel";
 
 const OPERATOR_ID = "00000000-0000-4000-8000-000000000002";
 const OPERATOR_ORG_ID = "00000000-0000-4000-8000-000000000001";
@@ -162,6 +165,8 @@ type Order = {
     id: string;
     quantity: string;
     acceptedQuantity: string | null;
+    decisionReason: string | null;
+    unitPriceMinor: string;
     status: string;
     offer: { productVariant: { product: { canonicalName: string } } };
   }>;
@@ -514,20 +519,24 @@ export default function SupplierWorkspace() {
     }
   };
 
-  const confirmOrder = async (order: Order) => {
+  const confirmOrder = async (
+    order: Order,
+    decisions: OrderConfirmationDecision[],
+  ): Promise<string | null> => {
     setBusy(`order:${order.id}`);
-    setError(null);
     try {
-      await api.post(`/supplier-orders/${order.id}/confirm`, {
-        decisions: order.items.map((item) => ({
-          itemId: item.id,
-          acceptedQuantity: Number(item.quantity),
-        })),
+      const confirmed = await api.confirmSupplierOrder(order.id, {
+        decisions,
       });
       await refresh();
-      setToast("Заказ подтверждён полностью");
+      setToast(
+        confirmed.status === "PARTIALLY_CONFIRMED"
+          ? "Заказ подтверждён частично, итог и резерв пересчитаны"
+          : "Заказ подтверждён полностью",
+      );
+      return null;
     } catch (cause) {
-      setError(errorMessage(cause));
+      return errorMessage(cause);
     } finally {
       setBusy(null);
     }
@@ -1117,14 +1126,12 @@ export default function SupplierWorkspace() {
                     </td>
                     <td>
                       {order.status === "AWAITING_CONFIRMATION" ? (
-                        <Button
-                          appearance="primary"
-                          icon={<CheckmarkCircle24Regular />}
-                          onClick={() => void confirmOrder(order)}
-                          disabled={busy === `order:${order.id}`}
-                        >
-                          Подтвердить всё
-                        </Button>
+                        <OrderConfirmationPanel
+                          order={order}
+                          onConfirm={(decisions) =>
+                            confirmOrder(order, decisions)
+                          }
+                        />
                       ) : (
                         <span className="mp-muted">Решение принято</span>
                       )}

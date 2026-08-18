@@ -190,6 +190,8 @@ describe("iteration 1A schemas", () => {
   it("rejects duplicate supplier-order decisions", () => {
     const itemId = "00000000-0000-4000-8000-000000000060";
     expect(confirmSupplierOrderSchema.safeParse({ decisions: [{ itemId, acceptedQuantity: 1 }, { itemId, acceptedQuantity: 0 }] }).success).toBe(false);
+    expect(confirmSupplierOrderSchema.safeParse({ decisions: [{ itemId, acceptedQuantity: 1, reason: "  " }] }).success).toBe(false);
+    expect(confirmSupplierOrderSchema.safeParse({ decisions: [{ itemId, acceptedQuantity: 1, reason: "Остаток изменился" }] }).success).toBe(true);
   });
 
   it("requires a ledger reference type for a reference id", () => {

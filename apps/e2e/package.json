@@ -5,6 +5,7 @@
   "scripts": {
     "e2e": "playwright test",
     "e2e:flow-a": "playwright test tests/flow-a.spec.ts --config playwright.flow-a.config.ts",
+    "e2e:flow-b2": "playwright test tests/flow-b2.spec.ts --config playwright.flow-b2.config.ts",
     "typecheck": "tsc --noEmit",
     "lint": "tsc --noEmit"
   },

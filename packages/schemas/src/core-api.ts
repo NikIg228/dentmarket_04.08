@@ -368,6 +368,7 @@ export const supplierOrderItemResponseSchema = z
     productVariantId: z.uuid(),
     quantity: decimalStringSchema,
     acceptedQuantity: decimalStringSchema.nullable(),
+    decisionReason: z.string().nullable(),
     unitPriceMinor: decimalStringSchema,
     totalPriceMinor: decimalStringSchema,
     currency: currencySchema,
