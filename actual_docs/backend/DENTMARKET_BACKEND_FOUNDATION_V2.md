@@ -828,6 +828,12 @@ production-safe до повторного полного security regression; е
 - [ ] Повторный Standard scan `c3217a8d-641e-42f6-8a74-5740480a4c9f` также
       остановлен: после готового preflight discovery остался `0/1049`,
       review receipts и canonical report не созданы.
+- [x] Prompt-only fallback `8abba50c-e286-4e2e-b94e-49a1ba42f857` создал
+      canonical report, но с `partial` coverage (27 focused files из 1049).
+- [ ] Fallback выявил три Medium source findings: AI tool permission bypass
+      (`CWE-862`), unsigned integration webhooks (`CWE-306`) и CSV
+      materialization до row limit (`CWE-400`). До B4.3 требуется remediation,
+      regression tests и новый полный R2E scan.
 
 Следующий этап — **B4.5-R2E**, а не B4.3: повторно проверить все изменённые
 source-to-sink paths и только после этого возвращаться к защищённому dead-letter

@@ -292,3 +292,7 @@ infrastructure evidence также остаётся явно открытым. �
 - [ ] Повторный Standard scan `c3217a8d-641e-42f6-8a74-5740480a4c9f` также
       заблокирован: preflight готов, но discovery остался `0/1049` без
       review receipts; canonical security report отсутствует.
+- [x] Prompt-only fallback `8abba50c-e286-4e2e-b94e-49a1ba42f857` создал
+      canonical report, но coverage `partial` (27/1049 focused files).
+- [ ] В fallback открыты 3 Medium findings (`CWE-862`, `CWE-306`, `CWE-400`):
+      исправить их и повторить R2E с complete coverage до перехода к B4.3.

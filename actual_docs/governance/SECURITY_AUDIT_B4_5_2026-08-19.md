@@ -241,3 +241,11 @@ B4.3 защищённый operator dead-letter replay.
       также остановлена: preflight был `ready`, но discovery остался `0/1049`
       без review receipts и worker progress; canonical report отсутствует.
       R2E по-прежнему не закрыт.
+- [x] Prompt-only fallback `8abba50c-e286-4e2e-b94e-49a1ba42f857` создал
+      canonical report, но coverage осталась `partial` (27 focused files из
+      1049), поэтому этот результат не закрывает R2E.
+- [ ] В fallback найдены 3 Medium findings: AI tools обходят
+      operation-specific permissions (`CWE-862`), integration webhooks
+      принимают unsigned payloads по умолчанию (`CWE-306`), CSV parser
+      материализует все строки до row limit (`CWE-400`). Сначала нужны
+      remediation patches и regressions, затем полный R2E scan с complete coverage.
