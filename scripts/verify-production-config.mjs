@@ -9,13 +9,18 @@ const requiredFiles = [
   "scripts/restore.sh",
   "scripts/backup-production.sh",
   "scripts/restore-production.sh",
+  "scripts/verify-backup-restore.mjs",
+  "scripts/verify-restore-drill.sh",
+  "actual_docs/operations/backup-restore-runbook.md",
   "actual_docs/operations/production-deployment.md",
   ".github/workflows/release.yml",
   ".github/workflows/security.yml",
 ];
 for (const file of requiredFiles) {
   let nonEmpty = false;
-  try { nonEmpty = statSync(file).size > 0; } catch {}
+  try {
+    nonEmpty = statSync(file).size > 0;
+  } catch {}
   if (!nonEmpty)
     throw new Error(
       `Required production artifact is missing or empty: ${file}`,

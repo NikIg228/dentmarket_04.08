@@ -23,6 +23,9 @@
   `observability-runbook.md`; локальный gate — `pnpm verify:observability`.
 - Sentry: error rate, unhandled exceptions, release regression.
 - OTEL: latency p95/p99, 5xx, queue lag, database pool saturation.
-- Backup: `scripts/verify-restore-drill.sh` на отдельной базе с подтверждением `I_UNDERSTAND_RESTORE_DRILL`.
+- Backup: `pnpm verify:backup-restore` по
+  [`backup-restore-runbook.md`](backup-restore-runbook.md); существующий artifact
+  восстанавливается только в новую пустую `dentmarket_restore_drill_*` БД с
+  подтверждением, равным точному имени target.
 - DAST: ручной workflow `.github/workflows/dast.yml` против HTTPS staging, без production target.
 - Live connectors: любой статус `CONNECTOR_NEEDED` блокирует go-live sign-off.

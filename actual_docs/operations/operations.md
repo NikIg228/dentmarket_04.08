@@ -27,7 +27,18 @@ Scheduler `MarketplaceAgreementsService.processRenewals` ежедневно за
 - целевые RPO 15 минут и RTO 4 часа для первой production-конфигурации;
 - restore drill не реже раза в квартал.
 
-Локальный backup:
+Автоматический локальный/CI rehearsal описан в
+[`backup-restore-runbook.md`](backup-restore-runbook.md). Он создаёт отдельную
+drill-базу, сверяет data/object checksums, migrations и API readiness и затем
+безопасно удаляет target:
+
+```powershell
+$env:RESTORE_DRILL_ADMIN_DATABASE_URL="postgresql://ADMIN_USER:ADMIN_PASSWORD@127.0.0.1:5432/postgres"
+$env:RESTORE_DRILL_USE_OBJECT_FIXTURE="true"
+pnpm verify:backup-restore
+```
+
+Docker-based локальный backup для maintenance-контура:
 
 ```bash
 ./scripts/backup.sh
@@ -43,7 +54,11 @@ docker compose up -d api admin-web buyer-web supplier-web landing-web
 
 После восстановления обязательны `prisma migrate status`, health, search rebuild и read-only сверка ledger/document checksums.
 
-Production backup/restore, immutable release and rollback описаны в [`production-deployment.md`](production-deployment.md). Production scripts работают напрямую с `DATABASE_URL`, проверяют SHA-256 и требуют явного `RESTORE_CONFIRM` перед удалением schema.
+Production backup/restore, immutable release and rollback описаны в
+[`production-deployment.md`](production-deployment.md). Recovery scripts
+работают напрямую с `DATABASE_URL` и проверяют SHA-256. Rehearsal выполняется
+только в новой пустой БД с prefix `dentmarket_restore_drill_*`; production
+recovery с заменой schema остаётся отдельной maintenance-процедурой.
 
 ## Incident flow
 

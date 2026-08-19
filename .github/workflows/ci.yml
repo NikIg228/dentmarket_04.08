@@ -125,3 +125,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm verify:postgres
+      - run: pnpm verify:backup-restore
+        env:
+          POSTGRES_CLIENT_MODE: docker
+          RESTORE_DRILL_USE_OBJECT_FIXTURE: "true"

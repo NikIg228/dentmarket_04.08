@@ -399,8 +399,9 @@ Gate намеренно разрешён только для локальной 
 - [x] Миграция `20260818130000_outbox_delivery_semantics` применена как 29-я;
   dispatcher tests, PostgreSQL regression и runtime split прошли.
 
-Текущий статус: **B0.1–B0.6, B1.1–B1.2, B2.1–B2.3, B3.1–B3.3 и B4.1 реализованы и проходят**.
-Следующая задача: **B4.2 — backup/restore rehearsal**.
+Текущий статус: **B0.1–B0.6, B1.1–B1.2, B2.1–B2.3, B3.1–B3.3 и B4.1–B4.2 реализованы и проходят**.
+Следующая задача: **B4.5 — security/dependency scan**; она поднята выше
+B4.3 из-за подтверждённых high-уязвимостей dependency graph.
 
 ### B1 — покупка клиникой
 
@@ -641,13 +642,13 @@ production connectors не входят в фазу; compensating rollback за�
 Ограничение B3.3: автоматическая компенсация намеренно не изменяет offer,
 который существовал до batch, и не откатывает данные, уже использованные заказом
 или активной резервацией. Такие случаи получают `409` и требуют отдельного
-операторского remediation workflow. Его observability закрыт в B4.1; следующий
-этап — B4.2.
+операторского remediation workflow. Его observability закрыт в B4.1, а
+восстановимость данных — в B4.2.
 
 ### B4 — эксплуатационный минимум
 
 - [x] B4.1 — metrics и alerts;
-- [ ] B4.2 — backup/restore rehearsal;
+- [x] B4.2 — backup/restore rehearsal;
 - [ ] B4.3 — dead-letter operations и защищённый replay;
 - [ ] B4.4 — rate limiting и production auth runbook;
 - [ ] B4.5 — security/dependency scan;
@@ -679,7 +680,38 @@ production connectors не входят в фазу; compensating rollback за�
 
 Ограничение B4.1: локальный contract и synthetic thresholds доказаны, но
 внешняя доставка alert и production dashboard получают `LIVE_VERIFIED` только
-при deployment monitoring stack. Это не блокирует следующий локальный этап B4.2.
+при deployment monitoring stack.
+
+Выполнено в B4.2:
+
+- [x] `pnpm verify:backup-restore` создаёт custom-format PostgreSQL dump,
+  manifest и SHA-256, затем восстанавливает их только в автоматически созданную
+  БД `dentmarket_restore_drill_*`; source и target сравниваются до restore.
+- [x] Target должен быть новым, помечается уникальным database comment и
+  удаляется только после повторной проверки marker; прикладному пользователю
+  `marketplace` право `CREATEDB` не выдавалось.
+- [x] Source сверяется до и после dump. Все 149 public tables и sequences
+  сравниваются по row count, а все таблицы ниже safety-порога — также по
+  content hash; изменение source во время backup делает gate красным.
+- [x] Object-storage ветка проверена двумя детерминированными файлами разных
+  типов; backup и restore inventory совпали по path, bytes и SHA-256.
+- [x] Restored DB имеет 31 актуальную Prisma migration, запускает API и отдаёт
+  успешные liveness/readiness. Финальный локальный замер: backup 0,887 с,
+  restore 5,362 с, полный drill 23,364 с; после gate осталось 0 drill-баз.
+- [x] Gate добавлен в PostgreSQL CI job с PostgreSQL 17 client через
+  изолированный Docker mode; production legacy verifier больше не выполняет
+  `DROP SCHEMA`, требует отдельную пустую БД и точное подтверждение её имени.
+- [x] `pnpm typecheck`, `pnpm test` (API 117/117), `pnpm build`,
+  `pnpm verify:postgres`, `pnpm verify:production-config`, shell syntax,
+  formatting и `git diff --check` проходят.
+
+Ограничение B4.2: локальный logical dump/restore получает
+`INTEGRATION_VERIFIED`, но не доказывает managed WAL/PITR, S3 versioning,
+retention и restore реального production snapshot. Эти пункты остаются
+deployment evidence; политика сохраняет RPO 15 минут и RTO 4 часа.
+
+Следующий этап — **B4.5**, а не B4.3: сначала устраняется известный high-risk
+dependency backlog, затем возвращаемся к защищённому dead-letter replay.
 
 ### B5 — frontend unification
 
@@ -738,8 +770,9 @@ Definition of Done: наблюдаемый итог, а не список фай
 - [x] Notifications и payment order export подключены через handler registry.
 - [x] ADR, migration, CI gate и эксплуатационные правила обновлены вместе с кодом.
 
-B1.2, B2.1–B2.3, B3.1–B3.3 и B4.1 после этого этапа также закрыты. Текущая
-следующая задача зафиксирована в разделе 8: **B4.2 — backup/restore rehearsal**.
+B1.2, B2.1–B2.3, B3.1–B3.3 и B4.1–B4.2 после этого этапа также закрыты.
+Текущая следующая задача зафиксирована в разделе 8:
+**B4.5 — security/dependency scan**.
 
 ## 12. Команды локальной проверки
 
@@ -750,6 +783,7 @@ pnpm test
 pnpm verify:runtime-split
 pnpm verify:outbox
 pnpm verify:observability
+pnpm verify:backup-restore
 pnpm verify:postgres
 pnpm verify:core-contract
 pnpm verify:pilot-backend

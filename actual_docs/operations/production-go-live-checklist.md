@@ -7,6 +7,7 @@
 - `pnpm build`
 - `pnpm verify:production-config`
 - `pnpm verify:production-connectors`
+- `pnpm verify:backup-restore` — logical local/CI rehearsal, не provider evidence
 - API health and readiness checks
 - Agreement gate: publication, marketplace visibility, confirmation, checkout, capture and order export
 - Supplier onboarding readiness and import diagnostics
@@ -25,6 +26,6 @@
 - Real supplier BIN, credentials, warehouse, prices, inventory and legal confirmation.
 - Signed 1C Agent and a real 1C database.
 - Real МойСклад tenant and API token.
-- DNS/TLS, backup restore drill and alert routing.
+- DNS/TLS, managed PITR + real production snapshot restore drill and alert routing.
 
 The connector preflight exits non-zero while required external values are missing. This is intentional: the marketplace remains fail-closed and cannot publish commercial offers with unverified contracts, prices or stock.

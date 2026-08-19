@@ -18,7 +18,14 @@ The API refuses to start when production would use development auth, localhost C
 
 ## Backup and restore drill
 
-Run `DATABASE_URL=... S3_BUCKET=... scripts/backup-production.sh`. A backup is valid only when `SHA256SUMS` verifies. Quarterly, restore into an isolated database and bucket with `RESTORE_CONFIRM=<backup-directory-name> scripts/restore-production.sh <absolute-backup-directory>`, then execute all verification scripts. Never run a restore against the live database while traffic is open.
+Run `DATABASE_URL=... S3_BUCKET=... scripts/backup-production.sh`. A backup is
+valid only when `SHA256SUMS` verifies. Quarterly, follow
+[`backup-restore-runbook.md`](backup-restore-runbook.md): restore the artifact
+into a separately provisioned empty `dentmarket_restore_drill_*` database and
+versioned isolated bucket, reconcile migrations/data/objects, start the API and
+record timings. `pnpm verify:backup-restore` is the repeatable local/CI contract;
+managed PITR and a real production snapshot still require provider-level
+evidence. Never run a rehearsal restore against the live database or bucket.
 
 ## Rollback
 
