@@ -4,6 +4,7 @@ import { SecurityCryptoService } from "./security-crypto.service";
 import { FileUploadPolicyService } from "./file-upload-policy.service";
 import { StorageModule } from "../storage/storage.module";
 import { OutboundRequestGateway } from "./outbound-request.gateway";
+import { SessionRevocationService } from "./session-revocation.service";
 
 @Global()
 @Module({
@@ -13,12 +14,14 @@ import { OutboundRequestGateway } from "./outbound-request.gateway";
     SecurityCryptoService,
     FileUploadPolicyService,
     OutboundRequestGateway,
+    SessionRevocationService,
   ],
   exports: [
     FileScannerService,
     SecurityCryptoService,
     FileUploadPolicyService,
     OutboundRequestGateway,
+    SessionRevocationService,
   ],
 })
 export class SecurityModule {}

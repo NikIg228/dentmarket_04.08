@@ -4,6 +4,7 @@ import jwt, { type JwtPayload } from "jsonwebtoken";
 import { environment, type MarketplaceEnvironment } from "../config/environment";
 
 type MarketplaceClaims = JwtPayload & { organization_id?: string; organization_ids?: string[]; amr?: string[] | string };
+type SessionVerifier = { assertActive(sessionId: string, userId: string): Promise<void> };
 
 export function resolveJwtActor(token: string, requestedOrganizationId: string | undefined, config: MarketplaceEnvironment, allowMfaBootstrap = false) {
   const key = (config.JWT_PUBLIC_KEY ?? config.JWT_SECRET)?.replaceAll("\\n", "\n");
@@ -25,7 +26,7 @@ export function resolveJwtActor(token: string, requestedOrganizationId: string |
   return { actorId: claims.sub, organizationId, authenticationMethods: methods, sessionId: typeof claims.jti === "string" ? claims.jti : undefined };
 }
 
-export function identityContextMiddleware() {
+export function identityContextMiddleware(sessionVerifier?: SessionVerifier) {
   const config = environment();
   return (request: Request, _response: Response, next: NextFunction) => {
     if (config.AUTH_MODE === "development") return next();
@@ -34,14 +35,18 @@ export function identityContextMiddleware() {
     delete request.headers["x-user-id"];
     delete request.headers["x-organization-id"];
     if (!authorization?.startsWith("Bearer ")) return next();
-    try {
+    void (async () => {
+      try {
       const allowMfaBootstrap = /^\/api\/identity\/mfa(?:\/|$)/.test(request.originalUrl.split("?")[0] ?? "");
       const actor = resolveJwtActor(authorization.slice(7), requestedOrganizationId, config, allowMfaBootstrap);
+      if (!sessionVerifier || !actor.sessionId) throw new UnauthorizedException("Bearer token is not bound to an active session");
+      await sessionVerifier.assertActive(actor.sessionId, actor.actorId);
       request.headers["x-user-id"] = actor.actorId;
       request.headers["x-organization-id"] = actor.organizationId;
       request.headers["x-authentication-methods"] = actor.authenticationMethods.join(",");
       if (actor.sessionId) request.headers["x-session-id"] = actor.sessionId;
       next();
-    } catch (error) { next(error); }
+      } catch (error) { next(error); }
+    })();
   };
 }

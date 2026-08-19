@@ -2,7 +2,7 @@
 
 **Дата:** 2026-08-19
 **Статус фазы:** `[x]` scan и dependency remediation завершены
-**Статус проекта по application security:** `BLOCKED` до B4.5-R2C (2 Medium findings)
+**Статус проекта по application security:** `BLOCKED` до B4.5-R2D (1 Medium finding)
 
 ## 1. Scope и доказательная база
 
@@ -23,9 +23,9 @@
 | ----------------------- | -----------------------------------: | ------------------------------------------------------------------: | -------------------- |
 | Production dependencies |                  15 high, 6 moderate |                                             0 known vulnerabilities | `[x]`                |
 | Source findings high    | 4, если исключить dependency finding |                                                                   0 | `[x]` R1A, `[x]` R1B |
-| Source findings medium  |                                    4 |                                                                   2 | `[x]` R2A, `[x]` R2B; 2 open |
+| Source findings medium  |                                    4 |                                                                   1 | `[x]` R2A, `[x]` R2B, `[x]` R2C; 1 open |
 | Typecheck               |                                    — |                                                         12/12 tasks | `[x]`                |
-| Unit/integration tests  |                                    — | API 143/143; schemas 38/38; api-client 7/7; Buyer 5/5; Supplier 1/1 | `[x]`                |
+| Unit/integration tests  |                                    — | API 147/147; schemas 38/38; api-client 7/7; Buyer 5/5; Supplier 1/1 | `[x]`                |
 | Production build        |                                    — |                                                           8/8 tasks | `[x]`                |
 | PostgreSQL integration  |                                    — |                  tenant, rollback, idempotency, scarce stock passed | `[x]`                |
 | Browser regression      |                                    — |                                                     17/17, 1 worker | `[x]`                |
@@ -58,7 +58,7 @@ finding исправлен и compatibility доказана. Она не озн
 | [x]    | High      | Supplier integration SSRF with response disclosure     | Tenant base URL → worker fetch/result        |
 | [x]    | Medium    | Ordinary tenants enumerate organizations/capabilities  | Tenant permission → unscoped query           |
 | [x]    | Medium    | XLSX decompression can exhaust API memory              | Compressed upload → bounded ZIP metadata → ExcelJS |
-| [ ]    | Medium    | Revoked sessions remain valid until JWT expiry         | Revoked `jti` → stateless middleware         |
+| [x]    | Medium    | Revoked sessions remain valid until JWT expiry         | Revoked `jti` → `AuthSession` status check         |
 | [ ]    | Medium    | Notification webhook allows blind SSRF                 | Tenant destination → background fetch        |
 
 ## 5. Hardening direction
@@ -188,10 +188,28 @@ gate проверяет тот же набор assertions и устраняет 
       authority, outbound security, `pnpm verify:web` (17/17) и
       `git diff --check`.
 
-## 11. Следующая задача
+## 11. B4.5-R2C — delayed session revocation remediation
 
-**B4.5-R2C:** закрыть Medium delayed session revocation: проверять статус
-отозванного `jti` до принятия JWT, добавить bounded cache/invalidation и
-regression для logout/revoke. Затем отдельным change set закрывается
-notification webhook SSRF; B4.3 начинается после всего R2 и повторного
-security regression.
+- [x] JWT access requests теперь требуют `jti` и проходят DB-backed проверку
+      `AuthSession` по `sessionId`, `userId`, `ACTIVE` status и `expiresAt` до
+      записи identity headers в request.
+- [x] Отозванные, истёкшие, отсутствующие или принадлежащие другому пользователю
+      sessions получают `401`; development identity headers этот путь не
+      обходят в production/JWT mode.
+- [x] Повторные deny-проверки ограничены bounded cache на 10 000 ключей с TTL
+      5 секунд; active-сессии не кэшируются, поэтому revoke/logout не ждёт TTL.
+- [x] Добавлены unit-regressions для active session, revoke/expired/subject
+      mismatch, bounded deny-cache и explicit invalidation.
+- [x] После R2C прошли `pnpm typecheck` (12/12), `pnpm test` (API 147/147,
+      schemas 38/38, api-client 7/7, Buyer 5/5, Supplier 1/1), `pnpm build`
+      (8/8), dependency audit, production config, DB-backed security storage,
+      live security, PostgreSQL, runtime split, core contract, platform
+      authority, outbound security, `pnpm verify:web` (17/17) и
+      `git diff --check`.
+
+## 12. Следующая задача
+
+**B4.5-R2D:** закрыть последний Medium notification webhook SSRF: пропустить
+tenant destination через центральный outbound gateway, запретить private/link-local
+targets и повторно проверить background delivery. B4.3 начинается после всего
+R2 и повторного security regression.

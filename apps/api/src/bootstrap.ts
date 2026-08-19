@@ -15,6 +15,7 @@ import { ApiExceptionFilter } from "./platform/http/api-exception.filter";
 import { runtimeCapabilities } from "./platform/runtime/process-role";
 import { MetricsService } from "./platform/observability/metrics.service";
 import { httpMetricsMiddleware } from "./platform/observability/metrics.middleware";
+import { SessionRevocationService } from "./platform/security/session-revocation.service";
 
 export async function createMarketplaceApp(
   options: { serverless?: boolean } = {},
@@ -57,7 +58,7 @@ export async function createMarketplaceApp(
           : false,
     }),
   );
-  app.use(identityContextMiddleware());
+  app.use(identityContextMiddleware(app.get(SessionRevocationService)));
   app.use(httpLoggerMiddleware());
   app.use(httpMetricsMiddleware(app.get(MetricsService)));
   app.useGlobalFilters(new ApiExceptionFilter());

@@ -401,10 +401,11 @@ Gate намеренно разрешён только для локальной 
 
 Текущий статус: **B0.1–B0.6, B1.1–B1.2, B2.1–B2.3, B3.1–B3.3,
 B4.1–B4.2 и B4.5 реализованы и проходят**.
-High source-code backlog B4.5-R1 закрыт фазами R1A и R1B. B4.5-R2A и R2B
+High source-code backlog B4.5-R1 закрыт фазами R1A и R1B. B4.5-R2A, R2B и R2C
 закрыли organization enumeration/capability disclosure и XLSX decompression
-exhaustion; следующая задача: **B4.5-R2C — delayed session revocation**. R2
-остаётся выше B4.3, пока два оставшихся Medium findings не исправлены и не
+exhaustion, а также delayed session revocation; следующая задача:
+**B4.5-R2D — notification webhook SSRF**. R2 остаётся выше B4.3, пока
+оставшийся Medium finding не исправлен и не
 прошли source-to-sink revalidation.
 
 ### B1 — покупка клиникой
@@ -795,16 +796,24 @@ deployment evidence; политика сохраняет RPO 15 минут и RT
       `pnpm verify:platform-authority`, `pnpm verify:outbound-security`,
       `pnpm verify:web` (17/17) и `git diff --check`.
 
+- [x] B4.5-R2C проверяет каждый JWT `jti` по `AuthSession` до принятия identity
+      headers: пользователь, `ACTIVE` status и `expiresAt` должны совпасть.
+- [x] Отозванные/истёкшие/чужие sessions отклоняются; active sessions не
+      кэшируются, а bounded deny-cache (10 000 ключей, 5 секунд) не задерживает
+      revoke/logout.
+- [x] Unit-regressions покрывают active, revoke, expiration, subject mismatch,
+      cache bound и explicit invalidation; после R2C проходят typecheck 12/12,
+      API 147/147, workspace test, build 8/8, security/DB/runtime/contract и
+      browser gates 17/17.
+
 Ограничение B4.5: dependency finding и все четыре High source findings, а также
 organization enumeration и XLSX Medium findings закрыты. Приложение ещё не
-production-safe: открыты 2 Medium — delayed session revocation и notification
-SSRF. Их чекбоксы остаются `[ ]` до исходного source-to-sink revalidation после
-исправления.
+production-safe: открыт 1 Medium — notification webhook SSRF. Его чекбокс
+остаётся `[ ]` до исходного source-to-sink revalidation после исправления.
 
-Следующий этап — **B4.5-R2C**, а не B4.3: сначала закрывается delayed session
-revocation, затем notification SSRF отдельными change sets. После всего R2 и
-повторного security regression можно возвращаться к защищённому dead-letter
-replay.
+Следующий этап — **B4.5-R2D**, а не B4.3: сначала закрывается notification
+webhook SSRF. После всего R2 и повторного security regression можно возвращаться
+к защищённому dead-letter replay.
 
 ### B5 — frontend unification
 
