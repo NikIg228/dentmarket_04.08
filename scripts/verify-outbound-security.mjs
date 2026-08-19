@@ -7,6 +7,8 @@ const adapterPaths = [
   "apps/api/src/modules/integrations/adapters/custom-api.adapter.ts",
   "apps/api/src/modules/integrations/adapters/moysklad.adapter.ts",
 ];
+const notificationAdapterPath =
+  "apps/api/src/modules/notifications/notification-adapters.ts";
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -17,6 +19,21 @@ const sources = await Promise.all(
     relativePath,
     source: await readFile(path.join(root, relativePath), "utf8"),
   })),
+);
+const notificationSource = await readFile(
+  path.join(root, notificationAdapterPath),
+  "utf8",
+);
+const webhookSource = notificationSource.slice(
+  notificationSource.indexOf("export class WebhookNotificationAdapter"),
+);
+assert(
+  webhookSource.includes("this.outbound.request("),
+  `${notificationAdapterPath} does not use OutboundRequestGateway`,
+);
+assert(
+  !/\bfetch\s*\(/.test(webhookSource),
+  `${notificationAdapterPath} webhook contains a direct fetch bypass`,
 );
 
 for (const { relativePath, source } of sources) {
@@ -47,10 +64,11 @@ console.log(
   JSON.stringify(
     {
       status: "passed",
-      adapters: adapterPaths,
+      adapters: [...adapterPaths, notificationAdapterPath],
       directFetchBypass: false,
       providerAllowlist: { MOYSKLAD: ["api.moysklad.ru"] },
       customApiPolicy: "central_gateway",
+      notificationWebhookPolicy: "central_gateway",
     },
     null,
     2,

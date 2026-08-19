@@ -1,4 +1,5 @@
 import { createHmac, randomUUID } from "node:crypto";
+import type { OutboundRequestGateway } from "../../platform/security/outbound-request.gateway";
 
 export type NotificationMessage = { id: string; channel: "IN_APP" | "EMAIL" | "SMS" | "WEBHOOK"; destination?: string | null; subject: string; body: string; payload?: unknown };
 export type NotificationDeliveryResult = { externalMessageId: string; provider: string; response: Record<string, unknown> };
@@ -23,12 +24,20 @@ export class HttpNotificationAdapter implements NotificationAdapter {
 }
 
 export class WebhookNotificationAdapter implements NotificationAdapter {
+  constructor(private readonly outbound: Pick<OutboundRequestGateway, "request">) {}
+
   async send(message: NotificationMessage) {
     if (!message.destination || !/^https?:\/\//.test(message.destination)) throw new Error("Webhook notification destination is missing or invalid");
     const body = JSON.stringify({ id: message.id, subject: message.subject, body: message.body, payload: message.payload });
     const secret = process.env.NOTIFICATION_WEBHOOK_SECRET ?? "local-webhook-secret";
     const signature = createHmac("sha256", secret).update(body).digest("hex");
-    const response = await fetch(message.destination, { method: "POST", headers: { "content-type": "application/json", "x-marketplace-signature": signature, "x-marketplace-event-id": message.id }, body, signal: AbortSignal.timeout(10_000) });
+    const response = await this.outbound.request(message.destination, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-marketplace-signature": signature, "x-marketplace-event-id": message.id },
+      body,
+      timeoutMs: 10_000,
+      maxResponseBytes: 64 * 1024,
+    });
     if (!response.ok) throw new Error(`Webhook returned HTTP ${response.status}`);
     return { externalMessageId: response.headers.get("x-request-id") ?? `webhook-${randomUUID()}`, provider: "signed-webhook", response: { status: response.status } };
   }

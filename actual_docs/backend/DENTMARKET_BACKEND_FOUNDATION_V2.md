@@ -401,11 +401,11 @@ Gate намеренно разрешён только для локальной 
 
 Текущий статус: **B0.1–B0.6, B1.1–B1.2, B2.1–B2.3, B3.1–B3.3,
 B4.1–B4.2 и B4.5 реализованы и проходят**.
-High source-code backlog B4.5-R1 закрыт фазами R1A и R1B. B4.5-R2A, R2B и R2C
+High source-code backlog B4.5-R1 закрыт фазами R1A и R1B. B4.5-R2A, R2B, R2C и R2D
 закрыли organization enumeration/capability disclosure и XLSX decompression
 exhaustion, а также delayed session revocation; следующая задача:
-**B4.5-R2D — notification webhook SSRF**. R2 остаётся выше B4.3, пока
-оставшийся Medium finding не исправлен и не
+**B4.5-R2E — повторный security regression**. R2 остаётся выше B4.3, пока
+изменённые source-to-sink paths не перепроверены и не
 прошли source-to-sink revalidation.
 
 ### B1 — покупка клиникой
@@ -806,14 +806,25 @@ deployment evidence; политика сохраняет RPO 15 минут и RT
       API 147/147, workspace test, build 8/8, security/DB/runtime/contract и
       browser gates 17/17.
 
-Ограничение B4.5: dependency finding и все четыре High source findings, а также
-organization enumeration и XLSX Medium findings закрыты. Приложение ещё не
-production-safe: открыт 1 Medium — notification webhook SSRF. Его чекбокс
-остаётся `[ ]` до исходного source-to-sink revalidation после исправления.
+- [x] B4.5-R2D переводит notification webhook на центральный
+      `OutboundRequestGateway`; tenant destination больше не вызывает прямой
+      `fetch`, private/link-local/reserved targets и небезопасные redirects
+      отклоняются до ответа.
+- [x] Notification adapter tests покрывают signed delivery, private destination
+      и invalid URL; outbound static gate проверяет webhook adapter отдельно от
+      provider-controlled email/SMS endpoints.
+- [x] После R2D проходят typecheck 12/12, API 150/150, workspace test,
+      build 8/8, dependency/security/DB/runtime/contract/authority/outbound и
+      browser gates 17/17.
 
-Следующий этап — **B4.5-R2D**, а не B4.3: сначала закрывается notification
-webhook SSRF. После всего R2 и повторного security regression можно возвращаться
-к защищённому dead-letter replay.
+Ограничение B4.5: dependency finding, все четыре High source findings и все
+четыре Medium source findings закрыты tactical patches. Приложение ещё не
+production-safe до повторного полного security regression; его чекбокс остаётся
+`[ ]` до завершения R2E.
+
+Следующий этап — **B4.5-R2E**, а не B4.3: повторно проверить все изменённые
+source-to-sink paths и только после этого возвращаться к защищённому dead-letter
+replay.
 
 ### B5 — frontend unification
 

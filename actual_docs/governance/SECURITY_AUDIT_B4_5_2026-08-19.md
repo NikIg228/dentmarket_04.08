@@ -2,7 +2,7 @@
 
 **Дата:** 2026-08-19
 **Статус фазы:** `[x]` scan и dependency remediation завершены
-**Статус проекта по application security:** `BLOCKED` до B4.5-R2D (1 Medium finding)
+**Статус проекта по application security:** `BLOCKED` до B4.5-R2E (повторный security regression)
 
 ## 1. Scope и доказательная база
 
@@ -23,9 +23,9 @@
 | ----------------------- | -----------------------------------: | ------------------------------------------------------------------: | -------------------- |
 | Production dependencies |                  15 high, 6 moderate |                                             0 known vulnerabilities | `[x]`                |
 | Source findings high    | 4, если исключить dependency finding |                                                                   0 | `[x]` R1A, `[x]` R1B |
-| Source findings medium  |                                    4 |                                                                   1 | `[x]` R2A, `[x]` R2B, `[x]` R2C; 1 open |
+| Source findings medium  |                                    4 |                                                                   0 | `[x]` R2A, `[x]` R2B, `[x]` R2C, `[x]` R2D; 0 open |
 | Typecheck               |                                    — |                                                         12/12 tasks | `[x]`                |
-| Unit/integration tests  |                                    — | API 147/147; schemas 38/38; api-client 7/7; Buyer 5/5; Supplier 1/1 | `[x]`                |
+| Unit/integration tests  |                                    — | API 150/150; schemas 38/38; api-client 7/7; Buyer 5/5; Supplier 1/1 | `[x]`                |
 | Production build        |                                    — |                                                           8/8 tasks | `[x]`                |
 | PostgreSQL integration  |                                    — |                  tenant, rollback, idempotency, scarce stock passed | `[x]`                |
 | Browser regression      |                                    — |                                                     17/17, 1 worker | `[x]`                |
@@ -59,7 +59,7 @@ finding исправлен и compatibility доказана. Она не озн
 | [x]    | Medium    | Ordinary tenants enumerate organizations/capabilities  | Tenant permission → unscoped query           |
 | [x]    | Medium    | XLSX decompression can exhaust API memory              | Compressed upload → bounded ZIP metadata → ExcelJS |
 | [x]    | Medium    | Revoked sessions remain valid until JWT expiry         | Revoked `jti` → `AuthSession` status check         |
-| [ ]    | Medium    | Notification webhook allows blind SSRF                 | Tenant destination → background fetch        |
+| [x]    | Medium    | Notification webhook allows blind SSRF                 | Tenant destination → central outbound gateway        |
 
 ## 5. Hardening direction
 
@@ -207,9 +207,27 @@ gate проверяет тот же набор assertions и устраняет 
       authority, outbound security, `pnpm verify:web` (17/17) и
       `git diff --check`.
 
-## 12. Следующая задача
+## 12. B4.5-R2D — notification webhook SSRF remediation
 
-**B4.5-R2D:** закрыть последний Medium notification webhook SSRF: пропустить
-tenant destination через центральный outbound gateway, запретить private/link-local
-targets и повторно проверить background delivery. B4.3 начинается после всего
-R2 и повторного security regression.
+- [x] `WebhookNotificationAdapter` больше не выполняет прямой `fetch`; tenant
+      destination проходит через `OutboundRequestGateway` с HTTPS/443, DNS/IP,
+      redirect revalidation, timeout и response-size policy.
+- [x] Private, loopback, link-local, reserved и небезопасные scheme/port
+      destinations отклоняются до network response; signed payload и event id
+      сохраняются.
+- [x] Добавлены notification adapter regressions для signed gateway delivery,
+      private destination и invalid URL; static bypass gate теперь проверяет
+      webhook adapter отдельно от provider-controlled email/SMS adapters.
+- [x] После R2D прошли `pnpm typecheck` (12/12), `pnpm test` (API 150/150,
+      schemas 38/38, api-client 7/7, Buyer 5/5, Supplier 1/1), `pnpm build`
+      (8/8), dependency audit, production config, DB-backed security storage,
+      live security, PostgreSQL, runtime split, core contract, platform
+      authority, outbound security, `pnpm verify:web` (17/17) и
+      `git diff --check`.
+
+## 13. Следующая задача
+
+**B4.5-R2E:** выполнить повторный полный security regression по изменённым
+source-to-sink paths и зафиксировать закрытие B4.5. До этого приложение остаётся
+`BLOCKED` для production; после зелёного R2E следующая продуктовая задача —
+B4.3 защищённый operator dead-letter replay.

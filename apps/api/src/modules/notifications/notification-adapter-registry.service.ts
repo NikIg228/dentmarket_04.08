@@ -1,11 +1,16 @@
 import { Injectable, ServiceUnavailableException } from "@nestjs/common";
 import type { NotificationChannel } from "@prisma/client";
 import { HttpNotificationAdapter, InAppNotificationAdapter, MockNotificationAdapter, WebhookNotificationAdapter } from "./notification-adapters";
+import { OutboundRequestGateway } from "../../platform/security/outbound-request.gateway";
 
 @Injectable()
 export class NotificationAdapterRegistry {
   private readonly inApp = new InAppNotificationAdapter();
-  private readonly webhook = new WebhookNotificationAdapter();
+  private readonly webhook: WebhookNotificationAdapter;
+
+  constructor(outbound: OutboundRequestGateway) {
+    this.webhook = new WebhookNotificationAdapter(outbound);
+  }
   resolve(channel: NotificationChannel) {
     if (channel === "IN_APP") return this.inApp;
     if (channel === "WEBHOOK") return this.webhook;
