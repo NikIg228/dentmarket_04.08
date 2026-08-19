@@ -401,10 +401,11 @@ Gate намеренно разрешён только для локальной 
 
 Текущий статус: **B0.1–B0.6, B1.1–B1.2, B2.1–B2.3, B3.1–B3.3,
 B4.1–B4.2 и B4.5 реализованы и проходят**.
-High source-code backlog B4.5-R1 закрыт фазами R1A и R1B. Следующая задача:
-**B4.5-R2A — устранение Medium organization enumeration/capability disclosure**;
-R2 остаётся выше B4.3, пока четыре Medium findings не исправлены и не прошли
-source-to-sink revalidation.
+High source-code backlog B4.5-R1 закрыт фазами R1A и R1B. B4.5-R2A закрыла
+Medium organization enumeration/capability disclosure; следующая задача:
+**B4.5-R2B — устранение XLSX decompression exhaustion**. R2 остаётся выше B4.3,
+пока три оставшихся Medium findings не исправлены и не прошли source-to-sink
+revalidation.
 
 ### B1 — покупка клиникой
 
@@ -765,16 +766,31 @@ deployment evidence; политика сохраняет RPO 15 минут и RT
       production config, DB-backed security storage, live security, PostgreSQL,
       runtime split, core contract, platform authority и browser 17/17.
 
-Ограничение B4.5: dependency finding и все четыре High source findings закрыты,
-но приложение ещё не production-safe. Открыты 4 Medium: organization
-enumeration, XLSX decompression exhaustion, delayed session revocation и
+- [x] B4.5-R2A закрывает organization enumeration/capability disclosure: `GET
+      /organizations` передаёт actor/tenant context в `OrganizationsService`,
+      а `PlatformAuthorityPolicy` разрешает unscoped capability projection только
+      активному marketplace operator.
+- [x] Supplier/buyer с обычным `organization.view` получает `403` до Prisma
+      `findMany`; operator сохраняет полный список для workbench. Unit regression
+      и PostgreSQL/API scenario `tenant_denied_operator_allowed` покрывают оба
+      исхода.
+- [x] После R2A проходят `pnpm typecheck` (12/12), `pnpm test` (API 138/138,
+      schemas 38/38, api-client 7/7, Buyer 5/5, Supplier 1/1), `pnpm build` (8/8),
+      dependency audit, production config, DB-backed security storage, live
+      security, `pnpm verify:postgres`, `pnpm verify:runtime-split`,
+      `pnpm verify:core-contract`, `pnpm verify:platform-authority`,
+      `pnpm verify:web` (17/17) и `git diff --check`.
+
+Ограничение B4.5: dependency finding и все четыре High source findings, а также
+organization enumeration Medium закрыты. Приложение ещё не production-safe:
+открыты 3 Medium — XLSX decompression exhaustion, delayed session revocation и
 notification SSRF. Их чекбоксы остаются `[ ]` до исходного source-to-sink
 revalidation после исправления.
 
-Следующий этап — **B4.5-R2A**, а не B4.3: сначала закрывается organization
-enumeration/capability disclosure, затем остальные Medium findings отдельными
-change sets. После R2 и повторного security regression можно возвращаться к
-защищённому dead-letter replay.
+Следующий этап — **B4.5-R2B**, а не B4.3: сначала закрывается XLSX
+decompression exhaustion, затем delayed session revocation и notification SSRF
+отдельными change sets. После всего R2 и повторного security regression можно
+возвращаться к защищённому dead-letter replay.
 
 ### B5 — frontend unification
 

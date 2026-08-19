@@ -2,12 +2,20 @@ import { ConflictException, Injectable } from "@nestjs/common";
 import type { CreateOrganizationInput } from "@marketplace/schemas";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../platform/prisma/prisma.service";
+import {
+  PlatformAuthorityPolicy,
+  type AuthorityActorContext,
+} from "../access-control/platform-authority.policy";
 
 @Injectable()
 export class OrganizationsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly authority: PlatformAuthorityPolicy,
+  ) {}
 
-  list() {
+  async list(context: AuthorityActorContext) {
+    await this.authority.assertPlatformOperator(context);
     return this.prisma.organization.findMany({
       include: { capabilities: true },
       orderBy: { createdAt: "desc" },

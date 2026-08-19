@@ -342,6 +342,7 @@ try {
     roleCode: "r1a_supplier_owner",
     roleName: "R1A supplier owner",
     permissionCodes: [
+      "organization.view",
       "organization.members.manage",
       "organization.roles.manage",
       "catalog.product.view",
@@ -355,7 +356,7 @@ try {
     emailPrefix: "operator",
     roleCode: "r1a_platform_operator",
     roleName: "R1A marketplace operator",
-    permissionCodes: ["catalog.product.create", "ai.use"],
+    permissionCodes: ["organization.view", "catalog.product.create", "ai.use"],
   });
   const globalRole = await prisma.role.create({
     data: {
@@ -422,6 +423,23 @@ try {
   api.stdout.on("data", rememberLog);
   api.stderr.on("data", rememberLog);
   await waitUntilReady();
+
+  await expectStatus("/organizations", { identity: supplier.identity }, 403);
+  const operatorOrganizations = await expectStatus(
+    "/organizations",
+    { identity: operator.identity },
+    200,
+  );
+  assert(
+    Array.isArray(operatorOrganizations) &&
+      operatorOrganizations.some(
+        ({ id }) => id === supplier.identity.organizationId,
+      ) &&
+      operatorOrganizations
+        .find(({ id }) => id === supplier.identity.organizationId)
+        ?.capabilities?.some(({ capability }) => capability === "SUPPLIER"),
+    "Platform operator organization view did not return the expected capability projection",
+  );
 
   const roleAuditBefore = await prisma.auditLog.count({
     where: {
@@ -811,6 +829,7 @@ try {
             "supplier_denied_for_product_variant_attributes_and_packaging_operator_allowed",
           aiRoleSelection: "capability_bound",
           legacyAiConversation: "revalidated_before_tool_execution",
+          organizationEnumeration: "tenant_denied_operator_allowed",
         },
       },
       null,

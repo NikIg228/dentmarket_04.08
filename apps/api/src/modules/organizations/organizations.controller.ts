@@ -13,8 +13,11 @@ export class OrganizationsController {
 
   @Get()
   @RequirePermissions("organization.view")
-  list() {
-    return this.organizations.list();
+  list(
+    @Headers("x-user-id") actorId: string,
+    @Headers("x-organization-id") organizationId: string,
+  ) {
+    return this.organizations.list({ actorId, organizationId });
   }
 
   @Post()

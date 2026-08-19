@@ -2,7 +2,7 @@
 
 **Дата:** 2026-08-19
 **Статус фазы:** `[x]` scan и dependency remediation завершены
-**Статус проекта по application security:** `BLOCKED` до B4.5-R2 (4 Medium findings)
+**Статус проекта по application security:** `BLOCKED` до B4.5-R2B (3 Medium findings)
 
 ## 1. Scope и доказательная база
 
@@ -23,9 +23,9 @@
 | ----------------------- | -----------------------------------: | ------------------------------------------------------------------: | -------------------- |
 | Production dependencies |                  15 high, 6 moderate |                                             0 known vulnerabilities | `[x]`                |
 | Source findings high    | 4, если исключить dependency finding |                                                                   0 | `[x]` R1A, `[x]` R1B |
-| Source findings medium  |                                    4 |                                                                   4 | `[ ]` remediation    |
+| Source findings medium  |                                    4 |                                                                   3 | `[x]` R2A; 3 open     |
 | Typecheck               |                                    — |                                                         12/12 tasks | `[x]`                |
-| Unit/integration tests  |                                    — | API 136/136; schemas 38/38; api-client 7/7; Buyer 5/5; Supplier 1/1 | `[x]`                |
+| Unit/integration tests  |                                    — | API 138/138; schemas 38/38; api-client 7/7; Buyer 5/5; Supplier 1/1 | `[x]`                |
 | Production build        |                                    — |                                                           8/8 tasks | `[x]`                |
 | PostgreSQL integration  |                                    — |                  tenant, rollback, idempotency, scarce stock passed | `[x]`                |
 | Browser regression      |                                    — |                                                     17/17, 1 worker | `[x]`                |
@@ -56,7 +56,7 @@ finding исправлен и compatibility доказана. Она не озн
 | [x]    | High      | Tenant admins can grant arbitrary platform permissions | Tenant role write → global permission        |
 | [x]    | High      | Supplier can mutate arbitrary shared product cards     | Broad permission + global ID write           |
 | [x]    | High      | Supplier integration SSRF with response disclosure     | Tenant base URL → worker fetch/result        |
-| [ ]    | Medium    | Ordinary tenants enumerate organizations/capabilities  | Tenant permission → unscoped query           |
+| [x]    | Medium    | Ordinary tenants enumerate organizations/capabilities  | Tenant permission → unscoped query           |
 | [ ]    | Medium    | XLSX decompression can exhaust API memory              | Compressed upload → ExcelJS before row limit |
 | [ ]    | Medium    | Revoked sessions remain valid until JWT expiry         | Revoked `jti` → stateless middleware         |
 | [ ]    | Medium    | Notification webhook allows blind SSRF                 | Tenant destination → background fetch        |
@@ -143,10 +143,33 @@ gate проверяет тот же набор assertions и устраняет 
       security, PostgreSQL, runtime split, core contract, platform authority,
       `pnpm verify:web` (17/17) и `git diff --check` проходят.
 
-## 9. Следующая задача
+## 9. B4.5-R2A — organization enumeration remediation
 
-**B4.5-R2A:** закрыть Medium organization enumeration/capability disclosure:
-обычная tenant permission не должна давать unscoped список организаций и их
-capabilities. После отдельного authorization regression и полного gate stack
-последовательно закрываются XLSX decompression exhaustion, delayed session
-revocation и notification webhook SSRF; B4.3 начинается после R2.
+- [x] `GET /organizations` принимает actor/tenant context и передаёт его в
+      `OrganizationsService`; unscoped Prisma projection больше не является
+      самостоятельной authorization boundary.
+- [x] `OrganizationsService.list()` вызывает `PlatformAuthorityPolicy` до
+      `findMany(include: { capabilities: true })`. Активный supplier/buyer с
+      обычным `organization.view` получает `403`, а не список организаций или
+      capability metadata.
+- [x] Marketplace operator сохраняет полный список, необходимый для operator
+      workbench; выдача capabilities разрешена только после active membership и
+      `MARKETPLACE_OPERATOR` capability.
+- [x] Добавлен unit regression
+      `apps/api/src/modules/organizations/organizations.service.spec.ts`:
+      tenant denial не вызывает Prisma, operator projection сохраняется.
+- [x] `pnpm verify:platform-authority` выполняет API/PostgreSQL regression
+      `tenant_denied_operator_allowed` и проверяет capability projection оператора.
+- [x] После R2A прошли `pnpm typecheck` (12/12), `pnpm test` (API 138/138,
+      schemas 38/38, api-client 7/7, Buyer 5/5, Supplier 1/1), `pnpm build` (8/8),
+      dependency audit, production config, DB-backed security storage, live
+      security, PostgreSQL, runtime split, core contract, platform authority,
+      `pnpm verify:web` (17/17) и `git diff --check`.
+
+## 10. Следующая задача
+
+**B4.5-R2B:** закрыть Medium XLSX decompression exhaustion: ограничить ZIP
+central-directory и распакованный объём до передачи файла в ExcelJS, добавить
+malicious archive regression и повторить полный gate stack. Затем отдельными
+change sets закрываются delayed session revocation и notification webhook SSRF;
+B4.3 начинается после всего R2 и повторного security regression.
