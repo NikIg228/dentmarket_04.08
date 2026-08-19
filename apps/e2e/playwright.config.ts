@@ -11,6 +11,7 @@ export default defineConfig({
   timeout: 30_000,
   expect: { timeout: 10_000 },
   fullyParallel: false,
+  workers: 1,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 2 : 0,
   reporter: process.env.CI ? [["github"], ["html", { open: "never" }]] : "list",
@@ -38,7 +39,8 @@ export default defineConfig({
       timeout: 120_000,
     },
     {
-      command: "pnpm --filter @marketplace/admin-web exec next start --port 3010",
+      command:
+        "pnpm --filter @marketplace/admin-web exec next start --port 3010",
       cwd: workspace,
       url: "http://127.0.0.1:3010",
       reuseExistingServer: true,

@@ -1,0 +1,104 @@
+# B4.5 — security/dependency audit
+
+**Дата:** 2026-08-19
+**Статус фазы:** `[x]` scan и dependency remediation завершены
+**Статус проекта по application security:** `BLOCKED` до remediation source findings
+
+## 1. Scope и доказательная база
+
+- Scan ID: `7a5358c7-a6f3-459d-a1fa-8bc22ef5c822`.
+- Проверенный revision: `e24913c9f50643ee602686bc6432a35bfc03473a`.
+- Режим: standard repository scan, manual source-to-sink validation и
+  registry-backed production dependency audit.
+- Покрытие: dependency graph, JWT/session/tenant boundaries, role delegation,
+  shared catalog, AI tools, integrations, notifications, uploads/parsers,
+  storage, payment/EDS callbacks и browser sinks.
+- Coverage partial: scan не доказывает production DNS/firewall/WAF/egress и не
+  получил один I/O worker receipt; критичные I/O paths дополнительно просмотрены
+  independent baseline и root review.
+
+## 2. Итог B4.5
+
+| Область                 |                                   До |                                                               После | Статус            |
+| ----------------------- | -----------------------------------: | ------------------------------------------------------------------: | ----------------- |
+| Production dependencies |                  15 high, 6 moderate |                                             0 known vulnerabilities | `[x]`             |
+| Source findings high    | 4, если исключить dependency finding |                                                                   4 | `[ ]` remediation |
+| Source findings medium  |                                    4 |                                                                   4 | `[ ]` remediation |
+| Typecheck               |                                    — |                                                         12/12 tasks | `[x]`             |
+| Unit/integration tests  |                                    — | API 117/117; schemas 38/38; api-client 7/7; Buyer 5/5; Supplier 1/1 | `[x]`             |
+| Production build        |                                    — |                                                           8/8 tasks | `[x]`             |
+| PostgreSQL integration  |                                    — |                  tenant, rollback, idempotency, scarce stock passed | `[x]`             |
+| Browser regression      |                                    — |                                                     17/17, 1 worker | `[x]`             |
+
+Фаза B4.5 означает, что scan выполнен, findings зафиксированы, dependency
+finding исправлен и compatibility доказана. Она не означает, что оставшиеся
+уязвимости прикладного кода закрыты или что проект production-ready.
+
+## 3. Dependency remediation
+
+- Next.js обновлён с 16.2.10 до 16.2.11 во всех web-приложениях и root tooling.
+- `pdfjs-dist` обновлён с 5.7.284 до 6.2.108; PDF import/render tests прошли.
+- Узкие pnpm overrides фиксируют уязвимые transitive ranges:
+  `sharp` 0.35.3, `postcss` 8.5.26, `brace-expansion` 1.1.18/2.1.4,
+  `js-yaml` 4.3.1, `deepmerge-ts` 8.0.1 и `nanoid` 5.1.16.
+- `nanoid` 5.1.16 выбран вместо заявленного advisory patch 3.3.18, потому что
+  registry resolver не отдавал 3.3.18 как устанавливаемую версию; production
+  build, API tests и browser flows подтвердили совместимость выбранной patched
+  major-ветки.
+- Lockfile пересобран pnpm 11; Turbo/Vite/Vitest не обновлялись относительно
+  исходного lockfile в рамках этой задачи.
+
+## 4. Открытые source findings
+
+| Готово | Приоритет | Finding                                                | Основная граница                             |
+| ------ | --------- | ------------------------------------------------------ | -------------------------------------------- |
+| [ ]    | High      | User-selected AI role exposes operator data            | Client role → global AI tools                |
+| [ ]    | High      | Tenant admins can grant arbitrary platform permissions | Tenant role write → global permission        |
+| [ ]    | High      | Supplier can mutate arbitrary shared product cards     | Broad permission + global ID write           |
+| [ ]    | High      | Supplier integration SSRF with response disclosure     | Tenant base URL → worker fetch/result        |
+| [ ]    | Medium    | Ordinary tenants enumerate organizations/capabilities  | Tenant permission → unscoped query           |
+| [ ]    | Medium    | XLSX decompression can exhaust API memory              | Compressed upload → ExcelJS before row limit |
+| [ ]    | Medium    | Revoked sessions remain valid until JWT expiry         | Revoked `jti` → stateless middleware         |
+| [ ]    | Medium    | Notification webhook allows blind SSRF                 | Tenant destination → background fetch        |
+
+## 5. Hardening direction
+
+Scan-backed hardening portfolio рекомендует два центральных in-process control
+внутри текущего modular monolith:
+
+1. Platform authority policy: grantable permission sets, operator-only actions,
+   final resource identity и server-derived AI tool authority.
+2. Outbound request gateway: HTTPS, DNS/IP/port policy, redirect revalidation,
+   timeouts, response limits и безопасная telemetry.
+
+Сначала всё равно нужны tactical patches исходных paths. Session revocation и
+XLSX limits лучше закрывать отдельными локальными change sets: active-session
+check с bounded cache/invalidation и ZIP central-directory limits до ExcelJS с
+оценкой parser isolation.
+
+## 6. Выполненные gates
+
+- [x] `pnpm audit --prod --audit-level high` — `No known vulnerabilities found`.
+- [x] `pnpm typecheck` — 12/12.
+- [x] `pnpm test` — все test packages зелёные.
+- [x] `pnpm build` — 8/8.
+- [x] `pnpm verify:production-config`.
+- [x] `pnpm verify:security-storage` с реальной PostgreSQL.
+- [x] `pnpm verify:security`.
+- [x] `pnpm verify:postgres`.
+- [x] `pnpm verify:runtime-split`.
+- [x] `pnpm verify:core-contract`.
+- [x] `pnpm verify:web` — 17/17.
+- [x] Hardening portfolio создан без изменения sealed scan evidence.
+
+Основной Playwright suite использует один worker. Два последовательных запуска
+с четырьмя workers дали разные action/setup timeouts при общей PostgreSQL/API и
+низкой доступной памяти; те же сценарии изолированно проходили. Последовательный
+gate проверяет тот же набор assertions и устраняет ресурсную недетерминированность.
+
+## 7. Следующая задача
+
+**B4.5-R1:** одним security change set закрыть четыре high findings, добавить
+negative authorization/SSRF tests, выполнить исходное source-to-sink
+revalidation и повторить audit, typecheck, tests, build, PostgreSQL, security и
+web gates. Только после этого high-чекбоксы получают `[x]`.

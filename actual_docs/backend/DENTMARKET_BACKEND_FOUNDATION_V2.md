@@ -55,23 +55,23 @@ DentMarket — B2B-маркетплейс стоматологических т�
 
 Аудит выполнен по коду, Prisma-схеме, тестам и живому локальному API, а не по статусам в старом ТЗ.
 
-| Область                    |                        Фактическое состояние |
-| -------------------------- | -------------------------------------------: |
-| Архитектура                |                     NestJS-модульный монолит |
-| База                       |                          PostgreSQL + Prisma |
-| Доменные модули            |                                           29 |
-| Prisma-модели              |                                          148 |
-| Prisma-enum                |                                          116 |
-| Миграции                   |                                           28 |
-| Контроллеры                |                                           41 |
-| HTTP operations в OpenAPI  |                                          287 |
-| Сервисные файлы            |                                           73 |
-| API spec-файлы             |                                           32 |
-| Тесты API в текущем suite  |       104, без условно пропущенных DB-тестов |
-| Плановые задачи внутри API |                                            6 |
-| Пилотный каталог           |                        500 активных карточек |
-| Покупаемая часть           |                      50 товаров, 500 офферов |
-| Пилотные стороны           |                    10 клиник, 10 поставщиков |
+| Область                    |                  Фактическое состояние |
+| -------------------------- | -------------------------------------: |
+| Архитектура                |               NestJS-модульный монолит |
+| База                       |                    PostgreSQL + Prisma |
+| Доменные модули            |                                     29 |
+| Prisma-модели              |                                    148 |
+| Prisma-enum                |                                    116 |
+| Миграции                   |                                     28 |
+| Контроллеры                |                                     41 |
+| HTTP operations в OpenAPI  |                                    287 |
+| Сервисные файлы            |                                     73 |
+| API spec-файлы             |                                     32 |
+| Тесты API в текущем suite  | 104, без условно пропущенных DB-тестов |
+| Плановые задачи внутри API |                                      6 |
+| Пилотный каталог           |                  500 активных карточек |
+| Покупаемая часть           |                50 товаров, 500 офферов |
+| Пилотные стороны           |              10 клиник, 10 поставщиков |
 
 Живой acceptance-flow прошёл: `health → readiness → каталог → сравнение 10 офферов → корзина → checkout → supplier order → inventory reservation → повтор checkout с тем же idempotency key`.
 
@@ -387,28 +387,30 @@ Gate намеренно разрешён только для локальной 
 Выполнено в B0.6:
 
 - [x] ADR 005 фиксирует at-least-once delivery, статусы, claim lease, retry,
-  dead-letter и требования идемпотентности.
+      dead-letter и требования идемпотентности.
 - [x] Все события обрабатываются единым dispatcher, а не остаются бессрочно
-  `PENDING` вне `PaymentCaptured`.
+      `PENDING` вне `PaymentCaptured`.
 - [x] Conditional claim защищает от двух одновременных worker; просроченный
-  `PROCESSING` lease восстанавливается.
+      `PROCESSING` lease восстанавливается.
 - [x] Retry использует exponential backoff до одного часа; постоянная ошибка
-  или исчерпание `maxAttempts` переводит событие в `DEAD_LETTER`.
+      или исчерпание `maxAttempts` переводит событие в `DEAD_LETTER`.
 - [x] Проекция уведомлений и `PaymentCaptured -> ORDER_EXPORT` зарегистрированы
-  как идемпотентные handlers.
+      как идемпотентные handlers.
 - [x] Миграция `20260818130000_outbox_delivery_semantics` применена как 29-я;
-  dispatcher tests, PostgreSQL regression и runtime split прошли.
+      dispatcher tests, PostgreSQL regression и runtime split прошли.
 
-Текущий статус: **B0.1–B0.6, B1.1–B1.2, B2.1–B2.3, B3.1–B3.3 и B4.1–B4.2 реализованы и проходят**.
-Следующая задача: **B4.5 — security/dependency scan**; она поднята выше
-B4.3 из-за подтверждённых high-уязвимостей dependency graph.
+Текущий статус: **B0.1–B0.6, B1.1–B1.2, B2.1–B2.3, B3.1–B3.3,
+B4.1–B4.2 и B4.5 реализованы и проходят**.
+Следующая задача: **B4.5-R1 — устранение четырёх high source-code findings**;
+она остаётся выше B4.3, потому что dependency graph уже очищен, но scan выявил
+критичные authorization и SSRF paths в прикладном коде.
 
 ### B1 — покупка клиникой
 
-| Готово | ID   | Задача                         | Gate |
-| ------ | ---- | ------------------------------ | ---- |
-| [x]    | B1.1 | Актуализация корзины            | `pnpm verify:postgres` |
-| [x]    | B1.2 | Flow A: поиск → сохранённый заказ | `pnpm verify:flow-a` |
+| Готово | ID   | Задача                            | Gate                   |
+| ------ | ---- | --------------------------------- | ---------------------- |
+| [x]    | B1.1 | Актуализация корзины              | `pnpm verify:postgres` |
+| [x]    | B1.2 | Flow A: поиск → сохранённый заказ | `pnpm verify:flow-a`   |
 
 B1.2 должен зафиксировать один безусловно рабочий путь:
 
@@ -425,30 +427,30 @@ Gate: одна клиника оформляет заказы у одного и
 Выполнено в B1.2:
 
 - [x] Временная клиника с минимальными buyer permissions входит через
-  development identity и полностью удаляется после gate.
+      development identity и полностью удаляется после gate.
 - [x] Buyer находит реальный pilot product и открывает сравнение 10 офферов:
-  8 доступны к заказу, 2 честно показаны недоступными.
+      8 доступны к заказу, 2 честно показаны недоступными.
 - [x] Отдельные browser-сценарии создают заказ одному поставщику и split-order
-  двум поставщикам.
+      двум поставщикам.
 - [x] После checkout Buyer видит номера заказов и статус
-  «Ждёт подтверждения».
+      «Ждёт подтверждения».
 - [x] Два параллельных повтора с тем же idempotency key возвращают исходный
-  checkout и не создают дублей.
+      checkout и не создают дублей.
 - [x] Прямой PostgreSQL assertion проверяет один checkout, ожидаемое число
-  supplier orders и активных резервов, а также неотрицательный остаток.
+      supplier orders и активных резервов, а также неотрицательный остаток.
 - [x] Zero-residue assertion после теста: временные организации, пользователи,
-  корзины, compliance-checks и связанные outbox events отсутствуют.
+      корзины, compliance-checks и связанные outbox events отсутствуют.
 - [x] Pilot seed гарантирует 500 действующих `PASSED/ALLOWED/GREEN`
-  compliance-checks для 500 demo-офферов; это проверяет
-  `pnpm verify:seed-profiles`.
+      compliance-checks для 500 demo-офферов; это проверяет
+      `pnpm verify:seed-profiles`.
 
 ### B2 — исполнение поставщиком
 
-| Готово | ID   | Задача | Gate |
-| ------ | ---- | ------ | ---- |
-| [x] | B2.1 | Полное/частичное подтверждение supplier order | `pnpm verify:flow-b2` |
-| [x] | B2.2 | Статус отгрузки, уведомление клиники и audit trail | `pnpm verify:flow-b2` |
-| [x] | B2.3 | Минимальные документы заказа и отгрузки | PostgreSQL + Playwright |
+| Готово | ID   | Задача                                             | Gate                    |
+| ------ | ---- | -------------------------------------------------- | ----------------------- |
+| [x]    | B2.1 | Полное/частичное подтверждение supplier order      | `pnpm verify:flow-b2`   |
+| [x]    | B2.2 | Статус отгрузки, уведомление клиники и audit trail | `pnpm verify:flow-b2`   |
+| [x]    | B2.3 | Минимальные документы заказа и отгрузки            | PostgreSQL + Playwright |
 
 1. список новых заказов;
 2. подтверждение полного или частичного количества;
@@ -460,23 +462,23 @@ Gate: одна клиника оформляет заказы у одного и
 Выполнено в B2.1:
 
 - [x] Поставщик открывает реальный новый заказ и подтверждает всё заказанное
-  количество через production-сборку supplier-web.
+      количество через production-сборку supplier-web.
 - [x] Частичное подтверждение требует buyer-visible причину по каждой
-  уменьшенной позиции и сохраняет её в `SupplierOrderItem.decisionReason`.
+      уменьшенной позиции и сохраняет её в `SupplierOrderItem.decisionReason`.
 - [x] Статус полного, частичного и нулевого подтверждения вычисляется единым
-  доменным правилом как `CONFIRMED`, `PARTIALLY_CONFIRMED` или `REJECTED`.
+      доменным правилом как `CONFIRMED`, `PARTIALLY_CONFIRMED` или `REJECTED`.
 - [x] Уменьшение количества атомарно пересчитывает item/order/checkout totals,
-  уменьшает локальный резерв и возвращает разницу в balance и lot.
+      уменьшает локальный резерв и возвращает разницу в balance и lot.
 - [x] Serializable transaction, row lock и retry `P2034` защищают повтор и
-  конкуренцию; одинаковое решение идемпотентно, другое решение конфликтует.
+      конкуренцию; одинаковое решение идемпотентно, другое решение конфликтует.
 - [x] Tenant isolation проверена: актор другого поставщика получает `403`.
 - [x] Buyer видит принятые количества, причину изменения и новый итог заказа.
 - [x] `supplier_order.confirmed` audit и `SupplierOrderConfirmed` outbox event
-  фиксируются один раз; event содержит обе организации и данные решения.
+      фиксируются один раз; event содержит обе организации и данные решения.
 - [x] `pnpm verify:flow-b2` проходит 2/2, а общий `pnpm verify:web` — 12/12 с
-  zero-residue очисткой временных заказов, акторов и резервов.
+      zero-residue очисткой временных заказов, акторов и резервов.
 - [x] Supplier production CSP использует request-scoped nonce; Playwright
-  выполняется с `bypassCSP=false` и доказывает работу React hydration.
+      выполняется с `bypassCSP=false` и доказывает работу React hydration.
 
 Ограничение B2.1: частичное освобождение внешнего резерва намеренно получает
 контролируемый конфликт до отдельной orchestration-задачи интеграционного
@@ -485,23 +487,23 @@ Gate: одна клиника оформляет заказы у одного и
 Выполнено в B2.2:
 
 - [x] Общие Zod-схемы, OpenAPI и `@marketplace/api-client` описывают создание,
-  чтение и versioned transition отгрузки; buyer/supplier order responses
-  возвращают склад, позиции и текущие отгрузки.
+      чтение и versioned transition отгрузки; buyer/supplier order responses
+      возвращают склад, позиции и текущие отгрузки.
 - [x] Поставщик через production-сборку supplier-web создаёт отгрузку только
-  для оплаченного подтверждённого заказа и проходит ручной путь
-  `DRAFT → PLANNED → PACKING → READY → DISPATCHED`.
+      для оплаченного подтверждённого заказа и проходит ручной путь
+      `DRAFT → PLANNED → PACKING → READY → DISPATCHED`.
 - [x] Каждый переход атомарно обновляет shipment и supplier order, записывает
-  `shipment.status_changed` audit и `ShipmentStatusChanged` outbox event.
+      `shipment.status_changed` audit и `ShipmentStatusChanged` outbox event.
 - [x] Event содержит buyer/supplier tenant, номера заказа и отгрузки, старый и
-  новый статус, перевозчика и tracking; transactional outbox создаёт
-  идемпотентное in-app уведомление клиники.
+      новый статус, перевозчика и tracking; transactional outbox создаёт
+      идемпотентное in-app уведомление клиники.
 - [x] Buyer через production-сборку видит статус, склад, перевозчика и tracking
-  внутри заказа, а затем видит отдельное уведомление с теми же данными.
+      внутри заказа, а затем видит отдельное уведомление с теми же данными.
 - [x] Tenant isolation возвращает `403` чужому поставщику, а stale version
-  возвращает `409` без второго перехода или лишнего audit/outbox evidence.
+      возвращает `409` без второго перехода или лишнего audit/outbox evidence.
 - [x] После B2.3 `pnpm verify:flow-b2` проходит 4/4, `pnpm verify:web` — 14/14; сценарий
-  включает viewport 390 px, проверку отсутствия page overflow и zero-residue
-  очистку shipment/notification/audit/outbox fixtures.
+      включает viewport 390 px, проверку отсутствия page overflow и zero-residue
+      очистку shipment/notification/audit/outbox fixtures.
 
 Ограничение B2.2: payment settlement является начальным условием сценария и
 не подменяется shipment-логикой. Закрытие доставки и proof of delivery
@@ -511,28 +513,28 @@ email-провайдер остаётся отдельным production-readines
 Выполнено в B2.3:
 
 - [x] Общие Zod-схемы, OpenAPI и `@marketplace/api-client` описывают
-  `POST /supplier-orders/:orderId/document-pack` и три документа ответа:
-  спецификацию, счёт и накладную.
+      `POST /supplier-orders/:orderId/document-pack` и три документа ответа:
+      спецификацию, счёт и накладную.
 - [x] Комплект формируется только поставщиком заказа или оператором для
-  оплаченного заказа и уже отправленной отгрузки с адресом доставки; чужой
-  supplier tenant получает `403`, неверное состояние — `409`.
+      оплаченного заказа и уже отправленной отгрузки с адресом доставки; чужой
+      supplier tenant получает `403`, неверное состояние — `409`.
 - [x] Денежные значения и состав документов строятся сервером из persisted
-  order/shipment snapshot в PostgreSQL, без доверия произвольным данным UI;
-  деньги форматируются без JavaScript `number`.
+      order/shipment snapshot в PostgreSQL, без доверия произвольным данным UI;
+      деньги форматируются без JavaScript `number`.
 - [x] Reference seed детерминированно создаёт четыре шаблона, включая
-  `ORDER_SPECIFICATION_RU`, `INVOICE_RU` и `WAYBILL_RU`; все seed profiles
-  проходят с 10 клиниками, 10 поставщиками и 500 pilot offers.
+      `ORDER_SPECIFICATION_RU`, `INVOICE_RU` и `WAYBILL_RU`; все seed profiles
+      проходят с 10 клиниками, 10 поставщиками и 500 pilot offers.
 - [x] Повторное формирование идемпотентно возвращает те же три `Document` и не
-  создаёт дополнительные `document.generated` audit или `DocumentGenerated`
-  outbox events.
+      создаёт дополнительные `document.generated` audit или `DocumentGenerated`
+      outbox events.
 - [x] Supplier и Buyer видят один и тот же комплект внутри заказа, скачивают
-  PDF/DOCX с checksum evidence; интерфейс имеет empty/error/success/busy
-  состояния и проходит viewport 390 px без page overflow.
+      PDF/DOCX с checksum evidence; интерфейс имеет empty/error/success/busy
+      состояния и проходит viewport 390 px без page overflow.
 - [x] `pnpm verify:flow-b2` проходит 4/4, `pnpm verify:web` — 14/14; PostgreSQL
-  проверяет связи checkout/order/shipment, immutable snapshot, checksum,
-  audit/outbox, tenant isolation и zero-residue очистку файлов и записей.
+      проверяет связи checkout/order/shipment, immutable snapshot, checksum,
+      audit/outbox, tenant isolation и zero-residue очистку файлов и записей.
 - [x] `pnpm typecheck`, `pnpm test`, `pnpm verify:core-contract`,
-  `pnpm verify:postgres` и `pnpm verify:seed-profiles` проходят.
+      `pnpm verify:postgres` и `pnpm verify:seed-profiles` проходят.
 
 Ограничение B2.3: квалифицированная ЭЦП, внешний email, налоговый ЭСФ,
 production object storage и proof of delivery остаются отдельными
@@ -540,11 +542,11 @@ production/legal gates и не имитируются локальным ком�
 
 ### B3 — catalog operations
 
-| Готово | ID   | Задача | Gate |
-| ------ | ---- | ------ | ---- |
-| [x] | B3.1 | CSV staging → validation → matching | integration test |
-| [x] | B3.2 | Operator review → publication → Buyer visibility | PostgreSQL + Playwright |
-| [x] | B3.3 | Откат ошибочного batch без потери raw/evidence | PostgreSQL + Playwright |
+| Готово | ID   | Задача                                           | Gate                    |
+| ------ | ---- | ------------------------------------------------ | ----------------------- |
+| [x]    | B3.1 | CSV staging → validation → matching              | integration test        |
+| [x]    | B3.2 | Operator review → publication → Buyer visibility | PostgreSQL + Playwright |
+| [x]    | B3.3 | Откат ошибочного batch без потери raw/evidence   | PostgreSQL + Playwright |
 
 1. импорт поставщика в staging;
 2. validation report;
@@ -556,28 +558,28 @@ production/legal gates и не имитируются локальным ком�
 Выполнено в B3.1:
 
 - [x] Общие Zod response/status-контракты импорта используются типизированным
-  API client; request/response/error-границы операции зарегистрированы в OpenAPI.
+      API client; request/response/error-границы операции зарегистрированы в OpenAPI.
 - [x] Реальный UTF-8 CSV проходит upload policy, quarantine и parser;
-  `ImportBatch.checksum` фиксирует исходные байты файла, а raw-строки
-  сохраняются до обработки без потери доказательств.
+      `ImportBatch.checksum` фиксирует исходные байты файла, а raw-строки
+      сохраняются до обработки без потери доказательств.
 - [x] Точное совпадение создаёт подтверждённый mapping и только `DRAFT` offer;
-  неизвестный SKU переходит в `MATCH_PENDING` с `ProductCandidate(PENDING)`,
-  некорректные обязательные поля и цена — в `REJECTED` с явными кодами причин.
+      неизвестный SKU переходит в `MATCH_PENDING` с `ProductCandidate(PENDING)`,
+      некорректные обязательные поля и цена — в `REJECTED` с явными кодами причин.
 - [x] Цена `9007199254740993` minor units и количество записываются без
-  преобразования через JavaScript `number`, поэтому точность Prisma Decimal
-  не теряется.
+      преобразования через JavaScript `number`, поэтому точность Prisma Decimal
+      не теряется.
 - [x] Завершённый batch возвращает сохранённый результат идемпотентно;
-  атомарный claim `MAPPED → PROCESSING` защищает от конкурентной повторной
-  обработки, чужая организация получает `403`.
+      атомарный claim `MAPPED → PROCESSING` защищает от конкурентной повторной
+      обработки, чужая организация получает `403`.
 - [x] Повторная обработка не создаёт дубли external items, mapping memory,
-  offers, price history, audit или outbox; автоматическая публикация отсутствует.
+      offers, price history, audit или outbox; автоматическая публикация отсутствует.
 - [x] `pnpm verify:flow-b3` проходит 3/3, детерминированные повторы B3.2 и
-  B3.3 — 10/10 каждый, `pnpm verify:web` — 17/17; PostgreSQL-проверки подтверждают checksum,
-  статусы, связи, audit/outbox, tenant isolation и zero-residue cleanup.
+      B3.3 — 10/10 каждый, `pnpm verify:web` — 17/17; PostgreSQL-проверки подтверждают checksum,
+      статусы, связи, audit/outbox, tenant isolation и zero-residue cleanup.
 - [x] `pnpm typecheck`, `pnpm test`, `pnpm verify:core-contract`,
-  `pnpm verify:postgres`, `pnpm verify:runtime-split`, `pnpm verify:outbox`,
-  `pnpm verify:pilot-backend`, `pnpm build` и DB-backed
-  `pnpm verify:security-storage` проходят.
+      `pnpm verify:postgres`, `pnpm verify:runtime-split`, `pnpm verify:outbox`,
+      `pnpm verify:pilot-backend`, `pnpm build` и DB-backed
+      `pnpm verify:security-storage` проходят.
 
 Ограничение B3.1: UI загрузки, operator review, публикация, Buyer visibility и
 rollback не входили в эту фазу. Operator review/publication закрыты B3.2,
@@ -586,28 +588,28 @@ rollback не входили в эту фазу. Operator review/publication з�
 Выполнено в B3.2:
 
 - [x] Общие Zod-контракты описывают очередь import review, решение оператора и
-  versioned publication response; OpenAPI и типизированный API client обновлены
-  вместе с сервером.
+      versioned publication response; OpenAPI и типизированный API client обновлены
+      вместе с сервером.
 - [x] Только marketplace operator может читать очередь импорта и одобрять
-  `ProductCandidate`; permission-bearing supplier получает `403`.
+      `ProductCandidate`; permission-bearing supplier получает `403`.
 - [x] Одобрение атомарно создаёт `ACTIVE` product/variant, sale packaging,
-  `DRAFT` offer/publication, точную KZT-цену, свежий остаток, confirmed match и
-  mapping memory; исходные raw/normalized данные остаются связаны с batch.
+      `DRAFT` offer/publication, точную KZT-цену, свежий остаток, confirmed match и
+      mapping memory; исходные raw/normalized данные остаются связаны с batch.
 - [x] До явной публикации Buyer не видит новую карточку. Publication gate
-  повторно проверяет активного поставщика, product/variant, упаковку, свежую
-  положительную KZT-цену, остаток, действующий договор и compliance.
+      повторно проверяет активного поставщика, product/variant, упаковку, свежую
+      положительную KZT-цену, остаток, действующий договор и compliance.
 - [x] State-changing publish использует `expectedVersion`; stale request
-  получает `409`, повтор уже достигнутого состояния идемпотентен и не создаёт
-  второй audit/outbox. Успешная публикация активирует offer, переводит import row
-  в `PUBLISHED` и синхронно перестраивает Buyer search projection.
+      получает `409`, повтор уже достигнутого состояния идемпотентен и не создаёт
+      второй audit/outbox. Успешная публикация активирует offer, переводит import row
+      в `PUBLISHED` и синхронно перестраивает Buyer search projection.
 - [x] Admin получил отдельную Fluent UI v9 очередь с loading/empty/error/success,
-  видимыми labels и confirmation dialog. Production CSP использует per-request
-  nonce, а 390 px browser gate подтверждает отсутствие page overflow.
+      видимыми labels и confirmation dialog. Production CSP использует per-request
+      nonce, а 390 px browser gate подтверждает отсутствие page overflow.
 - [x] `pnpm verify:flow-b3` проходит 3/3, B3.2 repeat — 10/10,
-  `pnpm verify:web` — 17/17; `pnpm typecheck`, `pnpm test`, `pnpm build`,
-  `pnpm verify:core-contract`, `pnpm verify:postgres`,
-  `pnpm verify:runtime-split`, `pnpm verify:outbox`,
-  `pnpm verify:pilot-backend` и DB-backed `pnpm verify:security-storage` проходят.
+      `pnpm verify:web` — 17/17; `pnpm typecheck`, `pnpm test`, `pnpm build`,
+      `pnpm verify:core-contract`, `pnpm verify:postgres`,
+      `pnpm verify:runtime-split`, `pnpm verify:outbox`,
+      `pnpm verify:pilot-backend` и DB-backed `pnpm verify:security-storage` проходят.
 
 Ограничение B3.2: текущий действующий marketplace agreement сохранён как
 технический gate до отдельного legal review Product V2. XLSX/PDF import и
@@ -616,28 +618,28 @@ production connectors не входят в фазу; compensating rollback за�
 Выполнено в B3.3:
 
 - [x] Миграция `20260819133000_import_batch_rollback` добавляет состояния
-  `ROLLING_BACK/ROLLED_BACK`, rollback metadata и отдельный статус строк без
-  физического удаления `ImportBatch` или `ImportRow`.
+      `ROLLING_BACK/ROLLED_BACK`, rollback metadata и отдельный статус строк без
+      физического удаления `ImportBatch` или `ImportRow`.
 - [x] Общий Zod-контракт, OpenAPI и типизированный API client описывают reason,
-  optimistic `expectedUpdatedAt`, сохранённые evidence и счётчики компенсации.
+      optimistic `expectedUpdatedAt`, сохранённые evidence и счётчики компенсации.
 - [x] Serializable transaction атомарно переводит завершённый batch через
-  conditional claim, скрывает и архивирует созданные им offers, деактивирует
-  актуальные цены, обнуляет доступный остаток, отзывает mapping, архивирует
-  созданные product/variant и синхронно перестраивает search projection.
+      conditional claim, скрывает и архивирует созданные им offers, деактивирует
+      актуальные цены, обнуляет доступный остаток, отзывает mapping, архивирует
+      созданные product/variant и синхронно перестраивает search projection.
 - [x] Автоматический rollback получает `409`, если request устарел, offer
-  существовал до batch, effect был superseded, либо появились order items или
-  активные reservations; tenant isolation возвращает `403` без частичного effect.
+      существовал до batch, effect был superseded, либо появились order items или
+      активные reservations; tenant isolation возвращает `403` без частичного effect.
 - [x] Checksum, quarantined upload, raw/normalized rows, прежние validation errors,
-  price history и связи сохраняются. `rollbackEvidence` фиксирует before-snapshot
-  строк, compliance, offers/publication, prices, inventory, mappings и products.
+      price history и связи сохраняются. `rollbackEvidence` фиксирует before-snapshot
+      строк, compliance, offers/publication, prices, inventory, mappings и products.
 - [x] Повтор уже завершённого rollback возвращает тот же response, повторно
-  доводит search projection до консистентного состояния и не создаёт второй
-  `import.batch.rolled_back` audit или `ImportBatchRolledBack` outbox event.
+      доводит search projection до консистентного состояния и не создаёт второй
+      `import.batch.rolled_back` audit или `ImportBatchRolledBack` outbox event.
 - [x] `pnpm verify:flow-b3` проходит 3/3, B3.3 repeat — 10/10,
-  `pnpm verify:web` — 17/17; отдельный Flow B2 regression — 4/4.
+      `pnpm verify:web` — 17/17; отдельный Flow B2 regression — 4/4.
 - [x] `pnpm typecheck`, `pnpm test`, `pnpm build`, `pnpm verify:core-contract`,
-  `pnpm verify:postgres`, `pnpm verify:runtime-split`, `pnpm verify:outbox`,
-  `pnpm verify:pilot-backend` и DB-backed `pnpm verify:security-storage` проходят.
+      `pnpm verify:postgres`, `pnpm verify:runtime-split`, `pnpm verify:outbox`,
+      `pnpm verify:pilot-backend` и DB-backed `pnpm verify:security-storage` проходят.
 
 Ограничение B3.3: автоматическая компенсация намеренно не изменяет offer,
 который существовал до batch, и не откатывает данные, уже использованные заказом
@@ -651,32 +653,32 @@ production connectors не входят в фазу; compensating rollback за�
 - [x] B4.2 — backup/restore rehearsal;
 - [ ] B4.3 — dead-letter operations и защищённый replay;
 - [ ] B4.4 — rate limiting и production auth runbook;
-- [ ] B4.5 — security/dependency scan;
+- [x] B4.5 — security/dependency scan;
 - [ ] B4.6 — нагрузочный профиль каталога и checkout.
 
 Выполнено в B4.1:
 
 - [x] Защищённый отдельным `METRICS_BEARER_TOKEN` endpoint `GET /api/metrics`
-  отдаёт Prometheus text exposition; production без независимого token не
-  стартует.
+      отдаёт Prometheus text exposition; production без независимого token не
+      стартует.
 - [x] HTTP histogram использует только low-cardinality labels `method`, Express
-  route template и `status_code`; tenant/user/UUID/query в labels не попадают.
+      route template и `status_code`; tenant/user/UUID/query в labels не попадают.
 - [x] PostgreSQL gauges покрывают checkout statuses, import statuses и rollback
-  age/audit count, а также все метрики ADR 005: outbox depth, oldest age,
-  expired lease, attempts и errors по `eventType`.
+      age/audit count, а также все метрики ADR 005: outbox depth, oldest age,
+      expired lease, attempts и errors по `eventType`.
 - [x] Семь versioned alert rules фиксируют PromQL, severity, owner, `for`, порог
-  и runbook для API/checkout, outbox и import rollback; 14 synthetic vectors
-  машинно проверяют healthy/firing границы.
+      и runbook для API/checkout, outbox и import rollback; 14 synthetic vectors
+      машинно проверяют healthy/firing границы.
 - [x] OTLP exporter одинаково принимает collector base URL и готовый
-  `/v1/traces`, не формируя ошибочный двойной путь.
+      `/v1/traces`, не формируя ошибочный двойной путь.
 - [x] `pnpm verify:observability` подтверждает 4/4 unit, alert catalog,
-  `401/200` metrics auth и реальные PostgreSQL gauges; `pnpm typecheck`,
-  `pnpm test` (API 117/117), `pnpm build`, `pnpm verify:runtime-split`,
-  `pnpm verify:production-config`, `pnpm verify:outbox`,
-  `pnpm verify:core-contract`, `pnpm verify:postgres` и
-  `pnpm verify:pilot-backend` проходят.
+      `401/200` metrics auth и реальные PostgreSQL gauges; `pnpm typecheck`,
+      `pnpm test` (API 117/117), `pnpm build`, `pnpm verify:runtime-split`,
+      `pnpm verify:production-config`, `pnpm verify:outbox`,
+      `pnpm verify:core-contract`, `pnpm verify:postgres` и
+      `pnpm verify:pilot-backend` проходят.
 - [x] `pnpm verify:observability` включён в основной PostgreSQL-backed CI job
-  после production build.
+      после production build.
 
 Ограничение B4.1: локальный contract и synthetic thresholds доказаны, но
 внешняя доставка alert и production dashboard получают `LIVE_VERIFIED` только
@@ -685,33 +687,69 @@ production connectors не входят в фазу; compensating rollback за�
 Выполнено в B4.2:
 
 - [x] `pnpm verify:backup-restore` создаёт custom-format PostgreSQL dump,
-  manifest и SHA-256, затем восстанавливает их только в автоматически созданную
-  БД `dentmarket_restore_drill_*`; source и target сравниваются до restore.
+      manifest и SHA-256, затем восстанавливает их только в автоматически созданную
+      БД `dentmarket_restore_drill_*`; source и target сравниваются до restore.
 - [x] Target должен быть новым, помечается уникальным database comment и
-  удаляется только после повторной проверки marker; прикладному пользователю
-  `marketplace` право `CREATEDB` не выдавалось.
+      удаляется только после повторной проверки marker; прикладному пользователю
+      `marketplace` право `CREATEDB` не выдавалось.
 - [x] Source сверяется до и после dump. Все 149 public tables и sequences
-  сравниваются по row count, а все таблицы ниже safety-порога — также по
-  content hash; изменение source во время backup делает gate красным.
+      сравниваются по row count, а все таблицы ниже safety-порога — также по
+      content hash; изменение source во время backup делает gate красным.
 - [x] Object-storage ветка проверена двумя детерминированными файлами разных
-  типов; backup и restore inventory совпали по path, bytes и SHA-256.
+      типов; backup и restore inventory совпали по path, bytes и SHA-256.
 - [x] Restored DB имеет 31 актуальную Prisma migration, запускает API и отдаёт
-  успешные liveness/readiness. Финальный локальный замер: backup 0,887 с,
-  restore 5,362 с, полный drill 23,364 с; после gate осталось 0 drill-баз.
+      успешные liveness/readiness. Финальный локальный замер: backup 0,887 с,
+      restore 5,362 с, полный drill 23,364 с; после gate осталось 0 drill-баз.
 - [x] Gate добавлен в PostgreSQL CI job с PostgreSQL 17 client через
-  изолированный Docker mode; production legacy verifier больше не выполняет
-  `DROP SCHEMA`, требует отдельную пустую БД и точное подтверждение её имени.
+      изолированный Docker mode; production legacy verifier больше не выполняет
+      `DROP SCHEMA`, требует отдельную пустую БД и точное подтверждение её имени.
 - [x] `pnpm typecheck`, `pnpm test` (API 117/117), `pnpm build`,
-  `pnpm verify:postgres`, `pnpm verify:production-config`, shell syntax,
-  formatting и `git diff --check` проходят.
+      `pnpm verify:postgres`, `pnpm verify:production-config`, shell syntax,
+      formatting и `git diff --check` проходят.
 
 Ограничение B4.2: локальный logical dump/restore получает
 `INTEGRATION_VERIFIED`, но не доказывает managed WAL/PITR, S3 versioning,
 retention и restore реального production snapshot. Эти пункты остаются
 deployment evidence; политика сохраняет RPO 15 минут и RTO 4 часа.
 
-Следующий этап — **B4.5**, а не B4.3: сначала устраняется известный high-risk
-dependency backlog, затем возвращаемся к защищённому dead-letter replay.
+Выполнено в B4.5:
+
+- [x] Standard repository scan `7a5358c7-a6f3-459d-a1fa-8bc22ef5c822`
+      завершён на revision `e24913c9f50643ee602686bc6432a35bfc03473a` и зафиксировал
+      5 high и 4 medium findings. Coverage остаётся partial только для live
+      infrastructure и одного deferred I/O receipt; критичные source paths были
+      покрыты независимым baseline и root review.
+- [x] Production dependency audit изменён с 15 high и 6 moderate на
+      `No known vulnerabilities found`: Next 16.2.11, Sharp 0.35.3,
+      PostCSS 8.5.26, pdfjs-dist 6.2.108 и узкие pnpm overrides для уязвимых
+      transitive ranges.
+- [x] `pnpm typecheck` проходит 12/12, `pnpm test` — API 117/117, schemas
+      38/38, api-client 7/7, Buyer 5/5 и Supplier 1/1; PDF import/render regression
+      проходит на pdfjs-dist 6.2.108.
+- [x] `pnpm build` проходит 8/8: API, Prisma client и четыре Next-приложения
+      собраны на обновлённом dependency graph.
+- [x] `pnpm verify:production-config`, DB-backed
+      `pnpm verify:security-storage`, `pnpm verify:security`,
+      `pnpm verify:postgres`, `pnpm verify:runtime-split` и
+      `pnpm verify:core-contract` проходят.
+- [x] `pnpm verify:web` проходит 17/17. Default suite переведён на один worker,
+      потому что shared PostgreSQL/API fixtures и ограниченная память делали
+      четырёхworkerный запуск недетерминированным; assertions и сценарии не
+      ослаблены.
+- [x] Долговечный отчёт и remediation backlog находятся в
+      `../governance/SECURITY_AUDIT_B4_5_2026-08-19.md`; derived hardening portfolio
+      отдельно описывает центральные platform-authority и outbound-egress controls.
+
+Ограничение B4.5: dependency finding закрыт, но scan не означает, что приложение
+стало production-safe. Открыты 4 high source findings — AI role escalation,
+arbitrary permission grants, shared-catalog BOLA и integration SSRF — и 4 medium:
+organization enumeration, XLSX decompression exhaustion, delayed session
+revocation и notification SSRF. Их чекбоксы остаются `[ ]` до исходного
+source-to-sink revalidation после исправления.
+
+Следующий этап — **B4.5-R1**, а не B4.3: сначала закрываются четыре high
+source-code findings и повторяется security regression, затем принимается
+решение о medium backlog и возвращении к защищённому dead-letter replay.
 
 ### B5 — frontend unification
 
