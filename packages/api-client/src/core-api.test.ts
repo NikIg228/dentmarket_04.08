@@ -96,4 +96,45 @@ describe("core marketplace API client", () => {
       expect.objectContaining({ method: "POST", body: "{}" }),
     );
   });
+
+  it("uses typed operator review and versioned offer publication routes", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(async () => new Response(JSON.stringify({ items: [] }), { status: 200 }));
+    const api = new MarketplaceApiClient("http://localhost:4012/api", {
+      actorId: "operator-user",
+      organizationId: "operator-org",
+    });
+    const candidateId = "00000000-0000-4000-8000-000000000091";
+    const supplierId = "00000000-0000-4000-8000-000000000092";
+    const offerId = "00000000-0000-4000-8000-000000000093";
+
+    await api.listCatalogImportReviews();
+    await api.approveCatalogImportCandidate(candidateId, {
+      canonicalName: "Flow B3.2 product",
+      slug: "flow-b3-2-product",
+      productType: "MATERIAL",
+      industryIds: ["00000000-0000-4000-8000-000000000094"],
+      categoryIds: ["00000000-0000-4000-8000-000000000095"],
+      saleUnitId: "00000000-0000-4000-8000-000000000096",
+      packageQuantity: 1,
+      decisionReason: "Validated supplier import row",
+    });
+    await api.setSupplierOfferPublication(supplierId, offerId, {
+      status: "PUBLISHED",
+      marketplaceVisible: true,
+      expectedVersion: 1,
+      decisionReason: "Publication gate passed",
+    });
+
+    expect(fetchMock.mock.calls.map(([url]) => String(url))).toEqual([
+      "http://localhost:4012/api/moderation/import-reviews",
+      `http://localhost:4012/api/moderation/import-reviews/${candidateId}/approve`,
+      `http://localhost:4012/api/suppliers/${supplierId}/offers/${offerId}/publication`,
+    ]);
+    expect(fetchMock.mock.calls[2]?.[1]).toEqual(expect.objectContaining({
+      method: "PUT",
+      body: JSON.stringify({ status: "PUBLISHED", marketplaceVisible: true, expectedVersion: 1, decisionReason: "Publication gate passed" }),
+    }));
+  });
 });

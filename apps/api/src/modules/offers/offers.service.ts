@@ -1,14 +1,15 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
-import type { AssignOfferPackagingInput, CreateSupplierOfferInput, SetOfferPriceInput, SetOfferPublicationInput } from "@marketplace/schemas";
+import type { AssignOfferPackagingInput, CreateSupplierOfferInput, SetOfferPriceInput, SetOfferPublicationInput, SupplierOfferPublicationResponse } from "@marketplace/schemas";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../platform/prisma/prisma.service";
 import { SupplierAccessService, type SupplierActorContext } from "../suppliers/supplier-access.service";
 import { ComplianceService } from "../compliance/compliance.service";
 import { MarketplaceAgreementsService } from "../agreements/marketplace-agreements.service";
+import { SearchProjectionService } from "../search/search-projection.service";
 
 @Injectable()
 export class OffersService {
-  constructor(private readonly prisma: PrismaService, private readonly access: SupplierAccessService, private readonly compliance: ComplianceService, private readonly agreements: MarketplaceAgreementsService) {}
+  constructor(private readonly prisma: PrismaService, private readonly access: SupplierAccessService, private readonly compliance: ComplianceService, private readonly agreements: MarketplaceAgreementsService, private readonly searchProjection: SearchProjectionService) {}
 
   async list(supplierOrganizationId: string, context: SupplierActorContext) {
     await this.access.assertCanManage(supplierOrganizationId, context);
@@ -72,7 +73,7 @@ export class OffersService {
   }
 
   private async requireOffer(supplierOrganizationId: string, offerId: string) {
-    const offer = await this.prisma.supplierOffer.findFirst({ where: { id: offerId, supplierOrganizationId }, include: { publication: true, productVariant: { include: { product: true } } } });
+    const offer = await this.prisma.supplierOffer.findFirst({ where: { id: offerId, supplierOrganizationId }, include: { supplier: true, packaging: true, publication: true, productVariant: { include: { product: true } } } });
     if (!offer) throw new NotFoundException("Supplier offer not found");
     return offer;
   }
@@ -117,30 +118,46 @@ export class OffersService {
     });
   }
 
-  async setPublication(supplierOrganizationId: string, offerId: string, input: SetOfferPublicationInput, context: SupplierActorContext) {
+  private publicationResponse(offer: { id: string; status: "DRAFT" | "ACTIVE" | "INACTIVE" | "BLOCKED" | "ARCHIVED"; version: number; productVariant: { productId: string }; publication: { status: "DRAFT" | "UNDER_REVIEW" | "PUBLISHED" | "HIDDEN" | "BLOCKED" | "PAUSED" | "RESTRICTED"; marketplaceVisible: boolean; publishedAt: Date | null; blockedReason: string | null } | null }): SupplierOfferPublicationResponse {
+    if (!offer.publication) throw new ConflictException("Offer publication record is missing");
+    return { offerId: offer.id, productId: offer.productVariant.productId, offerStatus: offer.status, offerVersion: offer.version, status: offer.publication.status, marketplaceVisible: offer.publication.marketplaceVisible, publishedAt: offer.publication.publishedAt?.toISOString() ?? null, blockedReason: offer.publication.blockedReason };
+  }
+
+  async setPublication(supplierOrganizationId: string, offerId: string, input: SetOfferPublicationInput, context: SupplierActorContext): Promise<SupplierOfferPublicationResponse> {
     await this.access.assertCanManage(supplierOrganizationId, context);
     const offer = await this.requireOffer(supplierOrganizationId, offerId);
-    if (input.status === "PUBLISHED" || input.marketplaceVisible) {
+    const targetOfferStatus = input.status === "PUBLISHED" || input.status === "RESTRICTED" ? "ACTIVE" : input.status === "BLOCKED" ? "BLOCKED" : input.status === "HIDDEN" || input.status === "PAUSED" ? "INACTIVE" : "DRAFT";
+    const sameState = offer.status === targetOfferStatus && offer.publication?.status === input.status && offer.publication.marketplaceVisible === input.marketplaceVisible && (offer.publication.blockedReason ?? null) === (input.blockedReason ?? null);
+    if (sameState) return this.publicationResponse(offer);
+    if (input.expectedVersion !== undefined && input.expectedVersion !== offer.version) throw new ConflictException("Offer was changed by another request");
+    const requiresPublicationGate = input.status === "PUBLISHED" || input.status === "RESTRICTED" || input.marketplaceVisible;
+    if (requiresPublicationGate) {
       await this.agreements.assertActive(supplierOrganizationId);
-    }
-    if (input.status === "PUBLISHED") {
-      if (offer.productVariant.product.status !== "ACTIVE") throw new BadRequestException("Only confirmed ACTIVE product cards can be published");
+      if (offer.supplier.status !== "ACTIVE") throw new BadRequestException("Only an active supplier can publish offers");
+      if (offer.productVariant.product.status !== "ACTIVE" || offer.productVariant.status !== "ACTIVE") throw new BadRequestException("Only confirmed ACTIVE product cards and variants can be published");
+      if (!offer.saleUnitId || !offer.packagingId || !offer.packaging || !offer.packaging.quantityInBaseUnit.equals(offer.baseUnitsPerSaleUnit)) throw new BadRequestException("Published offer requires a valid sale unit and packaging coefficient");
+      const now = new Date();
       const [activePrice, availableBalance] = await Promise.all([
-        this.prisma.offerPrice.count({ where: { offerId, status: "ACTIVE" } }),
-        this.prisma.inventoryBalance.count({ where: { offerId, quantityAvailable: { gt: 0 }, freshnessStatus: "FRESH" } }),
+        this.prisma.offerPrice.count({ where: { offerId, status: "ACTIVE", currency: "KZT", amountMinor: { gt: 0 }, validFrom: { lte: now }, OR: [{ validTo: null }, { validTo: { gt: now } }], AND: [{ OR: [{ freshnessExpiresAt: null }, { freshnessExpiresAt: { gt: now } }] }] } }),
+        this.prisma.inventoryBalance.count({ where: { offerId, quantityAvailable: { gt: 0 }, freshnessStatus: "FRESH", OR: [{ freshnessExpiresAt: null }, { freshnessExpiresAt: { gt: now } }] } }),
       ]);
-      if (activePrice === 0 || availableBalance === 0) throw new BadRequestException("Published offer requires an active price and fresh available inventory");
+      if (activePrice === 0 || availableBalance === 0) throw new BadRequestException("Published offer requires a fresh positive KZT price and fresh available inventory");
       await this.compliance.assertOfferPublishable(supplierOrganizationId, offerId, context);
     }
-    return this.prisma.$transaction(async (tx) => {
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const changed = await tx.supplierOffer.updateMany({ where: { id: offerId, version: offer.version }, data: { status: targetOfferStatus, version: { increment: 1 } } });
+      if (changed.count !== 1) throw new ConflictException("Offer was changed by another request");
       const publication = await tx.offerPublication.upsert({
         where: { offerId },
-        update: { status: input.status, marketplaceVisible: input.marketplaceVisible, blockedReason: input.blockedReason ?? null, publishedAt: input.status === "PUBLISHED" ? new Date() : undefined },
+        update: { status: input.status, marketplaceVisible: input.marketplaceVisible, blockedReason: input.blockedReason ?? null, publishedAt: input.status === "PUBLISHED" ? offer.publication?.publishedAt ?? new Date() : undefined },
         create: { offerId, status: input.status, marketplaceVisible: input.marketplaceVisible, blockedReason: input.blockedReason ?? null, publishedAt: input.status === "PUBLISHED" ? new Date() : undefined },
       });
-      await tx.auditLog.create({ data: { ...context, action: "offer.publication.changed", entityType: "SupplierOffer", entityId: offerId, before: offer.publication ?? Prisma.JsonNull, after: publication } });
-      await tx.outboxEvent.create({ data: { aggregateType: "SupplierOffer", aggregateId: offerId, eventType: "OfferPublicationChanged", payload: { supplierOrganizationId, offerId, status: input.status, marketplaceVisible: input.marketplaceVisible } } });
-      return publication;
+      if (input.status === "PUBLISHED") await tx.importRow.updateMany({ where: { externalItem: { supplierOrganizationId, matchedVariantId: offer.productVariantId }, status: "MATCHED" }, data: { status: "PUBLISHED" } });
+      await tx.auditLog.create({ data: { ...context, action: "offer.publication.changed", entityType: "SupplierOffer", entityId: offerId, before: { offerStatus: offer.status, offerVersion: offer.version, publication: offer.publication ? { status: offer.publication.status, marketplaceVisible: offer.publication.marketplaceVisible, publishedAt: offer.publication.publishedAt?.toISOString() ?? null, blockedReason: offer.publication.blockedReason } : null }, after: { publication: { status: publication.status, marketplaceVisible: publication.marketplaceVisible, publishedAt: publication.publishedAt?.toISOString() ?? null, blockedReason: publication.blockedReason }, offerStatus: targetOfferStatus, offerVersion: offer.version + 1, decisionReason: input.decisionReason ?? null } } });
+      await tx.outboxEvent.create({ data: { aggregateType: "SupplierOffer", aggregateId: offerId, eventType: "OfferPublicationChanged", payload: { supplierOrganizationId, offerId, productId: offer.productVariant.productId, status: input.status, marketplaceVisible: input.marketplaceVisible, decisionReason: input.decisionReason ?? null } } });
+      return tx.supplierOffer.findUniqueOrThrow({ where: { id: offerId }, include: { publication: true, productVariant: { select: { productId: true } } } });
     });
+    await this.searchProjection.rebuildProduct(offer.productVariant.productId);
+    return this.publicationResponse(updated);
   }
 }

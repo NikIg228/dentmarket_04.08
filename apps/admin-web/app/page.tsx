@@ -30,6 +30,7 @@ import { SupplierControls } from "./supplier-controls";
 import { SupplierOperations } from "./supplier-operations";
 import { TrustOperations } from "./trust-operations";
 import { ProductCorrectionQueue } from "./product-correction-queue";
+import { CatalogImportReviewQueue } from "./catalog-import-review";
 import { clearAdminSession, isLocalAdminDevelopment, readAdminSession } from "./admin-auth";
 
 type SectionId =
@@ -163,7 +164,7 @@ export default function OperationsWorkspace() {
     organizations: <><ResourceLists /><FoundationManagement /></>,
     access: <><SupplierControls /><PlatformAssurance /></>,
     catalog: <><ProductCorrectionQueue /><CatalogQuality /><CommerceFoundation /></>,
-    imports: <><IntegrationOperations /><ConnectorReadinessRegistry /></>,
+    imports: <><CatalogImportReviewQueue /><IntegrationOperations /><ConnectorReadinessRegistry /></>,
     orders: <><SupplierOperations /><AgreementOperations /></>,
     security: <TrustOperations />,
     settings: <CommerceSkeleton />,

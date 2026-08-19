@@ -1,9 +1,12 @@
 import type {
   AddCartItemRequest,
+  ApproveImportProductCandidateInput,
   CartItemResponse,
   CartResponse,
   CartValidationResponse,
   CatalogSearchResponse,
+  CatalogImportReview,
+  CatalogImportReviewQueueResponse,
   CheckoutCartRequest,
   CheckoutResponse,
   CompareOffersRequest,
@@ -19,11 +22,16 @@ import type {
   SupplierImportBatchResponse,
   SupplierImportDiagnosticsResponse,
   ShipmentResponse,
+  SetOfferPublicationInput,
+  SupplierOfferPublicationResponse,
   TransitionShipmentRequest,
 } from "@marketplace/schemas";
 
 export type {
+  CatalogImportReview,
+  CatalogImportReviewQueueResponse,
   OrderDocumentResponse,
+  SupplierOfferPublicationResponse,
   SupplierImportBatchResponse,
   SupplierImportDiagnosticsResponse,
 } from "@marketplace/schemas";
@@ -309,6 +317,33 @@ export class MarketplaceApiClient {
   ) {
     return this.get<SupplierImportDiagnosticsResponse>(
       `/suppliers/${supplierOrganizationId}/import-batches/${batchId}/diagnostics`,
+    );
+  }
+
+  listCatalogImportReviews() {
+    return this.get<CatalogImportReviewQueueResponse>(
+      "/moderation/import-reviews",
+    );
+  }
+
+  approveCatalogImportCandidate(
+    candidateId: string,
+    input: ApproveImportProductCandidateInput,
+  ) {
+    return this.post<CatalogImportReview>(
+      `/moderation/import-reviews/${candidateId}/approve`,
+      input,
+    );
+  }
+
+  setSupplierOfferPublication(
+    supplierOrganizationId: string,
+    offerId: string,
+    input: SetOfferPublicationInput,
+  ) {
+    return this.put<SupplierOfferPublicationResponse>(
+      `/suppliers/${supplierOrganizationId}/offers/${offerId}/publication`,
+      input,
     );
   }
 }

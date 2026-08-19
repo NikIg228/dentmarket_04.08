@@ -4,6 +4,7 @@ import { ApiTags } from "@nestjs/swagger";
 import { PermissionsGuard } from "../access-control/permissions.guard";
 import { RequirePermissions } from "../access-control/require-permissions.decorator";
 import { OffersService } from "./offers.service";
+import { ApiCoreBody, ApiCoreErrors, ApiCoreProtected, ApiCoreResponse, ApiUuidParam } from "../../platform/openapi/core-openapi";
 
 @ApiTags("supplier-offers")
 @UseGuards(PermissionsGuard)
@@ -36,6 +37,12 @@ export class OffersController {
 
   @Put(":offerId/publication")
   @RequirePermissions("catalog.offer.publish")
+  @ApiCoreProtected()
+  @ApiUuidParam("supplierOrganizationId", "Supplier organization")
+  @ApiUuidParam("offerId", "Supplier offer")
+  @ApiCoreBody("SetOfferPublicationRequest")
+  @ApiCoreResponse("SupplierOfferPublicationResponse")
+  @ApiCoreErrors()
   setPublication(@Param("supplierOrganizationId") supplierOrganizationId: string, @Param("offerId") offerId: string, @Body() body: unknown, @Headers("x-user-id") actorId: string, @Headers("x-organization-id") organizationId: string) {
     const parsed = setOfferPublicationSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException(parsed.error.flatten());

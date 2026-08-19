@@ -55,7 +55,7 @@
     "verify:release": "pnpm typecheck && pnpm test && pnpm build && pnpm verify:production-config",
     "verify:flow-a": "pnpm --filter @marketplace/schemas build && pnpm --filter @marketplace/api build && pnpm --filter @marketplace/buyer-web build && pnpm --filter @marketplace/e2e e2e:flow-a",
     "verify:flow-b2": "pnpm --filter @marketplace/schemas build && pnpm --filter @marketplace/api build && pnpm --filter @marketplace/buyer-web build && pnpm --filter @marketplace/supplier-web build && pnpm --filter @marketplace/e2e e2e:flow-b2",
-    "verify:flow-b3": "pnpm --filter @marketplace/schemas build && pnpm --filter @marketplace/api build && pnpm --filter @marketplace/e2e e2e:flow-b3",
+    "verify:flow-b3": "pnpm --filter @marketplace/schemas build && pnpm --filter @marketplace/api-client build && pnpm --filter @marketplace/api build && pnpm --filter @marketplace/admin-web build && pnpm --filter @marketplace/buyer-web build && pnpm --filter @marketplace/e2e e2e:flow-b3",
     "verify:web": "pnpm --filter @marketplace/e2e e2e"
   },
   "devDependencies": {

@@ -341,8 +341,21 @@ export const setOfferPublicationSchema = z.object({
   status: z.enum(["DRAFT", "UNDER_REVIEW", "PUBLISHED", "HIDDEN", "BLOCKED", "PAUSED", "RESTRICTED"]),
   marketplaceVisible: z.boolean(),
   blockedReason: z.string().trim().max(240).nullable().optional(),
+  expectedVersion: z.number().int().positive().optional(),
+  decisionReason: z.string().trim().min(5).max(500).optional(),
 }).refine((value) => !value.marketplaceVisible || value.status === "PUBLISHED" || value.status === "RESTRICTED", {
   message: "Marketplace visibility requires a published or restricted status",
+});
+
+export const supplierOfferPublicationResponseSchema = z.object({
+  offerId: z.uuid(),
+  productId: z.uuid(),
+  offerStatus: z.enum(["DRAFT", "ACTIVE", "INACTIVE", "BLOCKED", "ARCHIVED"]),
+  offerVersion: z.number().int().positive(),
+  status: z.enum(["DRAFT", "UNDER_REVIEW", "PUBLISHED", "HIDDEN", "BLOCKED", "PAUSED", "RESTRICTED"]),
+  marketplaceVisible: z.boolean(),
+  publishedAt: z.iso.datetime().nullable(),
+  blockedReason: z.string().nullable(),
 });
 
 export const setInventoryBalanceSchema = z.object({
@@ -398,6 +411,7 @@ export type ConfirmSupplierItemMatchInput = z.infer<typeof confirmSupplierItemMa
 export type CreateSupplierOfferInput = z.infer<typeof createSupplierOfferSchema>;
 export type SetOfferPriceInput = z.infer<typeof setOfferPriceSchema>;
 export type SetOfferPublicationInput = z.infer<typeof setOfferPublicationSchema>;
+export type SupplierOfferPublicationResponse = z.infer<typeof supplierOfferPublicationResponseSchema>;
 export type SetInventoryBalanceInput = z.infer<typeof setInventoryBalanceSchema>;
 export type CreateInventoryLotInput = z.infer<typeof createInventoryLotSchema>;
 export type CreateInventoryReservationInput = z.infer<typeof createInventoryReservationSchema>;
@@ -411,6 +425,74 @@ export const approveProductCandidateSchema = z.object({
   categoryIds: z.array(z.uuid()).min(1).max(20),
   saleUnitId: z.uuid().nullable().optional(),
   packageQuantity: z.number().positive().default(1),
+});
+
+export const approveImportProductCandidateSchema = approveProductCandidateSchema.extend({
+  saleUnitId: z.uuid(),
+  decisionReason: z.string().trim().min(5).max(500),
+});
+
+const importReviewResultSchema = z.object({
+  product: z.object({ id: z.uuid(), name: z.string(), status: z.string() }),
+  variant: z.object({ id: z.uuid(), status: z.string() }),
+  offer: z.object({
+    id: z.uuid(),
+    status: z.string(),
+    version: z.number().int().positive(),
+    publicationStatus: z.string(),
+    marketplaceVisible: z.boolean(),
+    publishedAt: z.iso.datetime().nullable(),
+    priceMinor: z.string().nullable(),
+    currency: z.string().nullable(),
+    quantityAvailable: z.string().nullable(),
+    readinessBlockers: z.array(z.string()),
+  }),
+});
+
+export const catalogImportReviewSchema = z.object({
+  id: z.uuid(),
+  status: z.enum(["PENDING", "APPROVED", "REJECTED"]),
+  createdAt: z.iso.datetime(),
+  updatedAt: z.iso.datetime(),
+  supplier: z.object({ organizationId: z.uuid(), displayName: z.string() }),
+  proposed: z.object({
+    name: z.string(),
+    sku: z.string().nullable(),
+    gtin: z.string().nullable(),
+    brand: z.string().nullable(),
+  }),
+  source: z.object({
+    externalItemId: z.uuid(),
+    externalId: z.string(),
+    fileName: z.string(),
+    batchId: z.uuid(),
+    rowNumber: z.number().int().positive(),
+    normalizedData: z.record(z.string(), z.unknown()).nullable(),
+    complianceStatus: z.string(),
+    complianceReasons: z.array(z.string()),
+  }),
+  suggestedMatches: z.array(z.object({
+    variantId: z.uuid(),
+    productId: z.uuid(),
+    productName: z.string(),
+    sku: z.string().nullable(),
+    score: z.string(),
+    reasons: z.array(z.string()),
+  })),
+  decision: z.object({
+    decidedAt: z.iso.datetime().nullable(),
+    rejectionReason: z.string().nullable(),
+  }).nullable(),
+  result: importReviewResultSchema.nullable(),
+});
+
+export const catalogImportReviewQueueResponseSchema = z.object({
+  items: z.array(catalogImportReviewSchema),
+  options: z.object({
+    industries: z.array(z.object({ id: z.uuid(), name: z.string() })),
+    categories: z.array(z.object({ id: z.uuid(), name: z.string(), industryId: z.uuid() })),
+    units: z.array(z.object({ id: z.uuid(), name: z.string(), symbol: z.string() })),
+  }),
 });
 
 export const rejectProductCandidateSchema = z.object({
@@ -557,6 +639,9 @@ export const resolveLotRecallSchema = z.object({
 });
 
 export type ApproveProductCandidateInput = z.infer<typeof approveProductCandidateSchema>;
+export type ApproveImportProductCandidateInput = z.infer<typeof approveImportProductCandidateSchema>;
+export type CatalogImportReview = z.infer<typeof catalogImportReviewSchema>;
+export type CatalogImportReviewQueueResponse = z.infer<typeof catalogImportReviewQueueResponseSchema>;
 export type RejectProductCandidateInput = z.infer<typeof rejectProductCandidateSchema>;
 export type SubmitProductCorrectionInput = z.infer<typeof submitProductCorrectionSchema>;
 export type DecideProductCorrectionInput = z.infer<typeof decideProductCorrectionSchema>;

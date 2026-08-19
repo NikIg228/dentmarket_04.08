@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import { headers } from "next/headers";
 import { Providers } from "./providers";
 import "./globals.css";
 
@@ -13,9 +14,12 @@ export const metadata: Metadata = {
   description: "Рабочий кабинет команды DentMarket",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  // A per-request render is required so Next can apply the CSP nonce generated
+  // by middleware to its bootstrap scripts.
+  await headers();
   return (
     <html lang="ru">
       <body className={inter.variable}>
