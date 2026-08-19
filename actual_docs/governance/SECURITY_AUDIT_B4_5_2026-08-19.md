@@ -231,3 +231,9 @@ gate проверяет тот же набор assertions и устраняет 
 source-to-sink paths и зафиксировать закрытие B4.5. До этого приложение остаётся
 `BLOCKED` для production; после зелёного R2E следующая продуктовая задача —
 B4.3 защищённый operator dead-letter replay.
+
+- [ ] Попытка Standard scan `9cc6f935-afb0-49d7-8dd4-4025210fdce0` не завершена:
+      после готового preflight continuation thread остался в `systemError`,
+      discovery/validation workers не стартовали, canonical report не создан.
+      Чекбокс R2E намеренно остаётся `[ ]`; повторить scan в исправленном
+      Codex Security runtime перед B4.3.

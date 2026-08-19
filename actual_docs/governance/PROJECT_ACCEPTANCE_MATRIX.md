@@ -285,3 +285,7 @@ SSRF; focused regressions, полный gate stack и 17/17 browser regression �
 Проект остаётся `BLOCKED` до повторной проверки source-to-sink paths; live
 infrastructure evidence также остаётся явно открытым. После зелёного R2E
 следует B4.3.
+
+- [ ] R2E не закрыт: Standard scan `9cc6f935-afb0-49d7-8dd4-4025210fdce0`
+      остался в `systemError` до discovery/validation; canonical security
+      report отсутствует. Повторить его в исправленном runtime.

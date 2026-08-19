@@ -822,6 +822,10 @@ deployment evidence; политика сохраняет RPO 15 минут и RT
 production-safe до повторного полного security regression; его чекбокс остаётся
 `[ ]` до завершения R2E.
 
+- [ ] R2E Standard scan `9cc6f935-afb0-49d7-8dd4-4025210fdce0` остановлен как
+      блокированный: continuation thread остался в `systemError` после
+      preflight, discovery/validation и canonical report отсутствуют.
+
 Следующий этап — **B4.5-R2E**, а не B4.3: повторно проверить все изменённые
 source-to-sink paths и только после этого возвращаться к защищённому dead-letter
 replay.
