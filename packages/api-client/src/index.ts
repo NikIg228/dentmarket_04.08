@@ -8,6 +8,7 @@ import type {
   CheckoutResponse,
   CompareOffersRequest,
   ConfirmSupplierOrderRequest,
+  CreateImportBatchInput,
   GenerateOrderDocumentPackRequest,
   CreateShipmentRequest,
   OrderDocumentPackResponse,
@@ -15,11 +16,17 @@ import type {
   OfferComparisonResponse,
   SearchCatalogRequest,
   SupplierOrderResponse,
+  SupplierImportBatchResponse,
+  SupplierImportDiagnosticsResponse,
   ShipmentResponse,
   TransitionShipmentRequest,
 } from "@marketplace/schemas";
 
-export type { OrderDocumentResponse } from "@marketplace/schemas";
+export type {
+  OrderDocumentResponse,
+  SupplierImportBatchResponse,
+  SupplierImportDiagnosticsResponse,
+} from "@marketplace/schemas";
 
 export type ApiContext = {
   actorId?: string;
@@ -273,6 +280,35 @@ export class MarketplaceApiClient {
     return this.post<OrderDocumentPackResponse>(
       `/supplier-orders/${orderId}/document-pack`,
       input,
+    );
+  }
+
+  createSupplierImportBatch(
+    supplierOrganizationId: string,
+    input: CreateImportBatchInput,
+  ) {
+    return this.post<SupplierImportBatchResponse>(
+      `/suppliers/${supplierOrganizationId}/import-batches`,
+      input,
+    );
+  }
+
+  processSupplierImportBatch(
+    supplierOrganizationId: string,
+    batchId: string,
+  ) {
+    return this.post<SupplierImportBatchResponse>(
+      `/suppliers/${supplierOrganizationId}/import-batches/${batchId}/process`,
+      {},
+    );
+  }
+
+  getSupplierImportDiagnostics(
+    supplierOrganizationId: string,
+    batchId: string,
+  ) {
+    return this.get<SupplierImportDiagnosticsResponse>(
+      `/suppliers/${supplierOrganizationId}/import-batches/${batchId}/diagnostics`,
     );
   }
 }

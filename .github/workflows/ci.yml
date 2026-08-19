@@ -84,6 +84,7 @@ jobs:
           pnpm verify:security
           pnpm verify:onboarding-agreement
           pnpm verify:trust-geo
+          pnpm verify:flow-b3
           pnpm verify:web
       - name: Upload failure diagnostics
         if: failure()

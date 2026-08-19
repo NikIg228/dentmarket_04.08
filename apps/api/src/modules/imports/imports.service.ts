@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
   type OnModuleInit,
@@ -25,8 +26,6 @@ import {
 } from "./matching";
 import { BackgroundQueueService } from "../../platform/jobs/background-queue.service";
 import { FileUploadPolicyService } from "../../platform/security/file-upload-policy.service";
-import { ComplianceService } from "../compliance/compliance.service";
-import { MarketplaceAgreementsService } from "../agreements/marketplace-agreements.service";
 
 type RawRow = Record<string, unknown>;
 
@@ -84,6 +83,36 @@ function lineComplianceStatus(
   return { status: "READY", reasons: [] };
 }
 
+function rowFormatError(row: ReturnType<typeof normalizeRow>) {
+  if (!row.externalId || !row.name)
+    return {
+      code: "REQUIRED_VALUE_MISSING",
+      message: "External ID and name are required",
+    };
+  if (
+    row.priceMinor &&
+    (!/^[1-9]\d{0,19}$/.test(row.priceMinor) || BigInt(row.priceMinor) <= 0n)
+  )
+    return {
+      code: "INVALID_PRICE_MINOR",
+      message: "Price must be a positive integer in minor units",
+    };
+  if (
+    row.quantityOnHand &&
+    !/^\d+(?:\.\d{1,6})?$/.test(row.quantityOnHand)
+  )
+    return {
+      code: "INVALID_QUANTITY",
+      message: "Quantity must be a non-negative decimal with up to 6 fraction digits",
+    };
+  if (row.expirationDate && Number.isNaN(Date.parse(row.expirationDate)))
+    return {
+      code: "INVALID_EXPIRATION_DATE",
+      message: "Expiration date must be a valid date",
+    };
+  return null;
+}
+
 @Injectable()
 export class ImportsService implements OnModuleInit {
   constructor(
@@ -92,105 +121,7 @@ export class ImportsService implements OnModuleInit {
     private readonly fileParser: ImportFileParser,
     private readonly backgroundQueue: BackgroundQueueService,
     private readonly uploads: FileUploadPolicyService,
-    private readonly compliance: ComplianceService,
-    private readonly agreements: MarketplaceAgreementsService,
   ) {}
-
-  private async tryAutoPublishOffer(
-    supplierOrganizationId: string,
-    offerId: string,
-    context: SupplierActorContext,
-  ) {
-    const offer = await this.prisma.supplierOffer.findFirst({
-      where: { id: offerId, supplierOrganizationId },
-      include: {
-        publication: true,
-        productVariant: { include: { product: true } },
-        prices: {
-          where: {
-            status: "ACTIVE",
-            AND: [
-              { OR: [{ validTo: null }, { validTo: { gt: new Date() } }] },
-              {
-                OR: [
-                  { freshnessExpiresAt: null },
-                  { freshnessExpiresAt: { gt: new Date() } },
-                ],
-              },
-            ],
-          },
-          take: 1,
-        },
-        inventoryBalances: {
-          where: { freshnessStatus: "FRESH", quantityAvailable: { gt: 0 } },
-          take: 1,
-        },
-      },
-    });
-    if (!offer || offer.status === "BLOCKED" || offer.status === "ARCHIVED")
-      return false;
-    if (
-      offer.publication?.status === "PUBLISHED" &&
-      offer.status === "ACTIVE" &&
-      offer.publication.marketplaceVisible
-    )
-      return true;
-    if (
-      offer.productVariant.product.status !== "ACTIVE" ||
-      offer.prices.length === 0 ||
-      offer.inventoryBalances.length === 0
-    )
-      return false;
-    try {
-      await this.agreements.assertActive(supplierOrganizationId);
-      await this.compliance.assertOfferPublishable(
-        supplierOrganizationId,
-        offerId,
-        context,
-      );
-    } catch {
-      return false;
-    }
-    await this.prisma.$transaction(async (tx) => {
-      await tx.supplierOffer.update({
-        where: { id: offerId },
-        data: { status: "ACTIVE", version: { increment: 1 } },
-      });
-      const publication = await tx.offerPublication.upsert({
-        where: { offerId },
-        update: {
-          status: "PUBLISHED",
-          marketplaceVisible: true,
-          blockedReason: null,
-          publishedAt: new Date(),
-        },
-        create: {
-          offerId,
-          status: "PUBLISHED",
-          marketplaceVisible: true,
-          publishedAt: new Date(),
-        },
-      });
-      await tx.auditLog.create({
-        data: {
-          ...context,
-          action: "offer.auto_published_after_import",
-          entityType: "SupplierOffer",
-          entityId: offerId,
-          after: publication,
-        },
-      });
-      await tx.outboxEvent.create({
-        data: {
-          aggregateType: "SupplierOffer",
-          aggregateId: offerId,
-          eventType: "OfferAutoPublished",
-          payload: { supplierOrganizationId, offerId, source: "IMPORT" },
-        },
-      });
-    });
-    return true;
-  }
 
   onModuleInit() {
     this.backgroundQueue.register("imports.process", async (payload) =>
@@ -477,7 +408,7 @@ export class ImportsService implements OnModuleInit {
       conflictCount: conflicts.length,
       conflicts,
       idempotency:
-        "SupplierExternalItem is upserted by sourceId + externalId; repeated imports do not create duplicate external items.",
+        "A completed batch returns its persisted result without reprocessing; SupplierExternalItem remains unique by sourceId + externalId.",
     };
   }
 
@@ -493,8 +424,10 @@ export class ImportsService implements OnModuleInit {
     });
     if (!source) throw new NotFoundException("Supplier data source not found");
     let uploadAssetId: string | null = null;
+    let sourceChecksum: string | null = null;
     if (input.contentBase64) {
       const body = this.uploads.decodeBase64(input.contentBase64, 20_000_000);
+      sourceChecksum = createHash("sha256").update(body).digest("hex");
       const allowedKind =
         input.fileType === "EXCEL"
           ? "XLSX"
@@ -516,9 +449,9 @@ export class ImportsService implements OnModuleInit {
     const rows = parsedFile.rows;
     if (rows.length === 0 && input.fileType !== "PDF")
       throw new BadRequestException("Import does not contain data rows");
-    const checksum = createHash("sha256")
-      .update(JSON.stringify(rows))
-      .digest("hex");
+    const checksum =
+      sourceChecksum ??
+      createHash("sha256").update(JSON.stringify(rows)).digest("hex");
     return this.prisma.$transaction(
       async (tx) => {
         const batch = await tx.importBatch.create({
@@ -620,9 +553,15 @@ export class ImportsService implements OnModuleInit {
       include: { rows: { orderBy: { rowNumber: "asc" } } },
     });
     if (!batch) throw new NotFoundException("Import batch not found");
+    if (["COMPLETED", "COMPLETED_WITH_ERRORS"].includes(batch.status))
+      return batch;
     if (batch.status === "REVIEW_REQUIRED")
       throw new BadRequestException(
         "Import requires OCR or manual mapping before processing",
+      );
+    if (batch.status !== "MAPPED")
+      throw new ConflictException(
+        `Import batch cannot be processed from ${batch.status}`,
       );
     const mappingResult = supplierColumnMappingSchema.safeParse(
       batch.columnMapping,
@@ -648,10 +587,25 @@ export class ImportsService implements OnModuleInit {
       variants.map((variant) => [variant.id, variant]),
     );
 
-    await this.prisma.importBatch.update({
-      where: { id: batch.id },
+    const claimed = await this.prisma.importBatch.updateMany({
+      where: {
+        id: batch.id,
+        supplierOrganizationId,
+        status: "MAPPED",
+      },
       data: { status: "PROCESSING", startedAt: new Date(), completedAt: null },
     });
+    if (claimed.count !== 1) {
+      const current = await this.prisma.importBatch.findFirst({
+        where: { id: batch.id, supplierOrganizationId },
+      });
+      if (
+        current &&
+        ["COMPLETED", "COMPLETED_WITH_ERRORS"].includes(current.status)
+      )
+        return current;
+      throw new ConflictException("Import batch is already being processed");
+    }
     let processedRows = 0;
     let errorRows = 0;
     let cursor = 0;
@@ -660,21 +614,21 @@ export class ImportsService implements OnModuleInit {
         row.rawData as RawRow,
         mappingResult.data,
       );
-      if (!normalized.externalId || !normalized.name) {
+      const formatError = rowFormatError(normalized);
+      if (formatError) {
         errorRows += 1;
         await this.prisma.importRow.update({
           where: { id: row.id },
           data: {
             status: "REJECTED",
-            errorCode: "REQUIRED_VALUE_MISSING",
-            errorMessage: "External ID and name are required",
+            errorCode: formatError.code,
+            errorMessage: formatError.message,
             normalizedData: normalized as Prisma.InputJsonValue,
           },
         });
         return;
       }
       try {
-        let autoPublishOfferId: string | null = null;
         await this.prisma.$transaction(
           async (tx) => {
             const item = await tx.supplierExternalItem.upsert({
@@ -832,7 +786,6 @@ export class ImportsService implements OnModuleInit {
                     publication: { create: {} },
                   },
                 }));
-              autoPublishOfferId = offer.id;
               if (existingOffer)
                 await tx.supplierOffer.update({
                   where: { id: existingOffer.id },
@@ -844,10 +797,10 @@ export class ImportsService implements OnModuleInit {
                     version: { increment: 1 },
                   },
                 });
-              const amountMinor = Number(normalized.priceMinor);
+              const amountMinor = normalized.priceMinor;
               if (
-                Number.isFinite(amountMinor) &&
-                amountMinor >= 0 &&
+                amountMinor &&
+                /^[1-9]\d{0,19}$/.test(amountMinor) &&
                 /^[A-Z]{3}$/.test(normalized.currency ?? "")
               ) {
                 await tx.offerPrice.updateMany({
@@ -857,7 +810,7 @@ export class ImportsService implements OnModuleInit {
                 await tx.offerPrice.create({
                   data: {
                     offerId: offer.id,
-                    amountMinor: Math.trunc(amountMinor),
+                    amountMinor,
                     currency: normalized.currency!,
                     includesVat: true,
                     source: "IMPORT",
@@ -869,7 +822,7 @@ export class ImportsService implements OnModuleInit {
                 await tx.offerPriceHistory.create({
                   data: {
                     offerId: offer.id,
-                    amountMinor: Math.trunc(amountMinor),
+                    amountMinor,
                     currency: normalized.currency!,
                     includesVat: true,
                     source: "IMPORT",
@@ -877,12 +830,13 @@ export class ImportsService implements OnModuleInit {
                   },
                 });
               }
-              const quantity = Number(normalized.quantityOnHand);
+              const quantity = normalized.quantityOnHand;
               if (
                 defaultWarehouse &&
-                Number.isFinite(quantity) &&
-                quantity >= 0
+                quantity !== null &&
+                /^\d+(?:\.\d{1,6})?$/.test(quantity)
               ) {
+                const inStock = !/^0(?:\.0+)?$/.test(quantity);
                 await tx.inventoryBalance.upsert({
                   where: {
                     supplierOrganizationId_warehouseId_productVariantId: {
@@ -898,7 +852,7 @@ export class ImportsService implements OnModuleInit {
                     safetyStock: 0,
                     quantityAvailable: quantity,
                     availabilityStatus:
-                      quantity > 0 ? "IN_STOCK" : "OUT_OF_STOCK",
+                      inStock ? "IN_STOCK" : "OUT_OF_STOCK",
                     freshnessStatus: "FRESH",
                     source: "IMPORT",
                     externalUpdatedAt: new Date(),
@@ -918,7 +872,7 @@ export class ImportsService implements OnModuleInit {
                     safetyStock: 0,
                     quantityAvailable: quantity,
                     availabilityStatus:
-                      quantity > 0 ? "IN_STOCK" : "OUT_OF_STOCK",
+                      inStock ? "IN_STOCK" : "OUT_OF_STOCK",
                     freshnessStatus: "FRESH",
                     source: "IMPORT",
                     externalUpdatedAt: new Date(),
@@ -987,12 +941,6 @@ export class ImportsService implements OnModuleInit {
           },
           { maxWait: 15_000, timeout: 45_000 },
         );
-        if (autoPublishOfferId)
-          await this.tryAutoPublishOffer(
-            supplierOrganizationId,
-            autoPublishOfferId,
-            context,
-          );
         processedRows += 1;
       } catch (error) {
         errorRows += 1;

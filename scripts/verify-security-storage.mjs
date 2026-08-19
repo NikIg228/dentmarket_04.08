@@ -53,11 +53,12 @@ if (!databaseUrl) {
   process.exit(0);
 }
 
-const { Client } = requireFromApi("pg");
-const client = new Client({ connectionString: databaseUrl });
-await client.connect();
+const { PrismaClient } = requireFromApi("@prisma/client");
+const prisma = new PrismaClient({
+  datasources: { db: { url: databaseUrl } },
+});
 try {
-  const columns = await client.query(`
+  const columns = await prisma.$queryRawUnsafe(`
     SELECT table_name, column_name
     FROM information_schema.columns
     WHERE table_schema = 'public'
@@ -65,7 +66,7 @@ try {
         OR (table_name = 'SupplierDataSource' AND column_name = 'encryptedConfiguration'))
   `);
   const columnSet = new Set(
-    columns.rows.map(
+    columns.map(
       ({ table_name, column_name }) => `${table_name}.${column_name}`,
     ),
   );
@@ -79,7 +80,7 @@ try {
       );
   }
 
-  const configs = await client.query(`
+  const configs = await prisma.$queryRawUnsafe(`
     SELECT 'IntegrationConnection' AS table_name, "configuration" AS configuration, "encryptedConfiguration" AS encrypted
     FROM "IntegrationConnection" WHERE "configuration" IS NOT NULL
     UNION ALL
@@ -98,7 +99,7 @@ try {
       scan(nested);
     }
   };
-  for (const row of configs.rows) {
+  for (const row of configs) {
     scan(row.configuration);
     if (row.encrypted) encryptedConfigRows += 1;
   }
@@ -117,7 +118,7 @@ try {
         },
         database: {
           encryptedColumns: [...columnSet].sort(),
-          configurationRows: configs.rowCount,
+          configurationRows: configs.length,
           encryptedConfigRows,
           plaintextSensitiveKeys,
         },
@@ -128,5 +129,5 @@ try {
     ),
   );
 } finally {
-  await client.end();
+  await prisma.$disconnect();
 }

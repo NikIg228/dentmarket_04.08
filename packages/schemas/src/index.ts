@@ -252,6 +252,66 @@ export const createImportBatchSchema = z.object({
   message: "Rows or file content must be provided",
 });
 
+export const supplierImportBatchStatusSchema = z.enum([
+  "UPLOADED",
+  "MAPPED",
+  "REVIEW_REQUIRED",
+  "PROCESSING",
+  "COMPLETED",
+  "COMPLETED_WITH_ERRORS",
+  "FAILED",
+]);
+
+export const supplierImportRowStatusSchema = z.enum([
+  "RAW",
+  "NORMALIZED",
+  "MATCH_PENDING",
+  "MATCHED",
+  "REJECTED",
+  "PUBLISHED",
+]);
+
+export const supplierImportBatchResponseSchema = z
+  .object({
+    id: z.uuid(),
+    supplierOrganizationId: z.uuid(),
+    sourceId: z.uuid(),
+    fileName: z.string(),
+    fileType: z.enum(["MANUAL", "CSV", "EXCEL", "PDF", "API", "ERP"]),
+    checksum: z.string().regex(/^[a-f0-9]{64}$/).nullable(),
+    status: supplierImportBatchStatusSchema,
+    columnMapping: z.record(z.string(), z.unknown()).nullable(),
+    extractionMetadata: z.record(z.string(), z.unknown()).nullable(),
+    totalRows: z.number().int().nonnegative(),
+    processedRows: z.number().int().nonnegative(),
+    errorRows: z.number().int().nonnegative(),
+    startedAt: z.iso.datetime().nullable(),
+    completedAt: z.iso.datetime().nullable(),
+    createdAt: z.iso.datetime(),
+    updatedAt: z.iso.datetime(),
+  })
+  .passthrough();
+
+export const supplierImportConflictSchema = z.object({
+  rowNumber: z.number().int().positive(),
+  status: supplierImportRowStatusSchema,
+  code: z.string().nullable(),
+  message: z.string().nullable(),
+  data: z.record(z.string(), z.unknown()).nullable(),
+});
+
+export const supplierImportDiagnosticsResponseSchema = z.object({
+  batchId: z.uuid(),
+  status: supplierImportBatchStatusSchema,
+  totalRows: z.number().int().nonnegative(),
+  processedRows: z.number().int().nonnegative(),
+  errorRows: z.number().int().nonnegative(),
+  byStatus: z.record(z.string(), z.number().int().nonnegative()),
+  conflictCount: z.number().int().nonnegative(),
+  conflicts: z.array(supplierImportConflictSchema),
+  idempotency: z.string(),
+});
+
 export const confirmSupplierItemMatchSchema = z.object({ productVariantId: z.uuid() });
 
 export const createSupplierOfferSchema = z.object({
@@ -328,6 +388,12 @@ export type CreateWarehouseInput = z.infer<typeof createWarehouseSchema>;
 export type CreateSupplierDataSourceInput = z.infer<typeof createSupplierDataSourceSchema>;
 export type SupplierColumnMappingInput = z.infer<typeof supplierColumnMappingSchema>;
 export type CreateImportBatchInput = z.infer<typeof createImportBatchSchema>;
+export type SupplierImportBatchResponse = z.infer<
+  typeof supplierImportBatchResponseSchema
+>;
+export type SupplierImportDiagnosticsResponse = z.infer<
+  typeof supplierImportDiagnosticsResponseSchema
+>;
 export type ConfirmSupplierItemMatchInput = z.infer<typeof confirmSupplierItemMatchSchema>;
 export type CreateSupplierOfferInput = z.infer<typeof createSupplierOfferSchema>;
 export type SetOfferPriceInput = z.infer<typeof setOfferPriceSchema>;

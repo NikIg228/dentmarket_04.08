@@ -157,7 +157,7 @@ git diff --check
 Внешние материалы являются обязательным набором профессиональных практик, а
 не набором инструкций, которые нужно бездумно складывать в один prompt:
 
-- `C:\Users\user\Desktop\agency-agents-main\agency-agents-main` — выбирайте
+- `C:\Users\user\Desktop\Agentic Skills\agency-agents-main\agency-agents-main` — выбирайте
   релевантные роли: backend architect для модели/границ, frontend developer
   для реализации, UI designer и UX architect для интерфейса, code reviewer
   для рисков, Git workflow master для истории, testing roles для доказательств.

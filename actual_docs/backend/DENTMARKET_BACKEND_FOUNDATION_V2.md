@@ -399,8 +399,8 @@ Gate намеренно разрешён только для локальной 
 - [x] Миграция `20260818130000_outbox_delivery_semantics` применена как 29-я;
   dispatcher tests, PostgreSQL regression и runtime split прошли.
 
-Текущий статус: **B0.1–B0.6, B1.1–B1.2 и B2.1–B2.3 реализованы и проходят**.
-Следующая задача: **B3.1 — доказать CSV staging → validation → matching**.
+Текущий статус: **B0.1–B0.6, B1.1–B1.2, B2.1–B2.3 и B3.1 реализованы и проходят**.
+Следующая задача: **B3.2 — доказать operator review → publication → Buyer visibility**.
 
 ### B1 — покупка клиникой
 
@@ -541,7 +541,7 @@ production/legal gates и не имитируются локальным ком�
 
 | Готово | ID   | Задача | Gate |
 | ------ | ---- | ------ | ---- |
-| [ ] | B3.1 | CSV staging → validation → matching | integration test |
+| [x] | B3.1 | CSV staging → validation → matching | integration test |
 | [ ] | B3.2 | Operator review → publication → Buyer visibility | PostgreSQL + Playwright |
 | [ ] | B3.3 | Откат ошибочного batch без потери raw/evidence | integration test |
 
@@ -551,6 +551,35 @@ production/legal gates и не имитируются локальным ком�
 4. operator review спорных позиций;
 5. публикация оффера;
 6. откат ошибочного batch.
+
+Выполнено в B3.1:
+
+- [x] Общие Zod response/status-контракты импорта используются типизированным
+  API client; request/response/error-границы операции зарегистрированы в OpenAPI.
+- [x] Реальный UTF-8 CSV проходит upload policy, quarantine и parser;
+  `ImportBatch.sourceChecksum` фиксирует исходные байты файла, а raw-строки
+  сохраняются до обработки без потери доказательств.
+- [x] Точное совпадение создаёт подтверждённый mapping и только `DRAFT` offer;
+  неизвестный SKU переходит в `MATCH_PENDING` с `ProductCandidate(PENDING)`,
+  некорректные обязательные поля и цена — в `REJECTED` с явными кодами причин.
+- [x] Цена `9007199254740993` minor units и количество записываются без
+  преобразования через JavaScript `number`, поэтому точность Prisma Decimal
+  не теряется.
+- [x] Завершённый batch возвращает сохранённый результат идемпотентно;
+  атомарный claim `MAPPED → PROCESSING` защищает от конкурентной повторной
+  обработки, чужая организация получает `403`.
+- [x] Повторная обработка не создаёт дубли external items, mapping memory,
+  offers, price history, audit или outbox; автоматическая публикация отсутствует.
+- [x] `pnpm verify:flow-b3` проходит 1/1, детерминированный повтор — 10/10,
+  `pnpm verify:web` — 15/15; PostgreSQL-проверки подтверждают checksum,
+  статусы, связи, audit/outbox, tenant isolation и zero-residue cleanup.
+- [x] `pnpm typecheck`, `pnpm test`, `pnpm verify:core-contract`,
+  `pnpm verify:postgres`, `pnpm verify:runtime-split`, `pnpm verify:outbox`,
+  `pnpm verify:pilot-backend`, `pnpm build` и DB-backed
+  `pnpm verify:security-storage` проходят.
+
+Ограничение B3.1: UI загрузки, operator review, публикация, Buyer visibility и
+rollback не входят в эту фазу и остаются задачами B3.2–B3.3.
 
 ### B4 — эксплуатационный минимум
 
@@ -618,8 +647,9 @@ Definition of Done: наблюдаемый итог, а не список фай
 - [x] Notifications и payment order export подключены через handler registry.
 - [x] ADR, migration, CI gate и эксплуатационные правила обновлены вместе с кодом.
 
-B1.2 и B2.1–B2.3 после этого этапа также закрыты. Текущая следующая задача
-зафиксирована в разделе 8: **B3.1 — CSV staging → validation → matching**.
+B1.2, B2.1–B2.3 и B3.1 после этого этапа также закрыты. Текущая следующая
+задача зафиксирована в разделе 8: **B3.2 — operator review → publication →
+Buyer visibility**.
 
 ## 12. Команды локальной проверки
 

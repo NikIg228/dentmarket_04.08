@@ -27,6 +27,7 @@ import {
   checkoutResponseSchema,
   compareOffersSchema,
   confirmSupplierOrderSchema,
+  createImportBatchSchema,
   createShipmentSchema,
   createCartSchema,
   errorResponseSchema,
@@ -41,6 +42,8 @@ import {
   supplierOrderResponseSchema,
   shipmentListResponseSchema,
   shipmentResponseSchema,
+  supplierImportBatchResponseSchema,
+  supplierImportDiagnosticsResponseSchema,
   transitionShipmentSchema,
 } from "@marketplace/schemas";
 import { z, type ZodType } from "zod";
@@ -71,6 +74,7 @@ const coreZodSchemas = {
   AddCartItemRequest: addCartItemSchema,
   CheckoutCartRequest: checkoutCartSchema,
   ConfirmSupplierOrderRequest: confirmSupplierOrderSchema,
+  CreateSupplierImportBatchRequest: createImportBatchSchema,
   CreateShipmentRequest: createShipmentSchema,
   TransitionShipmentRequest: transitionShipmentSchema,
   GenerateOrderDocumentPackRequest: generateOrderDocumentPackSchema,
@@ -83,6 +87,8 @@ const coreZodSchemas = {
   CheckoutResponse: checkoutResponseSchema,
   SupplierOrderResponse: supplierOrderResponseSchema,
   SupplierOrderListResponse: supplierOrderListResponseSchema,
+  SupplierImportBatchResponse: supplierImportBatchResponseSchema,
+  SupplierImportDiagnosticsResponse: supplierImportDiagnosticsResponseSchema,
   ShipmentResponse: shipmentResponseSchema,
   ShipmentListResponse: shipmentListResponseSchema,
   OrderDocumentPackResponse: orderDocumentPackResponseSchema,

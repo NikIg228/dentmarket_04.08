@@ -3,6 +3,7 @@ import { addCartItemSchema, approveProductCandidateSchema, captureMockPaymentSch
 import { createRegistrationIntentSchema, mfaCodeSchema, socialExchangeSchema, updateConnectorReadinessSchema } from "./index.js";
 import { decideProductCorrectionSchema, submitProductCorrectionSchema } from "./index.js";
 import { generateOrderDocumentPackSchema } from "./index.js";
+import { supplierImportBatchResponseSchema, supplierImportDiagnosticsResponseSchema } from "./index.js";
 
 describe("createOrganizationSchema", () => {
   it("accepts a multi-capability Kazakhstan organization", () => {
@@ -135,6 +136,40 @@ describe("iteration 1A schemas", () => {
       rows: [{ id: "row-1", name: "Композит A2", price: 125000 }],
     });
     expect(result.rows?.[0]).toMatchObject({ price: 125000 });
+  });
+
+  it("validates supplier import batch and diagnostics responses", () => {
+    const batchId = "00000000-0000-4000-8000-000000000091";
+    const now = "2026-08-19T00:00:00.000Z";
+    expect(supplierImportBatchResponseSchema.parse({
+      id: batchId,
+      supplierOrganizationId: "00000000-0000-4000-8000-000000000092",
+      sourceId: "00000000-0000-4000-8000-000000000093",
+      fileName: "price.csv",
+      fileType: "CSV",
+      checksum: "a".repeat(64),
+      status: "COMPLETED_WITH_ERRORS",
+      columnMapping: { externalId: "externalId", name: "name" },
+      extractionMetadata: { method: "csv" },
+      totalRows: 3,
+      processedRows: 2,
+      errorRows: 1,
+      startedAt: now,
+      completedAt: now,
+      createdAt: now,
+      updatedAt: now,
+    }).status).toBe("COMPLETED_WITH_ERRORS");
+    expect(supplierImportDiagnosticsResponseSchema.parse({
+      batchId,
+      status: "COMPLETED_WITH_ERRORS",
+      totalRows: 3,
+      processedRows: 2,
+      errorRows: 1,
+      byStatus: { MATCHED: 1, MATCH_PENDING: 1, REJECTED: 1 },
+      conflictCount: 2,
+      conflicts: [],
+      idempotency: "completed batches are returned without reprocessing",
+    }).byStatus.MATCHED).toBe(1);
   });
 
   it("protects inventory invariants", () => {

@@ -3,9 +3,18 @@ import { confirmSupplierItemMatchSchema, createImportBatchSchema } from "@market
 import { ApiTags } from "@nestjs/swagger";
 import { PermissionsGuard } from "../access-control/permissions.guard";
 import { RequirePermissions } from "../access-control/require-permissions.decorator";
+import {
+  ApiCoreBody,
+  ApiCoreErrors,
+  ApiCoreProtected,
+  ApiCoreResponse,
+  ApiUuidParam,
+} from "../../platform/openapi/core-openapi";
 import { ImportsService } from "./imports.service";
 
 @ApiTags("supplier-imports")
+@ApiCoreProtected()
+@ApiCoreErrors()
 @UseGuards(PermissionsGuard)
 @Controller("suppliers/:supplierOrganizationId")
 export class ImportsController {
@@ -25,6 +34,9 @@ export class ImportsController {
   }
 
   @Post("import-batches")
+  @ApiUuidParam("supplierOrganizationId", "Supplier organization identifier")
+  @ApiCoreBody("CreateSupplierImportBatchRequest")
+  @ApiCoreResponse("SupplierImportBatchResponse", 201)
   @RequirePermissions("import.manage")
   createBatch(@Param("supplierOrganizationId") supplierOrganizationId: string, @Body() body: unknown, @Headers("x-user-id") actorId: string, @Headers("x-organization-id") organizationId: string) {
     const parsed = createImportBatchSchema.safeParse(body);
@@ -39,12 +51,18 @@ export class ImportsController {
   }
 
   @Get("import-batches/:batchId/diagnostics")
+  @ApiUuidParam("supplierOrganizationId", "Supplier organization identifier")
+  @ApiUuidParam("batchId", "Supplier import batch identifier")
+  @ApiCoreResponse("SupplierImportDiagnosticsResponse")
   @RequirePermissions("import.manage")
   diagnostics(@Param("supplierOrganizationId") supplierOrganizationId: string, @Param("batchId") batchId: string, @Headers("x-user-id") actorId: string, @Headers("x-organization-id") organizationId: string) {
     return this.imports.diagnostics(supplierOrganizationId, batchId, this.context(actorId, organizationId));
   }
 
   @Post("import-batches/:batchId/process")
+  @ApiUuidParam("supplierOrganizationId", "Supplier organization identifier")
+  @ApiUuidParam("batchId", "Supplier import batch identifier")
+  @ApiCoreResponse("SupplierImportBatchResponse", 201)
   @RequirePermissions("import.manage")
   processBatch(@Param("supplierOrganizationId") supplierOrganizationId: string, @Param("batchId") batchId: string, @Headers("x-user-id") actorId: string, @Headers("x-organization-id") organizationId: string) {
     return this.imports.processBatch(supplierOrganizationId, batchId, this.context(actorId, organizationId));
