@@ -1,37 +1,104 @@
-import { URL } from "node:url";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 
-const required = ["SENTRY_DSN", "OTEL_EXPORTER_OTLP_ENDPOINT"];
-const missing = required.filter((key) => !process.env[key]);
-if (missing.length) {
-  console.error(`Missing observability configuration: ${missing.join(", ")}`);
-  process.exit(2);
+const root = path.resolve(import.meta.dirname, "..");
+const rulesPath = path.join(
+  root,
+  "infra",
+  "observability",
+  "dentmarket-alert-rules.json",
+);
+const runbookPath = path.join(
+  root,
+  "actual_docs",
+  "operations",
+  "observability-runbook.md",
+);
+const rules = JSON.parse(await readFile(rulesPath, "utf8"));
+const runbook = await readFile(runbookPath, "utf8");
+const runbookAnchors = new Set(
+  [...runbook.matchAll(/^##\s+(.+)$/gm)].map(([, heading]) =>
+    heading
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}\s-]/gu, "")
+      .trim()
+      .replace(/\s+/g, "-")
+      .replace(/-+/g, "-"),
+  ),
+);
+
+function assert(condition, message) {
+  if (!condition) throw new Error(message);
 }
-for (const key of required) {
-  const value = process.env[key];
-  try {
-    new URL(value);
-  } catch {
-    console.error(`${key} must be an absolute URL`);
-    process.exit(2);
-  }
+
+function compare(value, operator, threshold) {
+  if (operator === ">") return value > threshold;
+  if (operator === ">=") return value >= threshold;
+  throw new Error(`Unsupported alert operator: ${operator}`);
 }
-const result = {
-  configured: true,
-  sentry: {
-    dsn: true,
-    piiDisabled: process.env.SENTRY_SEND_DEFAULT_PII !== "true",
-  },
-  otel: {
-    endpoint: true,
-    serviceName: process.env.OTEL_SERVICE_NAME ?? "marketplace-api",
-  },
-  syntheticAlert:
-    process.env.ALERT_TEST_CONFIRM === "I_UNDERSTAND_SYNTHETIC_ALERT"
-      ? "AUTHORIZED"
-      : "NOT_RUN",
-};
-if (result.syntheticAlert === "NOT_RUN")
-  console.log(
-    "Configuration verified. Set ALERT_TEST_CONFIRM to run a live synthetic alert through the deployment runbook.",
+
+assert(rules.version === 1, "Alert catalog version must be 1");
+assert(rules.owner, "Alert catalog owner is required");
+assert(
+  Array.isArray(rules.rules) && rules.rules.length >= 6,
+  "Critical alert rules are missing",
+);
+
+const ids = new Set();
+const coveredMetrics = new Set();
+for (const rule of rules.rules) {
+  assert(
+    typeof rule.id === "string" && rule.id.length > 0,
+    "Alert id is required",
   );
-console.log(JSON.stringify(result, null, 2));
+  assert(!ids.has(rule.id), `Duplicate alert id: ${rule.id}`);
+  ids.add(rule.id);
+  assert(
+    ["warning", "critical"].includes(rule.severity),
+    `${rule.id}: invalid severity`,
+  );
+  assert(
+    typeof rule.promql === "string" && rule.promql.includes(rule.metric),
+    `${rule.id}: PromQL must reference its metric`,
+  );
+  assert(/^\d+[smhd]$/.test(rule.for), `${rule.id}: invalid for duration`);
+  assert(
+    rule.runbook.startsWith("actual_docs/operations/observability-runbook.md#"),
+    `${rule.id}: invalid runbook link`,
+  );
+  const anchor = rule.runbook.split("#")[1];
+  assert(runbookAnchors.has(anchor), `${rule.id}: runbook anchor is missing`);
+  assert(
+    !compare(rule.synthetic.healthy, rule.operator, rule.threshold),
+    `${rule.id}: healthy synthetic vector fires`,
+  );
+  assert(
+    compare(rule.synthetic.firing, rule.operator, rule.threshold),
+    `${rule.id}: firing synthetic vector does not fire`,
+  );
+  coveredMetrics.add(rule.metric);
+}
+
+for (const metric of [
+  "dentmarket_http_request_duration_seconds_count",
+  "dentmarket_outbox_oldest_event_age_seconds",
+  "dentmarket_outbox_expired_leases",
+  "dentmarket_outbox_events",
+  "dentmarket_import_rollback_oldest_age_seconds",
+]) {
+  assert(coveredMetrics.has(metric), `No alert covers ${metric}`);
+}
+
+console.log(
+  JSON.stringify(
+    {
+      alertCatalog: true,
+      rules: rules.rules.length,
+      syntheticVectors: rules.rules.length * 2,
+      owner: rules.owner,
+      runbook: path.relative(root, runbookPath),
+    },
+    null,
+    2,
+  ),
+);

@@ -56,6 +56,7 @@ const valid = {
   NOTIFICATION_WEBHOOK_SECRET: "n".repeat(48),
   SENTRY_DSN: "https://public@sentry.example.kz/1",
   OTEL_EXPORTER_OTLP_ENDPOINT: "https://otel.example.kz/v1/traces",
+  METRICS_BEARER_TOKEN: "t".repeat(48),
 };
 const run = (env) =>
   spawnSync(
@@ -79,12 +80,16 @@ const mockPayment = run({
 });
 if (mockPayment.status === 0)
   throw new Error("Mock payment mode was accepted in production");
+const unprotectedMetrics = run({ ...valid, METRICS_BEARER_TOKEN: "" });
+if (unprotectedMetrics.status === 0)
+  throw new Error("Production accepted an unprotected metrics endpoint");
 console.log(
   JSON.stringify(
     {
       productionContract: true,
       insecureCorsRejected: true,
       mockPaymentsRejected: true,
+      unprotectedMetricsRejected: true,
       artifacts: requiredFiles,
     },
     null,

@@ -19,6 +19,8 @@
 
 ## Контрольные процедуры
 
+- Metrics: защищённый `GET /api/metrics`, versioned rules и инструкции — в
+  `observability-runbook.md`; локальный gate — `pnpm verify:observability`.
 - Sentry: error rate, unhandled exceptions, release regression.
 - OTEL: latency p95/p99, 5xx, queue lag, database pool saturation.
 - Backup: `scripts/verify-restore-drill.sh` на отдельной базе с подтверждением `I_UNDERSTAND_RESTORE_DRILL`.

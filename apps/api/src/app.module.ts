@@ -44,6 +44,7 @@ import { OperationsModule } from "./modules/operations/operations.module";
 import { runtimeCapabilities } from "./platform/runtime/process-role";
 import { RuntimeReadinessService } from "./platform/runtime/runtime-readiness.service";
 import { OutboxModule } from "./platform/outbox/outbox.module";
+import { ObservabilityModule } from "./platform/observability/observability.module";
 
 const config = environment();
 const runtime = runtimeCapabilities(config.PROCESS_ROLE);
@@ -75,6 +76,7 @@ const runtime = runtimeCapabilities(config.PROCESS_ROLE);
     ]),
     BackgroundJobsModule,
     OutboxModule,
+    ObservabilityModule,
     SecurityModule,
     PrismaModule,
     StorageModule,

@@ -50,6 +50,7 @@ const environmentSchema = z.object({
   CLAMAV_PORT: z.coerce.number().int().min(1).max(65_535).default(3310),
   OTEL_EXPORTER_OTLP_ENDPOINT: z.string().url().optional(),
   SENTRY_DSN: z.string().url().optional(),
+  METRICS_BEARER_TOKEN: z.string().min(32).optional(),
   INTEGRATION_ENCRYPTION_KEY: encryptionKeySchema.optional(),
   INTEGRATION_ENCRYPTION_KEY_PREVIOUS: encryptionKeySchema.optional(),
   APP_SECURITY_ENCRYPTION_KEY: encryptionKeySchema.optional(),
@@ -78,6 +79,7 @@ const environmentSchema = z.object({
   LOG_LEVEL: z.enum(["trace", "debug", "info", "warn", "error", "fatal"]).default("info"),
 }).superRefine((value, context) => {
   if (value.NODE_ENV === "production" && value.PROCESS_ROLE === "all") context.addIssue({ code: "custom", path: ["PROCESS_ROLE"], message: "The all process role is restricted to local development and tests" });
+  if (value.NODE_ENV === "production" && !value.METRICS_BEARER_TOKEN) context.addIssue({ code: "custom", path: ["METRICS_BEARER_TOKEN"], message: "A dedicated metrics bearer token is required in production" });
   if (value.NODE_ENV === "production" && value.AUTH_MODE === "development") context.addIssue({ code: "custom", path: ["AUTH_MODE"], message: "Development identity headers are forbidden in production" });
   if (value.AUTH_MODE === "jwt" && !value.JWT_SECRET && !value.JWT_PUBLIC_KEY) context.addIssue({ code: "custom", path: ["JWT_PUBLIC_KEY"], message: "JWT_PUBLIC_KEY or JWT_SECRET is required in JWT mode" });
   if (value.SOCIAL_AUTH_ENABLED && !value.JWT_SECRET && !value.JWT_PRIVATE_KEY) context.addIssue({ code: "custom", path: ["JWT_PRIVATE_KEY"], message: "JWT_PRIVATE_KEY or JWT_SECRET is required to issue social sessions" });

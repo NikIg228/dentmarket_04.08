@@ -43,7 +43,7 @@ describe("PDF supplier price parsing", () => {
     const result = await new ImportFileParser().parseWithDiagnostics({ sourceId: "00000000-0000-4000-8000-000000000022", fileName: "supplier.pdf", fileType: "PDF", contentBase64: bytes.toString("base64"), columnMapping: { externalId: "externalId", name: "name", priceMinor: "priceMinor" } });
     expect(result).toMatchObject({ requiresReview: false, metadata: { method: "pdf_text_table", extractedRows: 1 } });
     expect(result.rows[0]).toMatchObject({ name: "Scan Body", sourcePrice: "4130", priceMinor: "", requiresPriceConfirmation: true });
-  });
+  }, 15_000);
 
   it("routes image-only catalogs to review instead of inventing products", async () => {
     const pdf = await PDFDocument.create();

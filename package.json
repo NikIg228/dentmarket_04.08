@@ -50,6 +50,7 @@
     "verify:security-storage": "pnpm --filter @marketplace/api exec node ../../scripts/verify-security-storage.mjs",
     "verify:production-config": "node scripts/verify-production-config.mjs",
     "verify:production-connectors": "node scripts/verify-production-connectors.mjs",
+    "verify:observability": "pnpm --filter @marketplace/api build && pnpm --filter @marketplace/api exec vitest run src/platform/observability && node scripts/verify-observability-alerts.mjs && node scripts/verify-observability-integration.mjs",
     "load-test:search": "node scripts/load-test-search.mjs",
     "load-test:handoff": "node scripts/load-test-handoff.mjs",
     "verify:release": "pnpm typecheck && pnpm test && pnpm build && pnpm verify:production-config",

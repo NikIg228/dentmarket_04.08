@@ -18,7 +18,10 @@
 
 - `SIGNATURE_GATEWAY_URL` and `SIGNATURE_CALLBACK_SECRET` — real EDS provider sandbox and callback verification.
 - `PAYMENT_PROVIDER_MODE=external`, `PAYMENT_GATEWAY_URL`, `PAYMENT_GATEWAY_TOKEN` — PSP sandbox capture/refund/webhook cycle.
-- `SENTRY_DSN` and `OTEL_EXPORTER_OTLP_ENDPOINT` — production observability.
+- `SENTRY_DSN`, `OTEL_EXPORTER_OTLP_ENDPOINT` и независимый
+  `METRICS_BEARER_TOKEN` — production observability; alert rules подключены из
+  `infra/observability/dentmarket-alert-rules.json` и live synthetic alert
+  доставлен по маршруту дежурной команды.
 - Real supplier BIN, credentials, warehouse, prices, inventory and legal confirmation.
 - Signed 1C Agent and a real 1C database.
 - Real МойСклад tenant and API token.

@@ -64,6 +64,7 @@ jobs:
       - run: pnpm test
       - run: pnpm verify:outbox
       - run: pnpm build
+      - run: pnpm verify:observability
       - run: pnpm verify:runtime-split
       - run: pnpm verify:core-contract
       - run: pnpm verify:production-config

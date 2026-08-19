@@ -399,8 +399,8 @@ Gate намеренно разрешён только для локальной 
 - [x] Миграция `20260818130000_outbox_delivery_semantics` применена как 29-я;
   dispatcher tests, PostgreSQL regression и runtime split прошли.
 
-Текущий статус: **B0.1–B0.6, B1.1–B1.2, B2.1–B2.3 и B3.1–B3.3 реализованы и проходят**.
-Следующая задача: **B4.1 — metrics и alerts**.
+Текущий статус: **B0.1–B0.6, B1.1–B1.2, B2.1–B2.3, B3.1–B3.3 и B4.1 реализованы и проходят**.
+Следующая задача: **B4.2 — backup/restore rehearsal**.
 
 ### B1 — покупка клиникой
 
@@ -641,16 +641,45 @@ production connectors не входят в фазу; compensating rollback за�
 Ограничение B3.3: автоматическая компенсация намеренно не изменяет offer,
 который существовал до batch, и не откатывает данные, уже использованные заказом
 или активной резервацией. Такие случаи получают `409` и требуют отдельного
-операторского remediation workflow. Следующий этап — B4.1.
+операторского remediation workflow. Его observability закрыт в B4.1; следующий
+этап — B4.2.
 
 ### B4 — эксплуатационный минимум
 
-- [ ] B4.1 — metrics и alerts;
+- [x] B4.1 — metrics и alerts;
 - [ ] B4.2 — backup/restore rehearsal;
 - [ ] B4.3 — dead-letter operations и защищённый replay;
 - [ ] B4.4 — rate limiting и production auth runbook;
 - [ ] B4.5 — security/dependency scan;
 - [ ] B4.6 — нагрузочный профиль каталога и checkout.
+
+Выполнено в B4.1:
+
+- [x] Защищённый отдельным `METRICS_BEARER_TOKEN` endpoint `GET /api/metrics`
+  отдаёт Prometheus text exposition; production без независимого token не
+  стартует.
+- [x] HTTP histogram использует только low-cardinality labels `method`, Express
+  route template и `status_code`; tenant/user/UUID/query в labels не попадают.
+- [x] PostgreSQL gauges покрывают checkout statuses, import statuses и rollback
+  age/audit count, а также все метрики ADR 005: outbox depth, oldest age,
+  expired lease, attempts и errors по `eventType`.
+- [x] Семь versioned alert rules фиксируют PromQL, severity, owner, `for`, порог
+  и runbook для API/checkout, outbox и import rollback; 14 synthetic vectors
+  машинно проверяют healthy/firing границы.
+- [x] OTLP exporter одинаково принимает collector base URL и готовый
+  `/v1/traces`, не формируя ошибочный двойной путь.
+- [x] `pnpm verify:observability` подтверждает 4/4 unit, alert catalog,
+  `401/200` metrics auth и реальные PostgreSQL gauges; `pnpm typecheck`,
+  `pnpm test` (API 117/117), `pnpm build`, `pnpm verify:runtime-split`,
+  `pnpm verify:production-config`, `pnpm verify:outbox`,
+  `pnpm verify:core-contract`, `pnpm verify:postgres` и
+  `pnpm verify:pilot-backend` проходят.
+- [x] `pnpm verify:observability` включён в основной PostgreSQL-backed CI job
+  после production build.
+
+Ограничение B4.1: локальный contract и synthetic thresholds доказаны, но
+внешняя доставка alert и production dashboard получают `LIVE_VERIFIED` только
+при deployment monitoring stack. Это не блокирует следующий локальный этап B4.2.
 
 ### B5 — frontend unification
 
@@ -709,8 +738,8 @@ Definition of Done: наблюдаемый итог, а не список фай
 - [x] Notifications и payment order export подключены через handler registry.
 - [x] ADR, migration, CI gate и эксплуатационные правила обновлены вместе с кодом.
 
-B1.2, B2.1–B2.3 и B3.1–B3.3 после этого этапа также закрыты. Текущая следующая
-задача зафиксирована в разделе 8: **B4.1 — metrics и alerts**.
+B1.2, B2.1–B2.3, B3.1–B3.3 и B4.1 после этого этапа также закрыты. Текущая
+следующая задача зафиксирована в разделе 8: **B4.2 — backup/restore rehearsal**.
 
 ## 12. Команды локальной проверки
 
@@ -720,6 +749,7 @@ pnpm typecheck
 pnpm test
 pnpm verify:runtime-split
 pnpm verify:outbox
+pnpm verify:observability
 pnpm verify:postgres
 pnpm verify:core-contract
 pnpm verify:pilot-backend

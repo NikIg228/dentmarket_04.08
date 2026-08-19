@@ -13,6 +13,8 @@ import { identityContextMiddleware } from "./platform/security/identity-context.
 import { registerCoreOpenApiSchemas } from "./platform/openapi/core-openapi";
 import { ApiExceptionFilter } from "./platform/http/api-exception.filter";
 import { runtimeCapabilities } from "./platform/runtime/process-role";
+import { MetricsService } from "./platform/observability/metrics.service";
+import { httpMetricsMiddleware } from "./platform/observability/metrics.middleware";
 
 export async function createMarketplaceApp(
   options: { serverless?: boolean } = {},
@@ -57,6 +59,7 @@ export async function createMarketplaceApp(
   );
   app.use(identityContextMiddleware());
   app.use(httpLoggerMiddleware());
+  app.use(httpMetricsMiddleware(app.get(MetricsService)));
   app.useGlobalFilters(new ApiExceptionFilter());
   app.useBodyParser("json", { limit: "32mb" });
   app.useBodyParser("urlencoded", { limit: "1mb", extended: true });

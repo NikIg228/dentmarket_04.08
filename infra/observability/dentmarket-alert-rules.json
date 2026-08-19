@@ -1,0 +1,83 @@
+{
+  "version": 1,
+  "owner": "platform-on-call",
+  "rules": [
+    {
+      "id": "DentMarketApiHighErrorRate",
+      "severity": "critical",
+      "metric": "dentmarket_http_request_duration_seconds_count",
+      "operator": ">",
+      "threshold": 0.05,
+      "for": "5m",
+      "promql": "sum(rate(dentmarket_http_request_duration_seconds_count{status_code=~\"5..\"}[5m])) / clamp_min(sum(rate(dentmarket_http_request_duration_seconds_count[5m])), 0.001) > 0.05",
+      "runbook": "actual_docs/operations/observability-runbook.md#api-errors-and-checkout",
+      "synthetic": { "healthy": 0.01, "firing": 0.08 }
+    },
+    {
+      "id": "DentMarketCheckoutErrors",
+      "severity": "critical",
+      "metric": "dentmarket_http_request_duration_seconds_count",
+      "operator": ">",
+      "threshold": 0,
+      "for": "2m",
+      "promql": "sum(rate(dentmarket_http_request_duration_seconds_count{route=\"/api/carts/:cartId/checkout\",status_code=~\"5..\"}[5m])) > 0",
+      "runbook": "actual_docs/operations/observability-runbook.md#api-errors-and-checkout",
+      "synthetic": { "healthy": 0, "firing": 1 }
+    },
+    {
+      "id": "DentMarketOutboxLag",
+      "severity": "critical",
+      "metric": "dentmarket_outbox_oldest_event_age_seconds",
+      "operator": ">",
+      "threshold": 300,
+      "for": "5m",
+      "promql": "max(dentmarket_outbox_oldest_event_age_seconds{status=~\"PENDING|FAILED\"}) > 300",
+      "runbook": "actual_docs/operations/observability-runbook.md#outbox-lag-leases-and-dead-letter",
+      "synthetic": { "healthy": 120, "firing": 600 }
+    },
+    {
+      "id": "DentMarketOutboxExpiredLease",
+      "severity": "warning",
+      "metric": "dentmarket_outbox_expired_leases",
+      "operator": ">",
+      "threshold": 0,
+      "for": "2m",
+      "promql": "dentmarket_outbox_expired_leases > 0",
+      "runbook": "actual_docs/operations/observability-runbook.md#outbox-lag-leases-and-dead-letter",
+      "synthetic": { "healthy": 0, "firing": 1 }
+    },
+    {
+      "id": "DentMarketOutboxDeadLetter",
+      "severity": "critical",
+      "metric": "dentmarket_outbox_events",
+      "operator": ">",
+      "threshold": 0,
+      "for": "1m",
+      "promql": "dentmarket_outbox_events{status=\"DEAD_LETTER\"} > 0",
+      "runbook": "actual_docs/operations/observability-runbook.md#outbox-lag-leases-and-dead-letter",
+      "synthetic": { "healthy": 0, "firing": 1 }
+    },
+    {
+      "id": "DentMarketImportRollbackStuck",
+      "severity": "critical",
+      "metric": "dentmarket_import_rollback_oldest_age_seconds",
+      "operator": ">",
+      "threshold": 300,
+      "for": "5m",
+      "promql": "dentmarket_import_rollback_oldest_age_seconds > 300",
+      "runbook": "actual_docs/operations/observability-runbook.md#import-rollback",
+      "synthetic": { "healthy": 60, "firing": 600 }
+    },
+    {
+      "id": "DentMarketImportRollbackErrors",
+      "severity": "warning",
+      "metric": "dentmarket_http_request_duration_seconds_count",
+      "operator": ">",
+      "threshold": 0,
+      "for": "2m",
+      "promql": "sum(rate(dentmarket_http_request_duration_seconds_count{route=\"/api/supplier-organizations/:supplierOrganizationId/import-batches/:batchId/rollback\",status_code=~\"5..\"}[5m])) > 0",
+      "runbook": "actual_docs/operations/observability-runbook.md#import-rollback",
+      "synthetic": { "healthy": 0, "firing": 1 }
+    }
+  ]
+}
