@@ -49,6 +49,7 @@
     "verify:security": "node scripts/verify-security.mjs",
     "verify:security-storage": "pnpm --filter @marketplace/api exec node ../../scripts/verify-security-storage.mjs",
     "verify:platform-authority": "pnpm --filter @marketplace/schemas build && pnpm --filter @marketplace/api build && node scripts/verify-platform-authority.mjs",
+    "verify:outbound-security": "pnpm --filter @marketplace/api exec vitest run src/platform/security/outbound-request.gateway.spec.ts src/modules/integrations/integration-adapters.spec.ts src/modules/integrations/adapters/custom-api.adapter.spec.ts src/modules/integrations/integration-execution.service.spec.ts && node scripts/verify-outbound-security.mjs",
     "verify:production-config": "node scripts/verify-production-config.mjs",
     "verify:production-connectors": "node scripts/verify-production-connectors.mjs",
     "verify:backup-restore": "pnpm --filter @marketplace/api build && node scripts/verify-backup-restore.mjs",

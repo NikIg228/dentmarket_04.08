@@ -401,9 +401,10 @@ Gate намеренно разрешён только для локальной 
 
 Текущий статус: **B0.1–B0.6, B1.1–B1.2, B2.1–B2.3, B3.1–B3.3,
 B4.1–B4.2 и B4.5 реализованы и проходят**.
-Следующая задача: **B4.5-R1 — устранение четырёх high source-code findings**;
-она остаётся выше B4.3, потому что dependency graph уже очищен, но scan выявил
-критичные authorization и SSRF paths в прикладном коде.
+High source-code backlog B4.5-R1 закрыт фазами R1A и R1B. Следующая задача:
+**B4.5-R2A — устранение Medium organization enumeration/capability disclosure**;
+R2 остаётся выше B4.3, пока четыре Medium findings не исправлены и не прошли
+source-to-sink revalidation.
 
 ### B1 — покупка клиникой
 
@@ -750,16 +751,29 @@ deployment evidence; политика сохраняет RPO 15 минут и RT
 - [x] После R1A повторно проходят dependency audit, typecheck 12/12,
       API 124/124 и остальные workspace tests, build 8/8, production/security
       config и storage, PostgreSQL, runtime split, core contract и browser 17/17.
+- [x] B4.5-R1B добавляет единый `OutboundRequestGateway`: HTTPS/443 policy,
+      проверку всех A/AAAA и public IP ranges, DNS pinning, same-origin redirect
+      revalidation, общий deadline, response-size limit и безопасные ошибки.
+- [x] `CUSTOM_API` больше не выполняет прямой `fetch`, а private/loopback,
+      mixed-DNS и alternative-IP destinations отклоняются до чтения ответа;
+      `MOYSKLAD` закреплён за `api.moysklad.ru` и игнорирует tenant base URL.
+- [x] `pnpm verify:outbound-security` проходит 25/25 targeted tests и статический
+      bypass gate; финальный diff-scan `657c3363-632e-42c0-8d08-f09880a55745`
+      проверил 9/9 source items с complete coverage и `0 findings`.
+- [x] После R1B повторно проходят frozen install, dependency audit, typecheck
+      12/12, API 136/136 и остальные workspace tests, build 8/8,
+      production config, DB-backed security storage, live security, PostgreSQL,
+      runtime split, core contract, platform authority и browser 17/17.
 
-Ограничение B4.5: dependency finding и три authorization High закрыты, но
-приложение ещё не production-safe. Открыт 1 high source finding — integration
-SSRF — и 4 medium: organization enumeration, XLSX decompression exhaustion,
-delayed session revocation и notification SSRF. Их чекбоксы остаются `[ ]` до
-исходного source-to-sink revalidation после исправления.
+Ограничение B4.5: dependency finding и все четыре High source findings закрыты,
+но приложение ещё не production-safe. Открыты 4 Medium: organization
+enumeration, XLSX decompression exhaustion, delayed session revocation и
+notification SSRF. Их чекбоксы остаются `[ ]` до исходного source-to-sink
+revalidation после исправления.
 
-Следующий этап — **B4.5-R1B**, а не B4.3: сначала закрывается integration SSRF
-через центральный outbound request gateway и повторяется полный security
-regression, затем принимается решение о medium backlog и возвращении к
+Следующий этап — **B4.5-R2A**, а не B4.3: сначала закрывается organization
+enumeration/capability disclosure, затем остальные Medium findings отдельными
+change sets. После R2 и повторного security regression можно возвращаться к
 защищённому dead-letter replay.
 
 ### B5 — frontend unification
