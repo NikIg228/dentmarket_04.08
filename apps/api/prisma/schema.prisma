@@ -121,6 +121,8 @@ enum ImportBatchStatus {
   COMPLETED
   COMPLETED_WITH_ERRORS
   FAILED
+  ROLLING_BACK
+  ROLLED_BACK
 }
 
 enum ImportRowStatus {
@@ -130,6 +132,7 @@ enum ImportRowStatus {
   MATCHED
   REJECTED
   PUBLISHED
+  ROLLED_BACK
 }
 
 enum MatchCandidateStatus {
@@ -246,6 +249,7 @@ enum ProductCandidateStatus {
   PENDING
   APPROVED
   REJECTED
+  ROLLED_BACK
 }
 
 enum ContractPriceStatus {
@@ -1743,6 +1747,10 @@ model ImportBatch {
   errorRows              Int                    @default(0)
   startedAt              DateTime?
   completedAt            DateTime?
+  rollbackReason         String?
+  rollbackEvidence       Json?
+  rolledBackAt           DateTime?
+  rolledBackById         String?                @db.Uuid
   supplier               SupplierProfile        @relation(fields: [supplierOrganizationId], references: [organizationId], onDelete: Cascade)
   source                 SupplierDataSource     @relation(fields: [sourceId], references: [id], onDelete: Restrict)
   rows                   ImportRow[]

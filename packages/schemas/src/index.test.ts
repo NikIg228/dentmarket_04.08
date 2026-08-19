@@ -3,7 +3,7 @@ import { addCartItemSchema, approveProductCandidateSchema, captureMockPaymentSch
 import { createRegistrationIntentSchema, mfaCodeSchema, socialExchangeSchema, updateConnectorReadinessSchema } from "./index.js";
 import { decideProductCorrectionSchema, submitProductCorrectionSchema } from "./index.js";
 import { generateOrderDocumentPackSchema } from "./index.js";
-import { supplierImportBatchResponseSchema, supplierImportDiagnosticsResponseSchema } from "./index.js";
+import { rollbackImportBatchSchema, supplierImportBatchResponseSchema, supplierImportDiagnosticsResponseSchema, supplierImportRollbackResponseSchema } from "./index.js";
 
 describe("createOrganizationSchema", () => {
   it("accepts a multi-capability Kazakhstan organization", () => {
@@ -156,6 +156,10 @@ describe("iteration 1A schemas", () => {
       errorRows: 1,
       startedAt: now,
       completedAt: now,
+      rollbackReason: null,
+      rollbackEvidence: null,
+      rolledBackAt: null,
+      rolledBackById: null,
       createdAt: now,
       updatedAt: now,
     }).status).toBe("COMPLETED_WITH_ERRORS");
@@ -170,6 +174,16 @@ describe("iteration 1A schemas", () => {
       conflicts: [],
       idempotency: "completed batches are returned without reprocessing",
     }).byStatus.MATCHED).toBe(1);
+    expect(rollbackImportBatchSchema.safeParse({ reason: "Ошибка в прайс-листе поставщика", expectedUpdatedAt: now }).success).toBe(true);
+    expect(rollbackImportBatchSchema.safeParse({ reason: "short", expectedUpdatedAt: now }).success).toBe(false);
+    expect(supplierImportRollbackResponseSchema.parse({
+      batchId,
+      status: "ROLLED_BACK",
+      rolledBackAt: now,
+      reason: "Ошибка в прайс-листе поставщика",
+      preserved: { checksum: "a".repeat(64), rawRows: 3, uploadAsset: true },
+      effects: { rows: 3, externalItems: 2, offers: 1, prices: 1, inventoryBalances: 1, mappingMemories: 1, productCandidates: 1, products: 1 },
+    }).status).toBe("ROLLED_BACK");
   });
 
   it("protects inventory invariants", () => {

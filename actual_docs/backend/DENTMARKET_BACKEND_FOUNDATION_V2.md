@@ -399,8 +399,8 @@ Gate намеренно разрешён только для локальной 
 - [x] Миграция `20260818130000_outbox_delivery_semantics` применена как 29-я;
   dispatcher tests, PostgreSQL regression и runtime split прошли.
 
-Текущий статус: **B0.1–B0.6, B1.1–B1.2, B2.1–B2.3 и B3.1–B3.2 реализованы и проходят**.
-Следующая задача: **B3.3 — откат ошибочного batch без потери raw/evidence**.
+Текущий статус: **B0.1–B0.6, B1.1–B1.2, B2.1–B2.3 и B3.1–B3.3 реализованы и проходят**.
+Следующая задача: **B4.1 — metrics и alerts**.
 
 ### B1 — покупка клиникой
 
@@ -543,7 +543,7 @@ production/legal gates и не имитируются локальным ком�
 | ------ | ---- | ------ | ---- |
 | [x] | B3.1 | CSV staging → validation → matching | integration test |
 | [x] | B3.2 | Operator review → publication → Buyer visibility | PostgreSQL + Playwright |
-| [ ] | B3.3 | Откат ошибочного batch без потери raw/evidence | integration test |
+| [x] | B3.3 | Откат ошибочного batch без потери raw/evidence | PostgreSQL + Playwright |
 
 1. импорт поставщика в staging;
 2. validation report;
@@ -557,7 +557,7 @@ production/legal gates и не имитируются локальным ком�
 - [x] Общие Zod response/status-контракты импорта используются типизированным
   API client; request/response/error-границы операции зарегистрированы в OpenAPI.
 - [x] Реальный UTF-8 CSV проходит upload policy, quarantine и parser;
-  `ImportBatch.sourceChecksum` фиксирует исходные байты файла, а raw-строки
+  `ImportBatch.checksum` фиксирует исходные байты файла, а raw-строки
   сохраняются до обработки без потери доказательств.
 - [x] Точное совпадение создаёт подтверждённый mapping и только `DRAFT` offer;
   неизвестный SKU переходит в `MATCH_PENDING` с `ProductCandidate(PENDING)`,
@@ -570,8 +570,8 @@ production/legal gates и не имитируются локальным ком�
   обработки, чужая организация получает `403`.
 - [x] Повторная обработка не создаёт дубли external items, mapping memory,
   offers, price history, audit или outbox; автоматическая публикация отсутствует.
-- [x] `pnpm verify:flow-b3` проходит 2/2, детерминированный повтор B3.2 — 10/10,
-  `pnpm verify:web` — 16/16; PostgreSQL-проверки подтверждают checksum,
+- [x] `pnpm verify:flow-b3` проходит 3/3, детерминированные повторы B3.2 и
+  B3.3 — 10/10 каждый, `pnpm verify:web` — 17/17; PostgreSQL-проверки подтверждают checksum,
   статусы, связи, audit/outbox, tenant isolation и zero-residue cleanup.
 - [x] `pnpm typecheck`, `pnpm test`, `pnpm verify:core-contract`,
   `pnpm verify:postgres`, `pnpm verify:runtime-split`, `pnpm verify:outbox`,
@@ -579,8 +579,8 @@ production/legal gates и не имитируются локальным ком�
   `pnpm verify:security-storage` проходят.
 
 Ограничение B3.1: UI загрузки, operator review, публикация, Buyer visibility и
-rollback не входили в эту фазу. Operator review/publication закрыты B3.2;
-rollback остаётся B3.3.
+rollback не входили в эту фазу. Operator review/publication закрыты B3.2,
+а compensating rollback — B3.3.
 
 Выполнено в B3.2:
 
@@ -602,15 +602,46 @@ rollback остаётся B3.3.
 - [x] Admin получил отдельную Fluent UI v9 очередь с loading/empty/error/success,
   видимыми labels и confirmation dialog. Production CSP использует per-request
   nonce, а 390 px browser gate подтверждает отсутствие page overflow.
-- [x] `pnpm verify:flow-b3` проходит 2/2, B3.2 repeat — 10/10,
-  `pnpm verify:web` — 16/16; `pnpm typecheck`, `pnpm test`, `pnpm build`,
+- [x] `pnpm verify:flow-b3` проходит 3/3, B3.2 repeat — 10/10,
+  `pnpm verify:web` — 17/17; `pnpm typecheck`, `pnpm test`, `pnpm build`,
   `pnpm verify:core-contract`, `pnpm verify:postgres`,
   `pnpm verify:runtime-split`, `pnpm verify:outbox`,
   `pnpm verify:pilot-backend` и DB-backed `pnpm verify:security-storage` проходят.
 
 Ограничение B3.2: текущий действующий marketplace agreement сохранён как
-технический gate до отдельного legal review Product V2. Откат ошибочного batch,
-XLSX/PDF import и production connectors не входят в фазу; следующий шаг — B3.3.
+технический gate до отдельного legal review Product V2. XLSX/PDF import и
+production connectors не входят в фазу; compensating rollback закрыт B3.3.
+
+Выполнено в B3.3:
+
+- [x] Миграция `20260819133000_import_batch_rollback` добавляет состояния
+  `ROLLING_BACK/ROLLED_BACK`, rollback metadata и отдельный статус строк без
+  физического удаления `ImportBatch` или `ImportRow`.
+- [x] Общий Zod-контракт, OpenAPI и типизированный API client описывают reason,
+  optimistic `expectedUpdatedAt`, сохранённые evidence и счётчики компенсации.
+- [x] Serializable transaction атомарно переводит завершённый batch через
+  conditional claim, скрывает и архивирует созданные им offers, деактивирует
+  актуальные цены, обнуляет доступный остаток, отзывает mapping, архивирует
+  созданные product/variant и синхронно перестраивает search projection.
+- [x] Автоматический rollback получает `409`, если request устарел, offer
+  существовал до batch, effect был superseded, либо появились order items или
+  активные reservations; tenant isolation возвращает `403` без частичного effect.
+- [x] Checksum, quarantined upload, raw/normalized rows, прежние validation errors,
+  price history и связи сохраняются. `rollbackEvidence` фиксирует before-snapshot
+  строк, compliance, offers/publication, prices, inventory, mappings и products.
+- [x] Повтор уже завершённого rollback возвращает тот же response, повторно
+  доводит search projection до консистентного состояния и не создаёт второй
+  `import.batch.rolled_back` audit или `ImportBatchRolledBack` outbox event.
+- [x] `pnpm verify:flow-b3` проходит 3/3, B3.3 repeat — 10/10,
+  `pnpm verify:web` — 17/17; отдельный Flow B2 regression — 4/4.
+- [x] `pnpm typecheck`, `pnpm test`, `pnpm build`, `pnpm verify:core-contract`,
+  `pnpm verify:postgres`, `pnpm verify:runtime-split`, `pnpm verify:outbox`,
+  `pnpm verify:pilot-backend` и DB-backed `pnpm verify:security-storage` проходят.
+
+Ограничение B3.3: автоматическая компенсация намеренно не изменяет offer,
+который существовал до batch, и не откатывает данные, уже использованные заказом
+или активной резервацией. Такие случаи получают `409` и требуют отдельного
+операторского remediation workflow. Следующий этап — B4.1.
 
 ### B4 — эксплуатационный минимум
 
@@ -678,9 +709,8 @@ Definition of Done: наблюдаемый итог, а не список фай
 - [x] Notifications и payment order export подключены через handler registry.
 - [x] ADR, migration, CI gate и эксплуатационные правила обновлены вместе с кодом.
 
-B1.2, B2.1–B2.3 и B3.1–B3.2 после этого этапа также закрыты. Текущая следующая
-задача зафиксирована в разделе 8: **B3.3 — откат ошибочного batch без потери
-raw/evidence**.
+B1.2, B2.1–B2.3 и B3.1–B3.3 после этого этапа также закрыты. Текущая следующая
+задача зафиксирована в разделе 8: **B4.1 — metrics и alerts**.
 
 ## 12. Команды локальной проверки
 

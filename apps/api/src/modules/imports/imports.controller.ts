@@ -1,5 +1,5 @@
 import { BadRequestException, Body, Controller, Get, Headers, Param, Post, UseGuards } from "@nestjs/common";
-import { confirmSupplierItemMatchSchema, createImportBatchSchema } from "@marketplace/schemas";
+import { confirmSupplierItemMatchSchema, createImportBatchSchema, rollbackImportBatchSchema } from "@marketplace/schemas";
 import { ApiTags } from "@nestjs/swagger";
 import { PermissionsGuard } from "../access-control/permissions.guard";
 import { RequirePermissions } from "../access-control/require-permissions.decorator";
@@ -66,6 +66,18 @@ export class ImportsController {
   @RequirePermissions("import.manage")
   processBatch(@Param("supplierOrganizationId") supplierOrganizationId: string, @Param("batchId") batchId: string, @Headers("x-user-id") actorId: string, @Headers("x-organization-id") organizationId: string) {
     return this.imports.processBatch(supplierOrganizationId, batchId, this.context(actorId, organizationId));
+  }
+
+  @Post("import-batches/:batchId/rollback")
+  @ApiUuidParam("supplierOrganizationId", "Supplier organization identifier")
+  @ApiUuidParam("batchId", "Supplier import batch identifier")
+  @ApiCoreBody("RollbackSupplierImportBatchRequest")
+  @ApiCoreResponse("SupplierImportRollbackResponse", 201)
+  @RequirePermissions("import.manage")
+  rollbackBatch(@Param("supplierOrganizationId") supplierOrganizationId: string, @Param("batchId") batchId: string, @Body() body: unknown, @Headers("x-user-id") actorId: string, @Headers("x-organization-id") organizationId: string) {
+    const parsed = rollbackImportBatchSchema.safeParse(body);
+    if (!parsed.success) throw new BadRequestException(parsed.error.flatten());
+    return this.imports.rollbackBatch(supplierOrganizationId, batchId, parsed.data, this.context(actorId, organizationId));
   }
 
   @Post("import-batches/:batchId/enqueue")

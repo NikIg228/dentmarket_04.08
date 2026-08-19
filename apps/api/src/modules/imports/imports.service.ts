@@ -7,9 +7,12 @@ import {
 } from "@nestjs/common";
 import {
   supplierColumnMappingSchema,
+  supplierImportRollbackResponseSchema,
   type ConfirmSupplierItemMatchInput,
   type CreateImportBatchInput,
+  type RollbackImportBatchInput,
   type SupplierColumnMappingInput,
+  type SupplierImportRollbackResponse,
 } from "@marketplace/schemas";
 import { createHash } from "node:crypto";
 import { Prisma } from "@prisma/client";
@@ -26,6 +29,7 @@ import {
 } from "./matching";
 import { BackgroundQueueService } from "../../platform/jobs/background-queue.service";
 import { FileUploadPolicyService } from "../../platform/security/file-upload-policy.service";
+import { SearchProjectionService } from "../search/search-projection.service";
 
 type RawRow = Record<string, unknown>;
 
@@ -121,7 +125,27 @@ export class ImportsService implements OnModuleInit {
     private readonly fileParser: ImportFileParser,
     private readonly backgroundQueue: BackgroundQueueService,
     private readonly uploads: FileUploadPolicyService,
+    private readonly searchProjection: SearchProjectionService,
   ) {}
+
+  private rollbackResponse(rollbackEvidence: Prisma.JsonValue | null): SupplierImportRollbackResponse {
+    if (!rollbackEvidence || typeof rollbackEvidence !== "object" || Array.isArray(rollbackEvidence))
+      throw new ConflictException("Import batch rollback evidence is missing");
+    const parsed = supplierImportRollbackResponseSchema.safeParse(rollbackEvidence.response);
+    if (!parsed.success) throw new ConflictException("Import batch rollback evidence is invalid");
+    return parsed.data;
+  }
+
+  private rollbackProductIds(rollbackEvidence: Prisma.JsonValue | null) {
+    if (!rollbackEvidence || typeof rollbackEvidence !== "object" || Array.isArray(rollbackEvidence)) return [];
+    const affected = rollbackEvidence.affected;
+    if (!affected || typeof affected !== "object" || Array.isArray(affected) || !Array.isArray(affected.productIds)) return [];
+    return affected.productIds.filter((productId): productId is string => typeof productId === "string");
+  }
+
+  private async rebuildRollbackProducts(rollbackEvidence: Prisma.JsonValue | null) {
+    for (const productId of this.rollbackProductIds(rollbackEvidence)) await this.searchProjection.rebuildProduct(productId);
+  }
 
   onModuleInit() {
     this.backgroundQueue.register("imports.process", async (payload) =>
@@ -1006,6 +1030,198 @@ export class ImportsService implements OnModuleInit {
       },
       { maxWait: 15_000, timeout: 45_000 },
     );
+  }
+
+  async rollbackBatch(
+    supplierOrganizationId: string,
+    batchId: string,
+    input: RollbackImportBatchInput,
+    context: SupplierActorContext,
+  ): Promise<SupplierImportRollbackResponse> {
+    await this.access.assertCanManage(supplierOrganizationId, context);
+    const initial = await this.prisma.importBatch.findFirst({
+      where: { id: batchId, supplierOrganizationId },
+      select: { status: true, updatedAt: true, rollbackEvidence: true },
+    });
+    if (!initial) throw new NotFoundException("Import batch not found");
+    if (initial.status === "ROLLED_BACK") {
+      await this.rebuildRollbackProducts(initial.rollbackEvidence);
+      return this.rollbackResponse(initial.rollbackEvidence);
+    }
+    if (!(["COMPLETED", "COMPLETED_WITH_ERRORS"] as const).includes(initial.status as "COMPLETED" | "COMPLETED_WITH_ERRORS"))
+      throw new ConflictException(`Import batch cannot be rolled back from ${initial.status}`);
+    if (initial.updatedAt.toISOString() !== input.expectedUpdatedAt)
+      throw new ConflictException("Import batch was changed by another request");
+
+    try {
+      const result = await this.prisma.$transaction(async (tx) => {
+        const batch = await tx.importBatch.findFirst({
+          where: { id: batchId, supplierOrganizationId },
+          include: {
+            rows: {
+              orderBy: { rowNumber: "asc" },
+              include: {
+                externalItem: { include: { productCandidate: true } },
+              },
+            },
+          },
+        });
+        if (!batch) throw new NotFoundException("Import batch not found");
+        if (batch.status === "ROLLED_BACK") return { response: this.rollbackResponse(batch.rollbackEvidence), productIds: this.rollbackProductIds(batch.rollbackEvidence) };
+        if (!(batch.status === "COMPLETED" || batch.status === "COMPLETED_WITH_ERRORS"))
+          throw new ConflictException(`Import batch cannot be rolled back from ${batch.status}`);
+        if (batch.updatedAt.toISOString() !== input.expectedUpdatedAt)
+          throw new ConflictException("Import batch was changed by another request");
+        if (batch.rows.some((row) => row.status !== "REJECTED" && !row.externalItem))
+          throw new ConflictException("Import batch effects were superseded by a later import and require manual remediation");
+
+        const claimed = await tx.importBatch.updateMany({
+          where: { id: batchId, supplierOrganizationId, status: { in: ["COMPLETED", "COMPLETED_WITH_ERRORS"] }, updatedAt: batch.updatedAt },
+          data: { status: "ROLLING_BACK" },
+        });
+        if (claimed.count !== 1) throw new ConflictException("Import batch was changed by another request");
+
+        const externalItems = batch.rows.flatMap((row) => row.externalItem ? [row.externalItem] : []);
+        const externalItemIds = [...new Set(externalItems.map(({ id }) => id))];
+        const externalIds = [...new Set(externalItems.map(({ externalId }) => externalId))];
+        const candidateIds = [...new Set(externalItems.flatMap(({ productCandidate }) => productCandidate ? [productCandidate.id] : []))];
+        const candidateProductIds = [...new Set(externalItems.flatMap(({ productCandidate }) => productCandidate?.approvedProductId ? [productCandidate.approvedProductId] : []))];
+        const candidateVariantIds = [...new Set(externalItems.flatMap(({ productCandidate }) => productCandidate?.approvedVariantId ? [productCandidate.approvedVariantId] : []))];
+        const offers = externalIds.length === 0 ? [] : await tx.supplierOffer.findMany({
+          where: { supplierOrganizationId, sourceId: batch.sourceId, sourceType: "IMPORT", externalId: { in: externalIds } },
+          include: {
+            publication: true,
+            productVariant: { select: { productId: true } },
+            prices: { where: { status: { in: ["ACTIVE", "SCHEDULED"] } }, select: { id: true, status: true, amountMinor: true, currency: true } },
+            inventoryBalances: { include: { reservations: { where: { status: "ACTIVE" }, select: { id: true } } } },
+            _count: { select: { supplierOrderItems: true } },
+          },
+        });
+        const batchStartedAt = batch.startedAt ?? batch.createdAt;
+        if (offers.some((offer) => offer.createdAt < batchStartedAt))
+          throw new ConflictException("Rollback would overwrite a commercial offer that existed before this batch");
+        if (offers.some((offer) => offer._count.supplierOrderItems > 0 || offer.inventoryBalances.some(({ reservations }) => reservations.length > 0)))
+          throw new ConflictException("Rollback is blocked because batch offers are already used by orders or active reservations");
+
+        const products = candidateProductIds.length === 0 ? [] : await tx.product.findMany({
+          where: { id: { in: candidateProductIds } },
+          select: { id: true, status: true, externalMetadata: true },
+        });
+        if (products.some((product) => {
+          const metadata = product.externalMetadata;
+          return !metadata || typeof metadata !== "object" || Array.isArray(metadata) || metadata.batchId !== batchId;
+        })) throw new ConflictException("Rollback cannot archive a canonical product that is not owned by this batch");
+
+        const mappings = externalIds.length === 0 ? [] : await tx.supplierMappingMemory.findMany({
+          where: { supplierOrganizationId, sourceId: batch.sourceId, externalId: { in: externalIds }, status: "ACTIVE" },
+          include: { supersedes: true },
+          orderBy: { version: "asc" },
+        });
+        const hasUploadAsset = Boolean(await tx.uploadAsset.findFirst({
+          where: { organizationId: supplierOrganizationId, metadata: { path: ["importBatchId"], equals: batchId } },
+          select: { id: true },
+        }));
+        const now = new Date();
+        const offerIds = offers.map(({ id }) => id);
+        const productIds = [...new Set([
+          ...products.map(({ id }) => id),
+          ...offers.map(({ productVariant }) => productVariant.productId),
+        ])];
+
+        if (offerIds.length > 0) {
+          await tx.offerPublication.updateMany({ where: { offerId: { in: offerIds } }, data: { status: "HIDDEN", marketplaceVisible: false, blockedReason: `Import batch rolled back: ${input.reason}` } });
+          await tx.supplierOffer.updateMany({ where: { id: { in: offerIds } }, data: { status: "ARCHIVED", version: { increment: 1 } } });
+          await tx.offerPrice.updateMany({ where: { offerId: { in: offerIds }, status: { in: ["ACTIVE", "SCHEDULED"] } }, data: { status: "INACTIVE", validTo: now } });
+          await tx.inventoryBalance.updateMany({ where: { offerId: { in: offerIds } }, data: { quantityAvailable: 0, availabilityStatus: "OUT_OF_STOCK", freshnessStatus: "STALE", freshnessExpiresAt: now, version: { increment: 1 } } });
+        }
+        for (const mapping of mappings) {
+          await tx.supplierMappingMemory.update({ where: { id: mapping.id }, data: { status: "REVOKED" } });
+          if (mapping.supersedes) {
+            const previousReasons = Array.isArray(mapping.supersedes.reasons) ? mapping.supersedes.reasons.map(String) : [];
+            await tx.supplierMappingMemory.create({
+              data: {
+                supplierOrganizationId,
+                sourceId: mapping.supersedes.sourceId,
+                externalKey: mapping.supersedes.externalKey,
+                externalId: mapping.supersedes.externalId,
+                supplierSku: mapping.supersedes.supplierSku,
+                productVariantId: mapping.supersedes.productVariantId,
+                version: mapping.version + 1,
+                status: "ACTIVE",
+                confidence: mapping.supersedes.confidence,
+                reasons: [...previousReasons, "restored_after_import_batch_rollback"],
+                createdById: context.actorId,
+                supersedesId: mapping.id,
+              },
+            });
+          }
+        }
+        if (externalItemIds.length > 0) {
+          await tx.supplierItemMatchCandidate.updateMany({ where: { externalItemId: { in: externalItemIds }, status: { in: ["PROPOSED", "CONFIRMED"] } }, data: { status: "REJECTED" } });
+          for (const item of externalItems) {
+            const previousReasons = Array.isArray(item.complianceReasons) ? item.complianceReasons.map(String) : [];
+            await tx.supplierExternalItem.update({ where: { id: item.id }, data: { matchedVariantId: null, complianceStatus: "ROLLED_BACK", complianceReasons: [...previousReasons, "IMPORT_BATCH_ROLLED_BACK", input.reason] } });
+          }
+        }
+        if (candidateIds.length > 0) await tx.productCandidate.updateMany({ where: { id: { in: candidateIds }, supplierOrganizationId }, data: { status: "ROLLED_BACK", rejectionReason: input.reason, decidedById: context.actorId, decidedAt: now } });
+        if (candidateVariantIds.length > 0) {
+          await tx.productPackaging.updateMany({ where: { productVariantId: { in: candidateVariantIds } }, data: { status: "INACTIVE", version: { increment: 1 } } });
+          await tx.productVariant.updateMany({ where: { id: { in: candidateVariantIds } }, data: { status: "ARCHIVED", version: { increment: 1 } } });
+        }
+        if (candidateProductIds.length > 0) await tx.product.updateMany({ where: { id: { in: candidateProductIds } }, data: { status: "ARCHIVED", version: { increment: 1 } } });
+        await tx.importRow.updateMany({ where: { batchId }, data: { status: "ROLLED_BACK" } });
+
+        const response: SupplierImportRollbackResponse = {
+          batchId,
+          status: "ROLLED_BACK",
+          rolledBackAt: now.toISOString(),
+          reason: input.reason,
+          preserved: { checksum: batch.checksum, rawRows: batch.rows.length, uploadAsset: hasUploadAsset },
+          effects: {
+            rows: batch.rows.length,
+            externalItems: externalItemIds.length,
+            offers: offers.length,
+            prices: offers.reduce((count, offer) => count + offer.prices.length, 0),
+            inventoryBalances: offers.reduce((count, offer) => count + offer.inventoryBalances.length, 0),
+            mappingMemories: mappings.length,
+            productCandidates: candidateIds.length,
+            products: products.length,
+          },
+        };
+        const rollbackEvidence = {
+          version: 1,
+          response,
+          previousBatch: { status: batch.status, updatedAt: batch.updatedAt.toISOString(), processedRows: batch.processedRows, errorRows: batch.errorRows },
+          affected: { externalItemIds, offerIds, candidateIds, candidateProductIds, candidateVariantIds, productIds, mappingMemoryIds: mappings.map(({ id }) => id) },
+          before: {
+            rows: batch.rows.map(({ id, rowNumber, status, errorCode, errorMessage }) => ({ id, rowNumber, status, errorCode, errorMessage })),
+            externalItems: externalItems.map(({ id, matchedVariantId, complianceStatus, complianceReasons }) => ({ id, matchedVariantId, complianceStatus, complianceReasons })),
+            offers: offers.map(({ id, status, version, publication, prices, inventoryBalances }) => ({
+              id,
+              status,
+              version,
+              publication: publication ? { status: publication.status, marketplaceVisible: publication.marketplaceVisible, blockedReason: publication.blockedReason, publishedAt: publication.publishedAt?.toISOString() ?? null } : null,
+              prices: prices.map(({ id: priceId, status: priceStatus, amountMinor, currency }) => ({ id: priceId, status: priceStatus, amountMinor: amountMinor.toString(), currency })),
+              inventoryBalances: inventoryBalances.map(({ id: balanceId, quantityOnHand, quantityReserved, quantityAvailable, availabilityStatus, freshnessStatus, version: balanceVersion }) => ({ id: balanceId, quantityOnHand: quantityOnHand.toString(), quantityReserved: quantityReserved.toString(), quantityAvailable: quantityAvailable.toString(), availabilityStatus, freshnessStatus, version: balanceVersion })),
+            })),
+            mappings: mappings.map(({ id, externalKey, productVariantId, version, status, supersedesId }) => ({ id, externalKey, productVariantId, version, status, supersedesId })),
+            candidates: externalItems.flatMap(({ productCandidate }) => productCandidate ? [{ id: productCandidate.id, status: productCandidate.status, approvedProductId: productCandidate.approvedProductId, approvedVariantId: productCandidate.approvedVariantId }] : []),
+            products,
+          },
+        };
+        await tx.importBatch.update({ where: { id: batchId }, data: { status: "ROLLED_BACK", rollbackReason: input.reason, rollbackEvidence, rolledBackAt: now, rolledBackById: context.actorId } });
+        await tx.auditLog.create({ data: { ...context, action: "import.batch.rolled_back", entityType: "ImportBatch", entityId: batchId, before: rollbackEvidence.previousBatch, after: response } });
+        await tx.outboxEvent.create({ data: { aggregateType: "ImportBatch", aggregateId: batchId, eventType: "ImportBatchRolledBack", payload: { supplierOrganizationId, ...response } } });
+        return { response, productIds };
+      }, { maxWait: 15_000, timeout: 60_000, isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+
+      for (const productId of result.productIds) await this.searchProjection.rebuildProduct(productId);
+      return result.response;
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034")
+        throw new ConflictException("Import batch changed concurrently; retry with current data");
+      throw error;
+    }
   }
 
   async externalItems(

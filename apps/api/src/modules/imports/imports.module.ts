@@ -4,9 +4,10 @@ import { SuppliersModule } from "../suppliers/suppliers.module";
 import { ImportFileParser } from "./import-file.parser";
 import { ImportsController } from "./imports.controller";
 import { ImportsService } from "./imports.service";
+import { SearchModule } from "../search/search.module";
 
 @Module({
-  imports: [AccessControlModule, SuppliersModule],
+  imports: [AccessControlModule, SuppliersModule, SearchModule],
   controllers: [ImportsController],
   providers: [ImportFileParser, ImportsService],
 })

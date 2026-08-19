@@ -86,15 +86,24 @@ describe("core marketplace API client", () => {
     });
     await api.processSupplierImportBatch(supplierId, batchId);
     await api.getSupplierImportDiagnostics(supplierId, batchId);
+    await api.rollbackSupplierImportBatch(supplierId, batchId, {
+      reason: "Supplier confirmed that the uploaded price list was incorrect",
+      expectedUpdatedAt: "2026-08-19T00:00:00.000Z",
+    });
 
     expect(fetchMock.mock.calls.map(([url]) => String(url))).toEqual([
       `http://localhost:4012/api/suppliers/${supplierId}/import-batches`,
       `http://localhost:4012/api/suppliers/${supplierId}/import-batches/${batchId}/process`,
       `http://localhost:4012/api/suppliers/${supplierId}/import-batches/${batchId}/diagnostics`,
+      `http://localhost:4012/api/suppliers/${supplierId}/import-batches/${batchId}/rollback`,
     ]);
     expect(fetchMock.mock.calls[1]?.[1]).toEqual(
       expect.objectContaining({ method: "POST", body: "{}" }),
     );
+    expect(fetchMock.mock.calls[3]?.[1]).toEqual(expect.objectContaining({
+      method: "POST",
+      body: JSON.stringify({ reason: "Supplier confirmed that the uploaded price list was incorrect", expectedUpdatedAt: "2026-08-19T00:00:00.000Z" }),
+    }));
   });
 
   it("uses typed operator review and versioned offer publication routes", async () => {

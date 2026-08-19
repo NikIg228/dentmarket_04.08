@@ -46,9 +46,11 @@ import {
   shipmentListResponseSchema,
   shipmentResponseSchema,
   setOfferPublicationSchema,
+  rollbackImportBatchSchema,
   supplierOfferPublicationResponseSchema,
   supplierImportBatchResponseSchema,
   supplierImportDiagnosticsResponseSchema,
+  supplierImportRollbackResponseSchema,
   transitionShipmentSchema,
 } from "@marketplace/schemas";
 import { z, type ZodType } from "zod";
@@ -80,6 +82,7 @@ const coreZodSchemas = {
   CheckoutCartRequest: checkoutCartSchema,
   ConfirmSupplierOrderRequest: confirmSupplierOrderSchema,
   CreateSupplierImportBatchRequest: createImportBatchSchema,
+  RollbackSupplierImportBatchRequest: rollbackImportBatchSchema,
   ApproveImportProductCandidateRequest: approveImportProductCandidateSchema,
   SetOfferPublicationRequest: setOfferPublicationSchema,
   CreateShipmentRequest: createShipmentSchema,
@@ -96,6 +99,7 @@ const coreZodSchemas = {
   SupplierOrderListResponse: supplierOrderListResponseSchema,
   SupplierImportBatchResponse: supplierImportBatchResponseSchema,
   SupplierImportDiagnosticsResponse: supplierImportDiagnosticsResponseSchema,
+  SupplierImportRollbackResponse: supplierImportRollbackResponseSchema,
   CatalogImportReviewQueueResponse: catalogImportReviewQueueResponseSchema,
   CatalogImportReviewResponse: catalogImportReviewSchema,
   SupplierOfferPublicationResponse: supplierOfferPublicationResponseSchema,

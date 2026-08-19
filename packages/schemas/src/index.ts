@@ -260,6 +260,8 @@ export const supplierImportBatchStatusSchema = z.enum([
   "COMPLETED",
   "COMPLETED_WITH_ERRORS",
   "FAILED",
+  "ROLLING_BACK",
+  "ROLLED_BACK",
 ]);
 
 export const supplierImportRowStatusSchema = z.enum([
@@ -269,6 +271,7 @@ export const supplierImportRowStatusSchema = z.enum([
   "MATCHED",
   "REJECTED",
   "PUBLISHED",
+  "ROLLED_BACK",
 ]);
 
 export const supplierImportBatchResponseSchema = z
@@ -287,6 +290,10 @@ export const supplierImportBatchResponseSchema = z
     errorRows: z.number().int().nonnegative(),
     startedAt: z.iso.datetime().nullable(),
     completedAt: z.iso.datetime().nullable(),
+    rollbackReason: z.string().nullable(),
+    rollbackEvidence: z.record(z.string(), z.unknown()).nullable(),
+    rolledBackAt: z.iso.datetime().nullable(),
+    rolledBackById: z.uuid().nullable(),
     createdAt: z.iso.datetime(),
     updatedAt: z.iso.datetime(),
   })
@@ -313,6 +320,33 @@ export const supplierImportDiagnosticsResponseSchema = z.object({
 });
 
 export const confirmSupplierItemMatchSchema = z.object({ productVariantId: z.uuid() });
+
+export const rollbackImportBatchSchema = z.object({
+  reason: z.string().trim().min(10).max(500),
+  expectedUpdatedAt: z.iso.datetime(),
+});
+
+export const supplierImportRollbackResponseSchema = z.object({
+  batchId: z.uuid(),
+  status: z.literal("ROLLED_BACK"),
+  rolledBackAt: z.iso.datetime(),
+  reason: z.string(),
+  preserved: z.object({
+    checksum: z.string().regex(/^[a-f0-9]{64}$/).nullable(),
+    rawRows: z.number().int().nonnegative(),
+    uploadAsset: z.boolean(),
+  }),
+  effects: z.object({
+    rows: z.number().int().nonnegative(),
+    externalItems: z.number().int().nonnegative(),
+    offers: z.number().int().nonnegative(),
+    prices: z.number().int().nonnegative(),
+    inventoryBalances: z.number().int().nonnegative(),
+    mappingMemories: z.number().int().nonnegative(),
+    productCandidates: z.number().int().nonnegative(),
+    products: z.number().int().nonnegative(),
+  }),
+});
 
 export const createSupplierOfferSchema = z.object({
   productVariantId: z.uuid(),
@@ -401,11 +435,15 @@ export type CreateWarehouseInput = z.infer<typeof createWarehouseSchema>;
 export type CreateSupplierDataSourceInput = z.infer<typeof createSupplierDataSourceSchema>;
 export type SupplierColumnMappingInput = z.infer<typeof supplierColumnMappingSchema>;
 export type CreateImportBatchInput = z.infer<typeof createImportBatchSchema>;
+export type RollbackImportBatchInput = z.infer<typeof rollbackImportBatchSchema>;
 export type SupplierImportBatchResponse = z.infer<
   typeof supplierImportBatchResponseSchema
 >;
 export type SupplierImportDiagnosticsResponse = z.infer<
   typeof supplierImportDiagnosticsResponseSchema
+>;
+export type SupplierImportRollbackResponse = z.infer<
+  typeof supplierImportRollbackResponseSchema
 >;
 export type ConfirmSupplierItemMatchInput = z.infer<typeof confirmSupplierItemMatchSchema>;
 export type CreateSupplierOfferInput = z.infer<typeof createSupplierOfferSchema>;
@@ -451,7 +489,7 @@ const importReviewResultSchema = z.object({
 
 export const catalogImportReviewSchema = z.object({
   id: z.uuid(),
-  status: z.enum(["PENDING", "APPROVED", "REJECTED"]),
+  status: z.enum(["PENDING", "APPROVED", "REJECTED", "ROLLED_BACK"]),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
   supplier: z.object({ organizationId: z.uuid(), displayName: z.string() }),

@@ -12,6 +12,7 @@ import type {
   CompareOffersRequest,
   ConfirmSupplierOrderRequest,
   CreateImportBatchInput,
+  RollbackImportBatchInput,
   GenerateOrderDocumentPackRequest,
   CreateShipmentRequest,
   OrderDocumentPackResponse,
@@ -21,6 +22,7 @@ import type {
   SupplierOrderResponse,
   SupplierImportBatchResponse,
   SupplierImportDiagnosticsResponse,
+  SupplierImportRollbackResponse,
   ShipmentResponse,
   SetOfferPublicationInput,
   SupplierOfferPublicationResponse,
@@ -34,6 +36,7 @@ export type {
   SupplierOfferPublicationResponse,
   SupplierImportBatchResponse,
   SupplierImportDiagnosticsResponse,
+  SupplierImportRollbackResponse,
 } from "@marketplace/schemas";
 
 export type ApiContext = {
@@ -317,6 +320,17 @@ export class MarketplaceApiClient {
   ) {
     return this.get<SupplierImportDiagnosticsResponse>(
       `/suppliers/${supplierOrganizationId}/import-batches/${batchId}/diagnostics`,
+    );
+  }
+
+  rollbackSupplierImportBatch(
+    supplierOrganizationId: string,
+    batchId: string,
+    input: RollbackImportBatchInput,
+  ) {
+    return this.post<SupplierImportRollbackResponse>(
+      `/suppliers/${supplierOrganizationId}/import-batches/${batchId}/rollback`,
+      input,
     );
   }
 
