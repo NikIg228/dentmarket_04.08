@@ -739,17 +739,28 @@ deployment evidence; политика сохраняет RPO 15 минут и RT
 - [x] Долговечный отчёт и remediation backlog находятся в
       `../governance/SECURITY_AUDIT_B4_5_2026-08-19.md`; derived hardening portfolio
       отдельно описывает центральные platform-authority и outbound-egress controls.
+- [x] B4.5-R1A закрывает три authorization High findings: tenant role
+      non-escalation и legacy grant filtering, operator-only canonical catalog,
+      capability-bound AI roles. Оба invitation acceptance path выполняют
+      accept-time role ownership revalidation до транзакции.
+- [x] Финальный security diff-scan `5d31ee89-1cc1-43dd-a3f6-70b1789ee0a2`
+      проверил 17/17 changed source items с complete coverage и `0 findings`;
+      `pnpm verify:platform-authority` доказал direct/legacy/invitation,
+      catalog child mutation и AI legacy-conversation сценарии на PostgreSQL/API.
+- [x] После R1A повторно проходят dependency audit, typecheck 12/12,
+      API 124/124 и остальные workspace tests, build 8/8, production/security
+      config и storage, PostgreSQL, runtime split, core contract и browser 17/17.
 
-Ограничение B4.5: dependency finding закрыт, но scan не означает, что приложение
-стало production-safe. Открыты 4 high source findings — AI role escalation,
-arbitrary permission grants, shared-catalog BOLA и integration SSRF — и 4 medium:
-organization enumeration, XLSX decompression exhaustion, delayed session
-revocation и notification SSRF. Их чекбоксы остаются `[ ]` до исходного
-source-to-sink revalidation после исправления.
+Ограничение B4.5: dependency finding и три authorization High закрыты, но
+приложение ещё не production-safe. Открыт 1 high source finding — integration
+SSRF — и 4 medium: organization enumeration, XLSX decompression exhaustion,
+delayed session revocation и notification SSRF. Их чекбоксы остаются `[ ]` до
+исходного source-to-sink revalidation после исправления.
 
-Следующий этап — **B4.5-R1**, а не B4.3: сначала закрываются четыре high
-source-code findings и повторяется security regression, затем принимается
-решение о medium backlog и возвращении к защищённому dead-letter replay.
+Следующий этап — **B4.5-R1B**, а не B4.3: сначала закрывается integration SSRF
+через центральный outbound request gateway и повторяется полный security
+regression, затем принимается решение о medium backlog и возвращении к
+защищённому dead-letter replay.
 
 ### B5 — frontend unification
 

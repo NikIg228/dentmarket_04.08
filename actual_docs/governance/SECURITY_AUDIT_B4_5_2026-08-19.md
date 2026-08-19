@@ -2,7 +2,7 @@
 
 **Дата:** 2026-08-19
 **Статус фазы:** `[x]` scan и dependency remediation завершены
-**Статус проекта по application security:** `BLOCKED` до remediation source findings
+**Статус проекта по application security:** `BLOCKED` до B4.5-R1B (integration SSRF)
 
 ## 1. Scope и доказательная база
 
@@ -22,10 +22,10 @@
 | Область                 |                                   До |                                                               После | Статус            |
 | ----------------------- | -----------------------------------: | ------------------------------------------------------------------: | ----------------- |
 | Production dependencies |                  15 high, 6 moderate |                                             0 known vulnerabilities | `[x]`             |
-| Source findings high    | 4, если исключить dependency finding |                                                                   4 | `[ ]` remediation |
+| Source findings high    | 4, если исключить dependency finding |                                                                   1 | `[x]` R1A, `[ ]` R1B |
 | Source findings medium  |                                    4 |                                                                   4 | `[ ]` remediation |
 | Typecheck               |                                    — |                                                         12/12 tasks | `[x]`             |
-| Unit/integration tests  |                                    — | API 117/117; schemas 38/38; api-client 7/7; Buyer 5/5; Supplier 1/1 | `[x]`             |
+| Unit/integration tests  |                                    — | API 124/124; schemas 38/38; api-client 7/7; Buyer 5/5; Supplier 1/1 | `[x]`             |
 | Production build        |                                    — |                                                           8/8 tasks | `[x]`             |
 | PostgreSQL integration  |                                    — |                  tenant, rollback, idempotency, scarce stock passed | `[x]`             |
 | Browser regression      |                                    — |                                                     17/17, 1 worker | `[x]`             |
@@ -52,9 +52,9 @@ finding исправлен и compatibility доказана. Она не озн
 
 | Готово | Приоритет | Finding                                                | Основная граница                             |
 | ------ | --------- | ------------------------------------------------------ | -------------------------------------------- |
-| [ ]    | High      | User-selected AI role exposes operator data            | Client role → global AI tools                |
-| [ ]    | High      | Tenant admins can grant arbitrary platform permissions | Tenant role write → global permission        |
-| [ ]    | High      | Supplier can mutate arbitrary shared product cards     | Broad permission + global ID write           |
+| [x]    | High      | User-selected AI role exposes operator data            | Client role → global AI tools                |
+| [x]    | High      | Tenant admins can grant arbitrary platform permissions | Tenant role write → global permission        |
+| [x]    | High      | Supplier can mutate arbitrary shared product cards     | Broad permission + global ID write           |
 | [ ]    | High      | Supplier integration SSRF with response disclosure     | Tenant base URL → worker fetch/result        |
 | [ ]    | Medium    | Ordinary tenants enumerate organizations/capabilities  | Tenant permission → unscoped query           |
 | [ ]    | Medium    | XLSX decompression can exhaust API memory              | Compressed upload → ExcelJS before row limit |
@@ -96,9 +96,36 @@ check с bounded cache/invalidation и ZIP central-directory limits до ExcelJS
 низкой доступной памяти; те же сценарии изолированно проходили. Последовательный
 gate проверяет тот же набор assertions и устраняет ресурсную недетерминированность.
 
-## 7. Следующая задача
+## 7. B4.5-R1A — platform authority remediation
 
-**B4.5-R1:** одним security change set закрыть четыре high findings, добавить
-negative authorization/SSRF tests, выполнить исходное source-to-sink
-revalidation и повторить audit, typecheck, tests, build, PostgreSQL, security и
-web gates. Только после этого high-чекбоксы получают `[x]`.
+- [x] Центральная `PlatformAuthorityPolicy` отделяет tenant RBAC от
+  marketplace-operator authority.
+- [x] Tenant role creation/assignment не принимает глобальные, чужие или
+  privilege-escalating роли; legacy global/foreign assignments не участвуют в
+  effective permissions.
+- [x] Public и social acceptance сохранённого приглашения повторно проверяют
+  ownership каждой роли до транзакции и не создают side effects при отказе.
+- [x] Canonical product, variant, attribute и packaging writes доступны только
+  активной организации с capability `MARKETPLACE_OPERATOR`.
+- [x] AI-роли привязаны к capability и повторно валидируются перед чтением,
+  feedback, message и tool execution сохранённого диалога.
+- [x] Первый diff-scan `9d749072-0c7c-4213-a2c7-4b1b6fa3e7cb` выявил legacy
+  global-role bypass; finding `csf_9981c0e2b00e186ac389a713` закрыт до phase
+  acceptance.
+- [x] Финальный diff-scan `5d31ee89-1cc1-43dd-a3f6-70b1789ee0a2` проверил 17/17
+  changed source items с complete coverage и завершился с `0 findings`.
+- [x] `pnpm install --frozen-lockfile`, `pnpm audit --prod --audit-level high`,
+  `pnpm typecheck` (12/12), `pnpm test` (API 124/124 и все workspace packages),
+  `pnpm build` (8/8), `pnpm verify:platform-authority`,
+  `pnpm verify:production-config`, `pnpm verify:security-storage`,
+  `pnpm verify:security`, `pnpm verify:postgres`, `pnpm verify:runtime-split`,
+  `pnpm verify:core-contract`, `pnpm verify:web` (17/17) и
+  `git diff --check` проходят.
+
+## 8. Следующая задача
+
+**B4.5-R1B:** закрыть оставшийся High finding integration SSRF через единый
+outbound request gateway: HTTPS/DNS/IP/port policy, redirect revalidation,
+timeout и response-size limits, безопасную telemetry и negative source-to-sink
+tests. Только после повторного полного gate stack можно снять security blocker
+по High findings и вернуться к решению о medium backlog/B4.3.

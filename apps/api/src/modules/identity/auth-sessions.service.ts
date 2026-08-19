@@ -7,6 +7,7 @@ import { environment } from "../../platform/config/environment";
 import { PrismaService } from "../../platform/prisma/prisma.service";
 import { OidcVerifierService } from "./oidc-verifier.service";
 import { OnboardingService } from "../onboarding/onboarding.service";
+import { PlatformAuthorityPolicy } from "../access-control/platform-authority.policy";
 
 type RequestMetadata = { ipAddress?: string; userAgent?: string; correlationId?: string };
 const hash = (value: string) => createHash("sha256").update(value).digest("hex");
@@ -28,7 +29,12 @@ const passwordMatches = (password: string, encoded: string | null) => {
 
 @Injectable()
 export class AuthSessionsService {
-  constructor(private readonly prisma: PrismaService, private readonly oidc: OidcVerifierService, private readonly onboarding: OnboardingService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly oidc: OidcVerifierService,
+    private readonly onboarding: OnboardingService,
+    private readonly authority: PlatformAuthorityPolicy,
+  ) {}
 
   private signingKey() {
     const config = environment();
@@ -182,6 +188,10 @@ export class AuthSessionsService {
     const invitation = await this.prisma.membershipInvitation.findUnique({ where: { tokenHash: hash(token) }, include: { roles: true } });
     if (!invitation || invitation.email.toLowerCase() !== email || invitation.status !== "PENDING") throw new BadRequestException("Invitation is invalid for this account");
     if (invitation.expiresAt <= new Date()) throw new BadRequestException("Invitation has expired");
+    await this.authority.assertRolesBelongToOrganization(
+      invitation.organizationId,
+      invitation.roles.map(({ roleId }) => roleId),
+    );
     await this.prisma.$transaction(async (tx) => {
       const membership = await tx.organizationMembership.upsert({
         where: { userId_organizationId: { userId, organizationId: invitation.organizationId } },

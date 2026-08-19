@@ -8,10 +8,25 @@ export class AccessControlService {
   async permissionsFor(userId: string, organizationId: string) {
     const membership = await this.prisma.organizationMembership.findUnique({
       where: { userId_organizationId: { userId, organizationId } },
-      include: { roles: { include: { role: { include: { permissions: { include: { permission: true } } } } } } },
+      include: {
+        roles: {
+          where: { role: { organizationId } },
+          include: {
+            role: {
+              include: { permissions: { include: { permission: true } } },
+            },
+          },
+        },
+      },
     });
     if (!membership || membership.status !== "ACTIVE") return [];
-    return [...new Set(membership.roles.flatMap(({ role }) => role.permissions.map(({ permission }) => permission.code)))].sort();
+    return [
+      ...new Set(
+        membership.roles.flatMap(({ role }) =>
+          role.permissions.map(({ permission }) => permission.code),
+        ),
+      ),
+    ].sort();
   }
 
   async hasAll(userId: string, organizationId: string, required: string[]) {

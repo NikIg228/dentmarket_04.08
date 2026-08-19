@@ -48,6 +48,7 @@
     "verify:onboarding-agreement": "node scripts/verify-onboarding-agreement.mjs",
     "verify:security": "node scripts/verify-security.mjs",
     "verify:security-storage": "pnpm --filter @marketplace/api exec node ../../scripts/verify-security-storage.mjs",
+    "verify:platform-authority": "pnpm --filter @marketplace/schemas build && pnpm --filter @marketplace/api build && node scripts/verify-platform-authority.mjs",
     "verify:production-config": "node scripts/verify-production-config.mjs",
     "verify:production-connectors": "node scripts/verify-production-connectors.mjs",
     "verify:backup-restore": "pnpm --filter @marketplace/api build && node scripts/verify-backup-restore.mjs",

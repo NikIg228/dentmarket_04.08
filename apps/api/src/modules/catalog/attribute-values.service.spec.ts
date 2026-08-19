@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { AttributeValuesService } from "./attribute-values.service";
 
 describe("AttributeValuesService typed mapping", () => {
-  const service = new AttributeValuesService({} as never);
+  const service = new AttributeValuesService({} as never, {} as never);
 
   it("stores integer values in the integer column", () => {
     const data = service.typedData("INTEGER", 125);
@@ -18,6 +18,8 @@ describe("AttributeValuesService typed mapping", () => {
   });
 
   it("rejects values that do not match the definition type", () => {
-    expect(() => service.typedData("BOOLEAN", "yes")).toThrow(BadRequestException);
+    expect(() => service.typedData("BOOLEAN", "yes")).toThrow(
+      BadRequestException,
+    );
   });
 });

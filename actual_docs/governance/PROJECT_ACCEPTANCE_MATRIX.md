@@ -278,11 +278,11 @@ Gate 0 считается закрытым только при одноврем�
 
 ## 11. Следующее действие
 
-Следующая реализационная задача — **B4.5-R1: remediation четырёх high
-source-code findings**. B4.5 scan завершён, а dependency graph очищен с
-15 high/6 moderate до нуля и прошёл build, PostgreSQL, security и 17/17 browser
-regression. Но scan также подтвердил AI role escalation, arbitrary permission
-grants, shared-catalog BOLA и integration SSRF, поэтому проект остаётся
-`BLOCKED` по Application Security. B4.3 начинается только после исправления и
-source-to-sink revalidation этих high findings. Medium backlog и live
-infrastructure evidence остаются явно открытыми.
+Следующая реализационная задача — **B4.5-R1B: remediation integration SSRF**.
+B4.5-R1A закрыла AI role escalation, arbitrary permission grants и
+shared-catalog BOLA; финальный diff-scan проверил 17/17 changed source items с
+complete coverage и `0 findings`, а полный gate stack, включая PostgreSQL и
+17/17 browser regression, прошёл. Проект всё ещё `BLOCKED` по Application
+Security из-за оставшегося High integration SSRF. B4.3 начинается только после
+его source-to-sink remediation/revalidation и решения по четырём Medium findings;
+live infrastructure evidence также остаётся явно открытым.
