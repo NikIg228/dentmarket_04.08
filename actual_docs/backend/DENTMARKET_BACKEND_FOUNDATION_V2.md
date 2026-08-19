@@ -401,11 +401,11 @@ Gate намеренно разрешён только для локальной 
 
 Текущий статус: **B0.1–B0.6, B1.1–B1.2, B2.1–B2.3, B3.1–B3.3,
 B4.1–B4.2 и B4.5 реализованы и проходят**.
-High source-code backlog B4.5-R1 закрыт фазами R1A и R1B. B4.5-R2A закрыла
-Medium organization enumeration/capability disclosure; следующая задача:
-**B4.5-R2B — устранение XLSX decompression exhaustion**. R2 остаётся выше B4.3,
-пока три оставшихся Medium findings не исправлены и не прошли source-to-sink
-revalidation.
+High source-code backlog B4.5-R1 закрыт фазами R1A и R1B. B4.5-R2A и R2B
+закрыли organization enumeration/capability disclosure и XLSX decompression
+exhaustion; следующая задача: **B4.5-R2C — delayed session revocation**. R2
+остаётся выше B4.3, пока два оставшихся Medium findings не исправлены и не
+прошли source-to-sink revalidation.
 
 ### B1 — покупка клиникой
 
@@ -781,16 +781,30 @@ deployment evidence; политика сохраняет RPO 15 минут и RT
       `pnpm verify:core-contract`, `pnpm verify:platform-authority`,
       `pnpm verify:web` (17/17) и `git diff --check`.
 
-Ограничение B4.5: dependency finding и все четыре High source findings, а также
-organization enumeration Medium закрыты. Приложение ещё не production-safe:
-открыты 3 Medium — XLSX decompression exhaustion, delayed session revocation и
-notification SSRF. Их чекбоксы остаются `[ ]` до исходного source-to-sink
-revalidation после исправления.
+- [x] B4.5-R2B ограничивает XLSX ZIP central directory до передачи архива в
+      ExcelJS: не более 2 000 записей, 16 MiB на запись, 64 MiB суммарно и
+      compression ratio 200; ZIP64 sentinel и неконсистентные metadata
+      отклоняются.
+- [x] Добавлены parser и ZIP policy regressions для обычного файла, per-entry /
+      total limits, zip-bomb ratio и ZIP64; malicious metadata отклоняется до
+      вызова ExcelJS.
+- [x] После R2B проходят `pnpm typecheck` (12/12), `pnpm test` (API 143/143,
+      schemas 38/38, api-client 7/7, Buyer 5/5, Supplier 1/1), `pnpm build`
+      (8/8), dependency audit, production config, DB-backed security storage,
+      live security, PostgreSQL, runtime split, core contract,
+      `pnpm verify:platform-authority`, `pnpm verify:outbound-security`,
+      `pnpm verify:web` (17/17) и `git diff --check`.
 
-Следующий этап — **B4.5-R2B**, а не B4.3: сначала закрывается XLSX
-decompression exhaustion, затем delayed session revocation и notification SSRF
-отдельными change sets. После всего R2 и повторного security regression можно
-возвращаться к защищённому dead-letter replay.
+Ограничение B4.5: dependency finding и все четыре High source findings, а также
+organization enumeration и XLSX Medium findings закрыты. Приложение ещё не
+production-safe: открыты 2 Medium — delayed session revocation и notification
+SSRF. Их чекбоксы остаются `[ ]` до исходного source-to-sink revalidation после
+исправления.
+
+Следующий этап — **B4.5-R2C**, а не B4.3: сначала закрывается delayed session
+revocation, затем notification SSRF отдельными change sets. После всего R2 и
+повторного security regression можно возвращаться к защищённому dead-letter
+replay.
 
 ### B5 — frontend unification
 

@@ -2,6 +2,7 @@ import { BadRequestException, Injectable } from "@nestjs/common";
 import type { CreateImportBatchInput } from "@marketplace/schemas";
 import { parse } from "csv-parse/sync";
 import ExcelJS from "exceljs";
+import { assertSafeZipPackage } from "../../platform/security/zip-resource-policy";
 
 type RawRow = Record<string, string | number | boolean | null>;
 export type ImportParseResult = { rows: RawRow[]; metadata: Record<string, unknown>; requiresReview: boolean };
@@ -63,6 +64,7 @@ export class ImportFileParser {
 
     if (input.fileType === "EXCEL") {
       try {
+        assertSafeZipPackage(buffer);
         const workbook = new ExcelJS.Workbook();
         await workbook.xlsx.load(buffer as unknown as Parameters<typeof workbook.xlsx.load>[0]);
         const sheet = workbook.worksheets[0];

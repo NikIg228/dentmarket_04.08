@@ -2,7 +2,7 @@
 
 **Дата:** 2026-08-19
 **Статус фазы:** `[x]` scan и dependency remediation завершены
-**Статус проекта по application security:** `BLOCKED` до B4.5-R2B (3 Medium findings)
+**Статус проекта по application security:** `BLOCKED` до B4.5-R2C (2 Medium findings)
 
 ## 1. Scope и доказательная база
 
@@ -23,9 +23,9 @@
 | ----------------------- | -----------------------------------: | ------------------------------------------------------------------: | -------------------- |
 | Production dependencies |                  15 high, 6 moderate |                                             0 known vulnerabilities | `[x]`                |
 | Source findings high    | 4, если исключить dependency finding |                                                                   0 | `[x]` R1A, `[x]` R1B |
-| Source findings medium  |                                    4 |                                                                   3 | `[x]` R2A; 3 open     |
+| Source findings medium  |                                    4 |                                                                   2 | `[x]` R2A, `[x]` R2B; 2 open |
 | Typecheck               |                                    — |                                                         12/12 tasks | `[x]`                |
-| Unit/integration tests  |                                    — | API 138/138; schemas 38/38; api-client 7/7; Buyer 5/5; Supplier 1/1 | `[x]`                |
+| Unit/integration tests  |                                    — | API 143/143; schemas 38/38; api-client 7/7; Buyer 5/5; Supplier 1/1 | `[x]`                |
 | Production build        |                                    — |                                                           8/8 tasks | `[x]`                |
 | PostgreSQL integration  |                                    — |                  tenant, rollback, idempotency, scarce stock passed | `[x]`                |
 | Browser regression      |                                    — |                                                     17/17, 1 worker | `[x]`                |
@@ -57,7 +57,7 @@ finding исправлен и compatibility доказана. Она не озн
 | [x]    | High      | Supplier can mutate arbitrary shared product cards     | Broad permission + global ID write           |
 | [x]    | High      | Supplier integration SSRF with response disclosure     | Tenant base URL → worker fetch/result        |
 | [x]    | Medium    | Ordinary tenants enumerate organizations/capabilities  | Tenant permission → unscoped query           |
-| [ ]    | Medium    | XLSX decompression can exhaust API memory              | Compressed upload → ExcelJS before row limit |
+| [x]    | Medium    | XLSX decompression can exhaust API memory              | Compressed upload → bounded ZIP metadata → ExcelJS |
 | [ ]    | Medium    | Revoked sessions remain valid until JWT expiry         | Revoked `jti` → stateless middleware         |
 | [ ]    | Medium    | Notification webhook allows blind SSRF                 | Tenant destination → background fetch        |
 
@@ -89,6 +89,9 @@ check с bounded cache/invalidation и ZIP central-directory limits до ExcelJS
 - [x] `pnpm verify:runtime-split`.
 - [x] `pnpm verify:core-contract`.
 - [x] `pnpm verify:web` — 17/17.
+- [x] `pnpm verify:platform-authority` — organization enumeration regression
+      `tenant_denied_operator_allowed`.
+- [x] `pnpm verify:outbound-security` — 25/25 targeted tests и static bypass gate.
 - [x] Hardening portfolio создан без изменения sealed scan evidence.
 
 Основной Playwright suite использует один worker. Два последовательных запуска
@@ -166,10 +169,29 @@ gate проверяет тот же набор assertions и устраняет 
       security, PostgreSQL, runtime split, core contract, platform authority,
       `pnpm verify:web` (17/17) и `git diff --check`.
 
-## 10. Следующая задача
+## 10. B4.5-R2B — XLSX decompression exhaustion remediation
 
-**B4.5-R2B:** закрыть Medium XLSX decompression exhaustion: ограничить ZIP
-central-directory и распакованный объём до передачи файла в ExcelJS, добавить
-malicious archive regression и повторить полный gate stack. Затем отдельными
-change sets закрываются delayed session revocation и notification webhook SSRF;
-B4.3 начинается после всего R2 и повторного security regression.
+- [x] До передачи ExcelJS проверяется ZIP central directory: количество записей,
+      размер каждой записи, суммарный распакованный объём и compression ratio.
+- [x] Зафиксированы пределы `2,000` записей, `16 MiB` на запись, `64 MiB`
+      суммарно и ratio `200`; ZIP64 sentinel и неконсистентная multi-disk
+      metadata отклоняются.
+- [x] Добавлены unit-regressions для обычного архива, per-entry/total limits,
+      zip-bomb ratio и ZIP64; parser regression подтверждает отказ до ExcelJS
+      при malicious metadata.
+- [x] `pnpm --filter @marketplace/api typecheck`, API tests (`143/143`) и
+      API build проходят.
+- [x] После R2B прошли `pnpm typecheck` (12/12), `pnpm test` (API 143/143,
+      schemas 38/38, api-client 7/7, Buyer 5/5, Supplier 1/1), `pnpm build`
+      (8/8), dependency audit, production config, DB-backed security storage,
+      live security, PostgreSQL, runtime split, core contract, platform
+      authority, outbound security, `pnpm verify:web` (17/17) и
+      `git diff --check`.
+
+## 11. Следующая задача
+
+**B4.5-R2C:** закрыть Medium delayed session revocation: проверять статус
+отозванного `jti` до принятия JWT, добавить bounded cache/invalidation и
+regression для logout/revoke. Затем отдельным change set закрывается
+notification webhook SSRF; B4.3 начинается после всего R2 и повторного
+security regression.

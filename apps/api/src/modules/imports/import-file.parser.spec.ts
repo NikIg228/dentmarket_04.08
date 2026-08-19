@@ -26,6 +26,31 @@ describe("ImportFileParser", () => {
     const parsed = await new ImportFileParser().parse({ sourceId: "00000000-0000-4000-8000-000000000022", fileName: "dirty.xlsx", fileType: "EXCEL", contentBase64: content, columnMapping: { externalId: "Код", name: "Название" } });
     expect(parsed[0]).toEqual(expected);
   });
+
+  it("rejects an XLSX zip bomb before ExcelJS decompression", async () => {
+    const packageBytes = Buffer.alloc(22);
+    packageBytes.writeUInt32LE(0x06054b50, 0);
+    packageBytes.writeUInt16LE(1, 8);
+    packageBytes.writeUInt16LE(1, 10);
+    packageBytes.writeUInt32LE(46 + "xl/workbook.xml".length, 12);
+    packageBytes.writeUInt32LE(0, 16);
+    const central = Buffer.alloc(46 + "xl/workbook.xml".length);
+    central.writeUInt32LE(0x02014b50, 0);
+    central.writeUInt32LE(1_000, 20);
+    central.writeUInt32LE(0xffffffff, 24);
+    central.writeUInt16LE("xl/workbook.xml".length, 28);
+    Buffer.from("xl/workbook.xml").copy(central, 46);
+    const bytes = Buffer.concat([central, packageBytes]);
+    await expect(
+      new ImportFileParser().parse({
+        sourceId: "00000000-0000-4000-8000-000000000022",
+        fileName: "bomb.xlsx",
+        fileType: "EXCEL",
+        contentBase64: bytes.toString("base64"),
+        columnMapping: { externalId: "externalId", name: "name" },
+      }),
+    ).rejects.toThrow("Excel file could not be parsed");
+  });
 });
 
 describe("PDF supplier price parsing", () => {
