@@ -237,3 +237,7 @@ B4.3 защищённый operator dead-letter replay.
       discovery/validation workers не стартовали, canonical report не создан.
       Чекбокс R2E намеренно остаётся `[ ]`; повторить scan в исправленном
       Codex Security runtime перед B4.3.
+- [ ] Повторная попытка Standard scan `c3217a8d-641e-42f6-8a74-5740480a4c9f`
+      также остановлена: preflight был `ready`, но discovery остался `0/1049`
+      без review receipts и worker progress; canonical report отсутствует.
+      R2E по-прежнему не закрыт.

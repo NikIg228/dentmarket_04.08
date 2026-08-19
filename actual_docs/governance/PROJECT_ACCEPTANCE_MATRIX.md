@@ -289,3 +289,6 @@ infrastructure evidence также остаётся явно открытым. �
 - [ ] R2E не закрыт: Standard scan `9cc6f935-afb0-49d7-8dd4-4025210fdce0`
       остался в `systemError` до discovery/validation; canonical security
       report отсутствует. Повторить его в исправленном runtime.
+- [ ] Повторный Standard scan `c3217a8d-641e-42f6-8a74-5740480a4c9f` также
+      заблокирован: preflight готов, но discovery остался `0/1049` без
+      review receipts; canonical security report отсутствует.

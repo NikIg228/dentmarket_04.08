@@ -825,6 +825,9 @@ production-safe до повторного полного security regression; е
 - [ ] R2E Standard scan `9cc6f935-afb0-49d7-8dd4-4025210fdce0` остановлен как
       блокированный: continuation thread остался в `systemError` после
       preflight, discovery/validation и canonical report отсутствуют.
+- [ ] Повторный Standard scan `c3217a8d-641e-42f6-8a74-5740480a4c9f` также
+      остановлен: после готового preflight discovery остался `0/1049`,
+      review receipts и canonical report не созданы.
 
 Следующий этап — **B4.5-R2E**, а не B4.3: повторно проверить все изменённые
 source-to-sink paths и только после этого возвращаться к защищённому dead-letter
