@@ -2,7 +2,8 @@
 
 **Дата:** 2026-08-19
 **Статус фазы:** `[x]` scan и dependency remediation завершены
-**Статус проекта по application security:** `BLOCKED` до B4.5-R2E (повторный security regression)
+**Статус этого исторического аудита:** `SUPERSEDED` текущим
+`actual_docs/governance/SECURITY_R2E_2026-08-20.md`.
 
 ## 1. Scope и доказательная база
 
@@ -227,36 +228,22 @@ gate проверяет тот же набор assertions и устраняет 
 
 ## 13. Следующая задача
 
-**B4.5-R2E:** выполнить повторный полный security regression по изменённым
-source-to-sink paths и зафиксировать закрытие B4.5. До этого приложение остаётся
-`BLOCKED` для production; после зелёного R2E следующая продуктовая задача —
-B4.3 защищённый operator dead-letter replay.
+Исторические попытки Standard/fallback scan выше сохранены для аудита и не
+являются текущим статусом. Текущий R2E закрыт следующим доказательством:
 
-- [ ] Попытка Standard scan `9cc6f935-afb0-49d7-8dd4-4025210fdce0` не завершена:
-      после готового preflight continuation thread остался в `systemError`,
-      discovery/validation workers не стартовали, canonical report не создан.
-      Чекбокс R2E намеренно остаётся `[ ]`; повторить scan в исправленном
-      Codex Security runtime перед B4.3.
-- [ ] Повторная попытка Standard scan `c3217a8d-641e-42f6-8a74-5740480a4c9f`
-      также остановлена: preflight был `ready`, но discovery остался `0/1049`
-      без review receipts и worker progress; canonical report отсутствует.
-      R2E по-прежнему не закрыт.
-- [x] Prompt-only fallback `8abba50c-e286-4e2e-b94e-49a1ba42f857` создал
-      canonical report, но coverage осталась `partial` (27 focused files из
-      1049), поэтому этот результат не закрывает R2E.
-- [ ] В fallback найдены 3 Medium findings: AI tools обходят
-      operation-specific permissions (`CWE-862`), integration webhooks
-      принимают unsigned payloads по умолчанию (`CWE-306`), CSV parser
-      материализует все строки до row limit (`CWE-400`). Сначала нужны
-      remediation patches и regressions, затем полный R2E scan с complete coverage.
+- [x] Standard scan `64b65075-d7f3-4c23-b6e2-1535e6067b80` на `8f450ea`
+      завершён с complete coverage `1055/1055`, `8/8` surfaces и `0`
+      reportable findings; canonical report проиндексирован.
+- [x] Payment, signature, PDF и inventory residual paths исправлены и покрыты
+      targeted regression tests.
+- [ ] Следующая реализационная задача — B4.3 защищённый operator dead-letter
+      replay.
 
 ## Current R2E override (2026-08-20)
 
 The authoritative current result is recorded in
 `actual_docs/governance/SECURITY_R2E_2026-08-20.md`. Scan
-`797606a1-946e-4c7c-ae43-22b304b4fc0f` completed with complete coverage on
-commit `ad66e39`, but reported two High and three Medium residual findings.
-The AI permission map, mandatory webhook HMAC/body/rate controls, and
-parser-level CSV limits are implemented and tested. The R2E checkbox remains
-`[ ]`; B4.3 is blocked until the residual findings are fixed and a new complete
-coverage scan is green.
+`64b65075-d7f3-4c23-b6e2-1535e6067b80` completed with complete coverage on
+commit `8f450ea` and `0` reportable findings. R2E is `[x]`; B4.3 is now the
+next task. Production infrastructure evidence remains a separate deployment
+gate.

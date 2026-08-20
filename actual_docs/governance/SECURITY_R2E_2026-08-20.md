@@ -1,44 +1,52 @@
 # B4.5-R2E — current security regression
 
-Status: `BLOCKED` (the scan completed with reportable residual findings).
+Status: `COMPLETE`.
 
-- Target revision: `ad66e3954f3af6ccf57beb7b3292be6f04a1c365` (`ad66e39`).
-- Codex Security scan: `797606a1-946e-4c7c-ae43-22b304b4fc0f`.
-- Mode: standard repository scan, complete coverage (`1053` tracked files; `6/6` review surfaces closed).
-- Result: `5` reportable findings — `2 High`, `3 Medium`.
-- TAC advisory: not granted; the result is based on the complete local review and recorded scan artifacts.
+- Target revision: `8f450ea1c60100cb050dd30ddcb6202297354a0d` (`8f450ea`).
+- Codex Security scan: `64b65075-d7f3-4c23-b6e2-1535e6067b80`.
+- Mode: standard repository scan, complete coverage (`1055/1055` tracked files; `8/8` review surfaces closed).
+- Result: `0` reportable findings.
+- TAC advisory: `not_granted`; protected TAC output may be unavailable, but the local canonical scan completed and was indexed.
+- Active worker advisory: the session had three usable worker slots, below the six-slot suggestion; coverage remained complete.
 
-## Requested remediation controls
+## Remediation controls
 
 - [x] AI tools have an explicit operation-to-permission map, platform-operator restrictions, and regression tests.
-- [x] Integration, payment, and signature webhooks require a verified raw body/HMAC before persistence; route throttling and a `1 MiB` body limit are enforced.
-- [x] CSV parsing enforces a parser-level `5,000` row limit, record-size limit, and `100`-column limit; XLSX and shared import schemas enforce the same column/field bounds.
-- [x] Runtime error responses, refresh rotation, MFA/login counters, tenant idempotency, promotion ownership, inventory scope, and outbound error disclosure were hardened.
+- [x] Integration, payment, and signature webhooks require verified raw body/HMAC before persistence; route throttling and a `1 MiB` body limit are enforced.
+- [x] CSV parsing enforces parser-level `5,000` row, record-size, and `100`-column limits; XLSX/PDF and shared import paths enforce bounded materialization.
+- [x] Runtime error responses, refresh rotation, MFA/login counters, tenant idempotency, promotion ownership, inventory scope, and outbound error disclosure are hardened.
+- [x] Payment authorization/capture/void/refund/payout claim a durable operation key before provider calls and pass a deterministic provider idempotency key.
+- [x] `PENDING` provider responses remain processing-only; irreversible allocation, order, inventory, ledger, refund, and cancellation effects are applied only by verified success/webhook finalization.
+- [x] Signature completion uses a conditional terminal transition; concurrent callbacks converge without overwriting a terminal state, and processing idempotency records are not poisoned by transient failures.
+- [x] PDF parsing rejects per-page text-item and total-character budgets before nested extraction and aborts at the parser row ceiling.
+- [x] Inventory availability is recomputed from a fresh transaction snapshot with Serializable isolation and version-conditional updates.
 
-## Residual findings blocking B4.3
+## Previously blocking findings — closed and rescanned
 
-- [ ] **High — payment external-side-effect TOCTOU** (`payment.external-side-effect-toctou`, CWE-362/CWE-841): provider calls happen before an atomic operation claim for authorization, capture, refund, cancel, and payout. A durable operation claim and provider idempotency key are required.
-- [ ] **High — pending payment finalization** (`payment.pending-finalization`, CWE-841): `PENDING` provider responses can still finalize allocations, orders, inventory, ledger, refund, or cancellation state. Only verified provider success may finalize irreversible effects.
-- [ ] **Medium — signature terminal-state race** (`signature.callback-terminal-race`, CWE-362/CWE-841): concurrent verified callbacks can overwrite a terminal signature state. Use a conditional/versioned transition.
-- [ ] **Medium — PDF resource amplification** (`imports.pdf-resource-amplification`, CWE-400): text items and characters are processed before parser-level ceilings. Enforce per-page and total item/character budgets before nested extraction.
-- [ ] **Medium — stale inventory availability** (`inventory.balance-stale-quantity`, CWE-362): `setBalance` derives availability from a reservation snapshot read outside the write transaction. Recompute under a lock/versioned conditional update.
+- [x] High — `payment.external-side-effect-toctou` (`CWE-362/CWE-841`): durable `PaymentAttempt` operation claims and deterministic provider keys now precede every external payment side effect.
+- [x] High — `payment.pending-finalization` (`CWE-841`): pending responses create processing records only; verified provider success finalizes through `applyProviderWebhook` exactly once.
+- [x] Medium — `signature.callback-terminal-race` (`CWE-362/CWE-841`): conditional signature transition and idempotent terminal convergence prevent conflicting callback overwrites.
+- [x] Medium — `imports.pdf-resource-amplification` (`CWE-400`): PDF item/character/row budgets are enforced before nested row extraction.
+- [x] Medium — `inventory.balance-stale-quantity` (`CWE-362`): balance snapshot and version check execute inside a Serializable write transaction.
 
-The R2E report is complete, but B4.3 must not start and the R2E checkbox must remain unchecked until the residual findings are remediated, the affected regressions pass, and a new complete-coverage scan is run on the resulting commit.
+The complete-coverage scan found no new reportable vulnerability. B4.5-R2E is closed; B4.3 may proceed after the documentation and gate evidence below remain green.
 
-## Verification evidence for `ad66e39`
+## Verification evidence for `8f450ea`
 
-- [x] `pnpm test` — API 163 tests, schemas 39, api-client 7, buyer 5, supplier 1; all workspace packages passed.
+- [x] `pnpm test` — 11/11 workspace tasks; API 48 files / 167 tests, schemas 39, api-client 7, buyer 5, supplier 1.
 - [x] `pnpm typecheck` — 12/12 workspace tasks.
 - [x] `pnpm build` — 8/8 workspace tasks.
-- [x] `pnpm verify:postgres` — tenant isolation, rollback, idempotency, and scarce-stock concurrency passed.
+- [x] `pnpm verify:postgres` — tenant isolation, rollback, idempotency, scarce-stock concurrency, and pilot seed passed.
 - [x] `pnpm verify:runtime-split` — API/worker/all capability matrix and entrypoint guards passed.
 - [x] `pnpm verify:platform-authority` — authority and AI role regressions passed.
 - [x] `pnpm verify:outbound-security` — 25/25 targeted tests and static bypass gate passed.
 - [x] `pnpm verify:production-config`.
-- [x] `pnpm verify:security-storage`.
+- [x] `pnpm verify:security-storage` — encrypted columns checked; no plaintext sensitive keys.
 - [x] `pnpm audit --prod --audit-level high` — no known vulnerabilities.
 - [x] `pnpm verify:web` — 17/17 Playwright scenarios.
-- [x] `pnpm verify:security` — headers, request IDs, rate limits, and MFA flow passed.
-- [x] `pnpm verify:core-contract` — 293 operations, 17 verified core operations, 38 component schemas.
+- [x] `pnpm verify:core-contract` — 293 operations, 17 verified core operations, 38 component schemas, 50/500 pilot catalog.
+- [x] `pnpm verify:outbox` — 8/8 tests.
+- [x] Codex Security R2E `64b65075-d7f3-4c23-b6e2-1535e6067b80` — complete coverage, 0 reportable findings.
+- [x] `git diff --check` before commit.
 
-Applied practices: backend/access-control review, security finding remediation and validation, code-review risk triage, and regression-test gates. Skills used: `codex-security:fix-finding` and `codex-security:security-scan`.
+Applied practices: backend/access-control review, payment state-machine review, source-to-sink security validation, code-review risk triage, focused regression testing, PostgreSQL concurrency verification, and browser acceptance gates. Skills used: `codex-security:fix-finding`, `codex-security:security-scan`, backend architect, code reviewer, and testing practices.

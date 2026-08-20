@@ -400,13 +400,14 @@ Gate намеренно разрешён только для локальной 
       dispatcher tests, PostgreSQL regression и runtime split прошли.
 
 Текущий статус: **B0.1–B0.6, B1.1–B1.2, B2.1–B2.3, B3.1–B3.3,
-B4.1–B4.2 и B4.5 реализованы и проходят**.
-High source-code backlog B4.5-R1 закрыт фазами R1A и R1B. B4.5-R2A, R2B, R2C и R2D
-закрыли organization enumeration/capability disclosure и XLSX decompression
-exhaustion, а также delayed session revocation; следующая задача:
-**B4.5-R2E — повторный security regression**. R2 остаётся выше B4.3, пока
-изменённые source-to-sink paths не перепроверены и не
-прошли source-to-sink revalidation.
+B4.1–B4.2 и B4.5-R2E реализованы и проходят**.
+High source-code backlog B4.5-R1 закрыт фазами R1A и R1B. B4.5-R2A–R2E
+закрыли organization enumeration, XLSX decompression exhaustion, delayed
+session revocation, notification webhook SSRF, payment side-effect claims,
+pending finalization, signature races, PDF resource budgets и stale inventory.
+Complete-coverage scan `64b65075-d7f3-4c23-b6e2-1535e6067b80` на `8f450ea`
+проверил `1055/1055` файлов и сообщил `0` reportable findings. Следующая
+задача — **B4.3: dead-letter operations и защищённый replay**.
 
 ### B1 — покупка клиникой
 
@@ -817,27 +818,15 @@ deployment evidence; политика сохраняет RPO 15 минут и RT
       build 8/8, dependency/security/DB/runtime/contract/authority/outbound и
       browser gates 17/17.
 
-Ограничение B4.5: dependency finding, все четыре High source findings и все
-четыре Medium source findings закрыты tactical patches. Приложение ещё не
-production-safe до повторного полного security regression; его чекбокс остаётся
-`[ ]` до завершения R2E.
+Ограничение B4.5: dependency finding и source findings закрыты tactical
+patches, focused regressions, полный gate stack и complete-coverage R2E.
 
-- [ ] R2E Standard scan `9cc6f935-afb0-49d7-8dd4-4025210fdce0` остановлен как
-      блокированный: continuation thread остался в `systemError` после
-      preflight, discovery/validation и canonical report отсутствуют.
-- [ ] Повторный Standard scan `c3217a8d-641e-42f6-8a74-5740480a4c9f` также
-      остановлен: после готового preflight discovery остался `0/1049`,
-      review receipts и canonical report не созданы.
-- [x] Prompt-only fallback `8abba50c-e286-4e2e-b94e-49a1ba42f857` создал
-      canonical report, но с `partial` coverage (27 focused files из 1049).
-- [ ] Fallback выявил три Medium source findings: AI tool permission bypass
-      (`CWE-862`), unsigned integration webhooks (`CWE-306`) и CSV
-      materialization до row limit (`CWE-400`). До B4.3 требуется remediation,
-      regression tests и новый полный R2E scan.
-
-Следующий этап — **B4.5-R2E**, а не B4.3: повторно проверить все изменённые
-source-to-sink paths и только после этого возвращаться к защищённому dead-letter
-replay.
+- [x] B4.5-R2E Standard scan `64b65075-d7f3-4c23-b6e2-1535e6067b80` завершён
+      на `8f450ea`: `1055/1055` файлов, `8/8` поверхностей, `0` reportable
+      findings; canonical report проиндексирован.
+- [x] Payment, signature, PDF и inventory residual paths закрыты кодом и
+      regression tests.
+- [ ] B4.3 — dead-letter operations и защищённый replay — следующая задача.
 
 ### B5 — frontend unification
 
@@ -942,9 +931,7 @@ pnpm dev:local
 ### Current security gate override (2026-08-20)
 
 `actual_docs/governance/SECURITY_R2E_2026-08-20.md` is the current R2E
-evidence. The complete-coverage scan `797606a1-946e-4c7c-ae43-22b304b4fc0f`
-on `ad66e39` is finished but reports two High and three Medium residual
-findings. Requested AI authorization, webhook HMAC/body/rate controls, and
-CSV parser limits are checked off there. Keep B4.3 and the R2E completion
-checkbox unchecked until the residual payment, signature, PDF, and inventory
-risks are remediated and rescanned.
+evidence. The complete-coverage scan `64b65075-d7f3-4c23-b6e2-1535e6067b80`
+on `8f450ea` is green with `0` reportable findings. Keep the R2E checkbox
+checked and continue with B4.3; live production infrastructure evidence remains
+a separate deployment concern.
