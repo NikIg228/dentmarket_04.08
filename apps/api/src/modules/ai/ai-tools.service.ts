@@ -1,13 +1,49 @@
 import { Injectable } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../platform/prisma/prisma.service";
+import { PlatformAuthorityPolicy } from "../access-control/platform-authority.policy";
 
 export type AiRole = "BUYER" | "SUPPLIER" | "OPERATOR" | "SUPPORT";
 export type ToolPlan = { name: string; input: Record<string, unknown>; requiresConfirmation: boolean };
 
+export const AI_TOOL_PERMISSION_MAP: Record<string, readonly string[]> = {
+  search_catalog: ["catalog.product.view"],
+  list_buyer_orders: ["order.create"],
+  buyer_owner_summary: ["order.create", "budget.view"],
+  buyer_smart_commerce_context: ["geo.view", "recommendation.use"],
+  supplier_integration_health: ["integration.view"],
+  list_supplier_orders: ["order.create"],
+  supplier_trust_context: ["trust.rating.view", "trust.review.view", "trust.incident.view", "geo.view"],
+  support_queue: ["support.ticket.view"],
+  trust_operations_queue: ["trust.incident.view"],
+  create_support_ticket: ["support.ticket.create"],
+};
+
 @Injectable()
 export class AiToolsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly authority: PlatformAuthorityPolicy,
+  ) {}
+
+  async assertAuthorized(
+    plan: ToolPlan,
+    context: { userId: string; organizationId: string; role: AiRole },
+  ) {
+    const required = AI_TOOL_PERMISSION_MAP[plan.name];
+    if (!required) throw new Error(`AI tool is not allowlisted: ${plan.name}`);
+    await this.authority.assertAiToolPermissions(
+      { actorId: context.userId, organizationId: context.organizationId },
+      context.role,
+      required,
+    );
+    if (plan.name === "support_queue" || plan.name === "trust_operations_queue") {
+      await this.authority.assertPlatformOperator({
+        actorId: context.userId,
+        organizationId: context.organizationId,
+      });
+    }
+  }
 
   plan(role: AiRole, content: string): ToolPlan {
     const normalized = content.toLocaleLowerCase("ru");
@@ -25,6 +61,7 @@ export class AiToolsService {
   }
 
   async execute(plan: ToolPlan, context: { userId: string; organizationId: string; role: AiRole }) {
+    await this.assertAuthorized(plan, context);
     switch (plan.name) {
       case "search_catalog": {
         const query = String(plan.input.query ?? "");

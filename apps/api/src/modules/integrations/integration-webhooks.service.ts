@@ -1,10 +1,11 @@
-import { Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
+import { Injectable, NotFoundException, PayloadTooLargeException, UnauthorizedException } from "@nestjs/common";
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../platform/prisma/prisma.service";
 import { IntegrationCryptoService } from "./integration-crypto.service";
 import { IntegrationJobsService } from "./integration-jobs.service";
 import { asRecord } from "./adapters/integration-adapter";
+import { INTEGRATION_WEBHOOK_MAX_BODY_BYTES } from "./integration-webhooks.constants";
 
 @Injectable()
 export class IntegrationWebhooksService {
@@ -15,11 +16,10 @@ export class IntegrationWebhooksService {
     if (!connection || connection.status === "REVOKED") throw new NotFoundException("Integration webhook endpoint not found");
     const payload = Array.isArray(body) ? body : asRecord(body);
     const payloadBytes = rawBody ?? Buffer.from(JSON.stringify(payload));
-    const configuration = asRecord(connection.configuration);
-    const signatureRequired = configuration.webhookSignatureRequired === true;
+    if (payloadBytes.length > INTEGRATION_WEBHOOK_MAX_BODY_BYTES) throw new PayloadTooLargeException("Integration webhook payload exceeds 1 MB");
     const signature = this.header(headers, "x-marketplace-signature");
     const timestamp = this.header(headers, "x-marketplace-timestamp");
-    const signatureStatus = signatureRequired ? this.verify(connection.encryptedWebhookSecret, payloadBytes, signature, timestamp) ? "VERIFIED" : "INVALID" : "SKIPPED";
+    const signatureStatus = this.verify(connection.encryptedWebhookSecret, payloadBytes, signature, timestamp) ? "VERIFIED" : "INVALID";
     const externalEventId = this.header(headers, "x-event-id") ?? this.header(headers, "x-request-id") ?? createHash("sha256").update(payloadBytes).digest("hex");
     const eventType = this.header(headers, "x-event-type") ?? this.eventType(payload);
     const safeHeaders = Object.fromEntries(["user-agent", "x-event-id", "x-event-type", "x-request-id", "x-lognex-webhook-id", "x-marketplace-timestamp"].map((name) => [name, this.header(headers, name)]).filter((entry) => entry[1]));

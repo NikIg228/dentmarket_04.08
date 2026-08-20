@@ -163,6 +163,11 @@ export class AiAssistantService {
         context,
       );
     const plan = this.tools.plan(conversation.role as AiRole, input.content);
+    await this.tools.assertAuthorized(plan, {
+      userId: context.actorId,
+      organizationId: context.organizationId,
+      role: conversation.role as AiRole,
+    });
     const execution = await this.prisma.aiToolExecution.create({
       data: {
         conversationId: id,
@@ -219,6 +224,18 @@ export class AiAssistantService {
       },
     });
     if (!execution) throw new NotFoundException("Pending AI action not found");
+    await this.tools.assertAuthorized(
+      {
+        name: execution.toolName,
+        input: execution.input as Record<string, unknown>,
+        requiresConfirmation: true,
+      },
+      {
+        userId: context.actorId,
+        organizationId: context.organizationId,
+        role,
+      },
+    );
     await this.prisma.aiToolExecution.update({
       where: { id: execution.id },
       data: { status: "RUNNING", confirmedAt: new Date(), messageId },

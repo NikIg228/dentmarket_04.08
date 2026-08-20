@@ -16,6 +16,8 @@ import { runtimeCapabilities } from "./platform/runtime/process-role";
 import { MetricsService } from "./platform/observability/metrics.service";
 import { httpMetricsMiddleware } from "./platform/observability/metrics.middleware";
 import { SessionRevocationService } from "./platform/security/session-revocation.service";
+import { INTEGRATION_WEBHOOK_MAX_BODY_BYTES } from "./modules/integrations/integration-webhooks.constants";
+import type { NextFunction, Request, Response } from "express";
 
 export async function createMarketplaceApp(
   options: { serverless?: boolean } = {},
@@ -62,6 +64,15 @@ export async function createMarketplaceApp(
   app.use(httpLoggerMiddleware());
   app.use(httpMetricsMiddleware(app.get(MetricsService)));
   app.useGlobalFilters(new ApiExceptionFilter());
+  app.use("/api/integrations/webhooks", (request: Request, response: Response, next: NextFunction) => {
+    const contentLengthHeader = request.headers["content-length"];
+    const contentLength = typeof contentLengthHeader === "string" ? Number(contentLengthHeader) : undefined;
+    if (contentLength !== undefined && (!Number.isFinite(contentLength) || contentLength > INTEGRATION_WEBHOOK_MAX_BODY_BYTES)) {
+      response.status(413).json({ code: "PAYLOAD_TOO_LARGE", message: "Integration webhook payload exceeds 1 MB" });
+      return;
+    }
+    next();
+  });
   app.useBodyParser("json", { limit: "32mb" });
   app.useBodyParser("urlencoded", { limit: "1mb", extended: true });
   app.setGlobalPrefix("api");

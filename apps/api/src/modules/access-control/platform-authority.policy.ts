@@ -108,6 +108,33 @@ export class PlatformAuthorityPolicy {
     }
   }
 
+  async assertAiToolPermissions(
+    context: AuthorityActorContext,
+    role: AuthorityAiRole,
+    requiredPermissionCodes: readonly string[],
+  ) {
+    const membership = await this.activeMembership(context);
+    const requiredCapability = aiRoleCapability[role];
+    if (
+      !membership.organization.capabilities.some(
+        ({ capability }) => capability === requiredCapability,
+      )
+    ) {
+      throw new ForbiddenException(
+        "Selected AI role is not available to the active organization",
+      );
+    }
+    const actorPermissions = this.permissionCodes(membership);
+    const missing = requiredPermissionCodes.filter(
+      (code) => !actorPermissions.has(code),
+    );
+    if (missing.length > 0) {
+      throw new ForbiddenException(
+        `AI tool permissions are missing: ${missing.join(", ")}`,
+      );
+    }
+  }
+
   async assertCanCreateRole(
     context: AuthorityActorContext,
     requestedPermissionCodes: string[],

@@ -65,6 +65,16 @@ describe("PlatformAuthorityPolicy", () => {
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
+  it("enforces the operation permission map for AI tools", async () => {
+    const fixture = policyFixture(membership(["BUYER"], ["ai.use", "budget.view"]));
+    await expect(
+      fixture.policy.assertAiToolPermissions(context, "BUYER", ["budget.view"]),
+    ).resolves.toBeUndefined();
+    await expect(
+      fixture.policy.assertAiToolPermissions(context, "BUYER", ["order.create"]),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
   it("prevents a role from granting permissions the actor does not hold", async () => {
     const fixture = policyFixture(
       membership(
