@@ -44,6 +44,7 @@ The complete-coverage scan found no new reportable vulnerability. B4.5-R2E is cl
 - [x] `pnpm verify:security-storage` — encrypted columns checked; no plaintext sensitive keys.
 - [x] `pnpm audit --prod --audit-level high` — no known vulnerabilities.
 - [x] `pnpm verify:web` — 17/17 Playwright scenarios.
+- [x] `pnpm verify:security` — security headers, request IDs, IP/user/tenant rate limits, MFA enrollment/challenge/disable.
 - [x] `pnpm verify:core-contract` — 293 operations, 17 verified core operations, 38 component schemas, 50/500 pilot catalog.
 - [x] `pnpm verify:outbox` — 8/8 tests.
 - [x] Codex Security R2E `64b65075-d7f3-4c23-b6e2-1535e6067b80` — complete coverage, 0 reportable findings.
