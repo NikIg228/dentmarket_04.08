@@ -79,9 +79,20 @@ worker. Поэтому обработчики обязаны выдержива�
 - глубина `FAILED` и `DEAD_LETTER`;
 - количество попыток и ошибок по `eventType`.
 
-Ручной replay `DEAD_LETTER` не входит в B0.6. До появления защищённой
-операторской операции replay выполняется только через отдельную проверяемую
-эксплуатационную процедуру и не меняет payload события.
+Защищённый operator replay реализован в B4.3 через
+`POST /api/operations/outbox/dead-letter/{eventId}/replay`. Операция требует
+`operations.outbox.replay` и capability `MARKETPLACE_OPERATOR`, принимает
+`idempotencyKey` и обязательную причину, а затем в Serializable-транзакции
+проверяет `DEAD_LETTER`, переводит событие в `PENDING`, сбрасывает retry budget
+до нуля и очищает lease/error. Payload не читается и не изменяется. Список
+для оператора доступен через `GET /api/operations/outbox/dead-letter` с
+ограничением `limit <= 100`; payload в ответ не выдаётся.
+
+Каждый replay записывается в `AuditLog` с actor/organization context,
+исходными попытками и причиной. `IdempotencyRecord` в scope
+`outbox.dead-letter.replay` возвращает тот же результат при повторе ключа и
+отклоняет reuse ключа для другого события или причины. Событие, которое уже
+не находится в `DEAD_LETTER`, повторно поставить нельзя.
 
 ## Последствия
 

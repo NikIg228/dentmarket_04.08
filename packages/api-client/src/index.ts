@@ -27,6 +27,10 @@ import type {
   SetOfferPublicationInput,
   SupplierOfferPublicationResponse,
   TransitionShipmentRequest,
+  OutboxDeadLetterQueryInput,
+  OutboxDeadLetterListResponse,
+  OutboxReplayInput,
+  OutboxReplayResponse,
 } from "@marketplace/schemas";
 
 export type {
@@ -274,10 +278,7 @@ export class MarketplaceApiClient {
     );
   }
 
-  transitionShipment(
-    shipmentId: string,
-    input: TransitionShipmentRequest,
-  ) {
+  transitionShipment(shipmentId: string, input: TransitionShipmentRequest) {
     return this.post<ShipmentResponse>(
       `/shipments/${shipmentId}/transitions`,
       input,
@@ -304,10 +305,7 @@ export class MarketplaceApiClient {
     );
   }
 
-  processSupplierImportBatch(
-    supplierOrganizationId: string,
-    batchId: string,
-  ) {
+  processSupplierImportBatch(supplierOrganizationId: string, batchId: string) {
     return this.post<SupplierImportBatchResponse>(
       `/suppliers/${supplierOrganizationId}/import-batches/${batchId}/process`,
       {},
@@ -357,6 +355,19 @@ export class MarketplaceApiClient {
   ) {
     return this.put<SupplierOfferPublicationResponse>(
       `/suppliers/${supplierOrganizationId}/offers/${offerId}/publication`,
+      input,
+    );
+  }
+
+  listOutboxDeadLetters(input: OutboxDeadLetterQueryInput = {}) {
+    return this.get<OutboxDeadLetterListResponse>(
+      this.withQuery("/operations/outbox/dead-letter", input),
+    );
+  }
+
+  replayOutboxDeadLetter(eventId: string, input: OutboxReplayInput) {
+    return this.post<OutboxReplayResponse>(
+      `/operations/outbox/dead-letter/${eventId}/replay`,
       input,
     );
   }

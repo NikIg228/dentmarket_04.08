@@ -400,14 +400,14 @@ Gate намеренно разрешён только для локальной 
       dispatcher tests, PostgreSQL regression и runtime split прошли.
 
 Текущий статус: **B0.1–B0.6, B1.1–B1.2, B2.1–B2.3, B3.1–B3.3,
-B4.1–B4.2 и B4.5-R2E реализованы и проходят**.
+B4.1–B4.3 и B4.5-R2E реализованы и проходят**.
 High source-code backlog B4.5-R1 закрыт фазами R1A и R1B. B4.5-R2A–R2E
 закрыли organization enumeration, XLSX decompression exhaustion, delayed
 session revocation, notification webhook SSRF, payment side-effect claims,
 pending finalization, signature races, PDF resource budgets и stale inventory.
 Complete-coverage scan `64b65075-d7f3-4c23-b6e2-1535e6067b80` на `8f450ea`
 проверил `1055/1055` файлов и сообщил `0` reportable findings. Следующая
-задача — **B4.3: dead-letter operations и защищённый replay**.
+Следующая задача — **B4.4: rate limiting и production auth runbook**.
 
 ### B1 — покупка клиникой
 
@@ -655,7 +655,7 @@ production connectors не входят в фазу; compensating rollback за�
 
 - [x] B4.1 — metrics и alerts;
 - [x] B4.2 — backup/restore rehearsal;
-- [ ] B4.3 — dead-letter operations и защищённый replay;
+- [x] B4.3 — dead-letter operations и защищённый replay;
 - [ ] B4.4 — rate limiting и production auth runbook;
 - [x] B4.5 — security/dependency scan;
 - [ ] B4.6 — нагрузочный профиль каталога и checkout.
@@ -715,6 +715,27 @@ production connectors не входят в фазу; compensating rollback за�
 `INTEGRATION_VERIFIED`, но не доказывает managed WAL/PITR, S3 versioning,
 retention и restore реального production snapshot. Эти пункты остаются
 deployment evidence; политика сохраняет RPO 15 минут и RTO 4 часа.
+
+Выполнено в B4.3:
+
+- [x] `GET /api/operations/outbox/dead-letter` отдаёт bounded metadata-only
+      очередь с фильтром `eventType` и `limit <= 100`; payload и внутренние
+      worker secrets не раскрываются.
+- [x] `POST /api/operations/outbox/dead-letter/:eventId/replay` доступен только
+      оператору с `MARKETPLACE_OPERATOR` и permissions
+      `operations.outbox.replay`; список защищён `operations.outbox.view`.
+- [x] Replay в Serializable-транзакции условно claim-ит только
+      `DEAD_LETTER`, возвращает событие в `PENDING`, сбрасывает `attempts` и
+      lease/error, не изменяя payload и не выдавая успех при конфликте.
+- [x] `IdempotencyRecord` предотвращает двойной replay и reuse ключа для
+      другого события/причины; `AuditLog` фиксирует actor, tenant, reason,
+      исходные attempts/error и новое состояние.
+- [x] Shared Zod/OpenAPI schemas, typed API-client methods и service regressions
+      покрывают authorization, list filtering, idempotency и non-DLQ rejection.
+- [x] `pnpm verify:outbox` проходит 14/14; `pnpm verify:pilot-backend`
+      подтверждает реальный PostgreSQL/API list → replay → повторный replay,
+      сохранность payload и audit record; `pnpm verify:core-contract` видит
+      295 операций, 19 verified core operations и 42 shared OpenAPI components.
 
 Выполнено в B4.5:
 
@@ -826,7 +847,9 @@ patches, focused regressions, полный gate stack и complete-coverage R2E.
       findings; canonical report проиндексирован.
 - [x] Payment, signature, PDF и inventory residual paths закрыты кодом и
       regression tests.
-- [ ] B4.3 — dead-letter operations и защищённый replay — следующая задача.
+- [x] B4.3 — dead-letter operations и защищённый replay завершены:
+      защищённый operator list/replay, отдельные permissions, Serializable
+      idempotency, audit trail и payload-preserving reset в `PENDING`.
 
 ### B5 — frontend unification
 
@@ -885,9 +908,9 @@ Definition of Done: наблюдаемый итог, а не список фай
 - [x] Notifications и payment order export подключены через handler registry.
 - [x] ADR, migration, CI gate и эксплуатационные правила обновлены вместе с кодом.
 
-B1.2, B2.1–B2.3, B3.1–B3.3 и B4.1–B4.2 после этого этапа также закрыты.
+B1.2, B2.1–B2.3, B3.1–B3.3 и B4.1–B4.3 после этого этапа также закрыты.
 Текущая следующая задача зафиксирована в разделе 8:
-**B4.5 — security/dependency scan**.
+**B4.4 — rate limiting и production auth runbook**.
 
 ## 12. Команды локальной проверки
 
@@ -933,5 +956,5 @@ pnpm dev:local
 `actual_docs/governance/SECURITY_R2E_2026-08-20.md` is the current R2E
 evidence. The complete-coverage scan `64b65075-d7f3-4c23-b6e2-1535e6067b80`
 on `8f450ea` is green with `0` reportable findings. Keep the R2E checkbox
-checked and continue with B4.3; live production infrastructure evidence remains
-a separate deployment concern.
+checked; B4.3 is complete and the next implementation phase is B4.4. Live
+production infrastructure evidence remains a separate deployment concern.

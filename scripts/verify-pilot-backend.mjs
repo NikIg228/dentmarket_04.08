@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
@@ -48,6 +49,10 @@ function assertOpenApiContract(openApi) {
     "ConfirmSupplierOrderRequest",
     "SupplierOrderResponse",
     "SupplierOrderListResponse",
+    "OutboxDeadLetterQuery",
+    "OutboxDeadLetterListResponse",
+    "OutboxReplayRequest",
+    "OutboxReplayResponse",
     "ErrorResponse",
   ];
   const components = openApi.components?.schemas ?? {};
@@ -117,6 +122,19 @@ function assertOpenApiContract(openApi) {
       "SupplierOrderResponse",
       "ConfirmSupplierOrderRequest",
     ],
+    [
+      "/api/operations/outbox/dead-letter",
+      "get",
+      "200",
+      "OutboxDeadLetterListResponse",
+    ],
+    [
+      "/api/operations/outbox/dead-letter/{eventId}/replay",
+      "post",
+      "200",
+      "OutboxReplayResponse",
+      "OutboxReplayRequest",
+    ],
   ];
   for (const [
     pathName,
@@ -160,6 +178,7 @@ function assertOpenApiContract(openApi) {
     "/api/buyers/{buyerOrganizationId}/carts",
     "/api/carts/{cartId}/checkout",
     "/api/supplier-orders",
+    "/api/operations/outbox/dead-letter",
   ]) {
     const pathItem = openApi.paths[pathName];
     const operation = pathItem.get ?? pathItem.post;
@@ -430,6 +449,93 @@ try {
         headers: identityHeaders,
         body: JSON.stringify(body),
       });
+
+    const replayEvent = await prisma.outboxEvent.create({
+      data: {
+        aggregateType: "B4.3_VERIFY",
+        aggregateId: randomUUID(),
+        eventType: "b4.3.verify",
+        payload: { sentinel: "payload-must-not-change" },
+        status: "DEAD_LETTER",
+        attempts: 10,
+        maxAttempts: 10,
+        lastError: "synthetic verification failure",
+      },
+    });
+    const replayKey = `b4.3-verify-${Date.now()}`;
+    try {
+      const deadLetters = await request(
+        "/operations/outbox/dead-letter?eventType=b4.3.verify&limit=10",
+        { headers: identityHeaders },
+      );
+      assertSchema(
+        coreSchemas.outboxDeadLetterListResponseSchema,
+        deadLetters,
+        "GET /operations/outbox/dead-letter",
+      );
+      assert(
+        deadLetters.items.some((item) => item.id === replayEvent.id),
+        "Synthetic dead-letter event is absent from the protected operator list",
+      );
+      const replay = await post(
+        `/operations/outbox/dead-letter/${replayEvent.id}/replay`,
+        {
+          idempotencyKey: replayKey,
+          reason: "Verify protected replay after a synthetic handler failure",
+        },
+      );
+      assertSchema(
+        coreSchemas.outboxReplayResponseSchema,
+        replay,
+        "POST /operations/outbox/dead-letter/:eventId/replay",
+      );
+      const repeatedReplay = await post(
+        `/operations/outbox/dead-letter/${replayEvent.id}/replay`,
+        {
+          idempotencyKey: replayKey,
+          reason: "Verify protected replay after a synthetic handler failure",
+        },
+      );
+      assert(
+        repeatedReplay.eventId === replay.eventId &&
+          repeatedReplay.status === replay.status &&
+          repeatedReplay.attempts === replay.attempts &&
+          repeatedReplay.replayedAt === replay.replayedAt,
+        `Dead-letter replay idempotency returned a different response: first=${JSON.stringify(replay)} repeated=${JSON.stringify(repeatedReplay)}`,
+      );
+      const persistedReplay = await prisma.outboxEvent.findUnique({
+        where: { id: replayEvent.id },
+      });
+      assert(
+        persistedReplay?.status === "PENDING" && persistedReplay.attempts === 0,
+        "Dead-letter replay did not reset the event to PENDING with zero attempts",
+      );
+      assert(
+        JSON.stringify(persistedReplay.payload) ===
+          JSON.stringify(replayEvent.payload),
+        "Dead-letter replay changed the event payload",
+      );
+      const replayAudit = await prisma.auditLog.findFirst({
+        where: {
+          entityType: "OutboxEvent",
+          entityId: replayEvent.id,
+          action: "outbox.dead_letter.replayed",
+        },
+      });
+      assert(replayAudit, "Dead-letter replay did not write an audit record");
+    } finally {
+      await prisma.auditLog.deleteMany({
+        where: {
+          entityType: "OutboxEvent",
+          entityId: replayEvent.id,
+          action: "outbox.dead_letter.replayed",
+        },
+      });
+      await prisma.idempotencyRecord.deleteMany({
+        where: { scope: "outbox.dead-letter.replay", key: replayKey },
+      });
+      await prisma.outboxEvent.delete({ where: { id: replayEvent.id } });
+    }
 
     const cart = await post(`/buyers/${buyer.id}/carts`, { currency: "KZT" });
     assertSchema(

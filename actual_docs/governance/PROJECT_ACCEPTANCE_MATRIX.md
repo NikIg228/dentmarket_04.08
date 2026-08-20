@@ -24,6 +24,9 @@
 - К пустой базе `marketplace` успешно применены 28 миграций и основной seed.
 - Активный Buyer fallback сокращён с 3 329 до 500 детерминированно отобранных карточек; полный snapshot сохранён в `data/archive/`.
 - Pilot seed создаёт 10 демо-клиник, 10 демо-поставщиков, 50 товаров с предложениями и 500 опубликованных demo-офферов.
+- Operator seed содержит dedicated `operations.outbox.view` и
+  `operations.outbox.replay` permissions; `pnpm verify:seed-profiles` подтверждает
+  86 reference permissions и повторяемость reference/operator/test/pilot profiles.
 - Smoke API вернул `health=ok`, 50 доступных товаров и 500 предложений.
 - В активной media-папке осталось 429 используемых файлов; 2 458 неиспользуемых файлов удалены из рабочей версии.
 - `pnpm typecheck`, `pnpm test` и последовательный `pnpm build` проходят. Параллельный запуск четырёх Next.js build на машине с 8 ГБ памяти признан нестабильным, поэтому root build ограничен `--concurrency=1`.
@@ -53,13 +56,13 @@
 | Node.js и pnpm            | `INTEGRATION_VERIFIED` | Node `24.18.0`, pnpm `11.9.0`; `pnpm install --frozen-lockfile` успешно восстановил все 10 workspace-проектов                                                                                                  | Offline-store не содержал четыре записи, поэтому полностью автономная установка пока не доказана          | Использовать frozen lockfile; отдельно подготовить CI/cache, если нужен offline build                   |
 | Локальная инфраструктура  | `BLOCKED`              | `compose.yaml` описывает PostgreSQL, Redis, MinIO и ClamAV                                                                                                                                                     | Команда `docker` на текущей машине отсутствует                                                            | Установить Docker Desktop либо явно утвердить локальный режим без Docker                                |
 | PostgreSQL-схема          | `INTEGRATION_VERIFIED` | 31 миграция применена через `prisma migrate deploy`; `prisma validate` и `pnpm verify:postgres` прошли 2026-08-19                                                                                              | Fresh CI run для новой миграции ожидает push/PR; Docker локально отсутствует                              | Сохранять migration deploy и PostgreSQL gate обязательными                                              |
-| Backend API               | `E2E_VERIFIED`         | B0.1–B0.6, Flow A, B2.1–B2.3 и B3.1–B3.3 проходят; B4.1–B4.2, dependency remediation, B4.5-R1, R2A–R2E проверены; R2E reviewed 1055/1055 files with 0 findings | Внешний alert/dashboard и production infrastructure ещё не имеют `LIVE_VERIFIED` | Следующая задача B4.3 — защищённый dead-letter replay |
+| Backend API               | `E2E_VERIFIED`         | B0.1–B0.6, Flow A, B2.1–B2.3 и B3.1–B3.3 проходят; B4.1–B4.3, dependency remediation, B4.5-R1, R2A–R2E проверены; R2E reviewed 1055/1055 files with 0 findings | Внешний alert/dashboard и production infrastructure ещё не имеют `LIVE_VERIFIED` | Следующая задача B4.4 — rate limiting и production auth runbook |
 | Backup/restore            | `INTEGRATION_VERIFIED` | `pnpm verify:backup-restore`: 149 таблиц с content hash, 2 object files, 31 migration и API health/readiness; source неизменен, target удалён                                                                  | Managed WAL/PITR, S3 versioning/retention и restore production snapshot не имеют `LIVE_VERIFIED`          | Выполнить provider-level timed drill перед go-live; локальный gate сохранять в CI                       |
 | Observability и alerts    | `INTEGRATION_VERIFIED` | `pnpm verify:observability`: 4/4 unit, 7 rules/14 synthetic vectors, metrics auth `401/200`, PostgreSQL outbox/checkout/import gauges; production config запрещает endpoint без token                          | Нет evidence внешнего monitoring deployment, notification route и live synthetic alert                    | При deployment подключить versioned PromQL rules и сохранить live evidence                              |
 | Dependency security       | `INTEGRATION_VERIFIED` | B4.5: production audit изменён с 15 high/6 moderate на `No known vulnerabilities found`; Next 16.2.11, Sharp 0.35.3, PostCSS 8.5.26 и pdfjs-dist 6.2.108 прошли build, PDF/import, PostgreSQL и web regression | Registry state меняется; production network и runtime exposure отдельных advisories не измерялись         | Сохранять `pnpm audit --prod --audit-level high` в CI и обновлять lockfile только с compatibility gates |
-| Application security      | `E2E_VERIFIED`         | Dependency finding и все source findings закрыты; R2A–R2E regressions, полный gate stack и complete-coverage scan `64b65075-d7f3-4c23-b6e2-1535e6067b80` зелёные | TAC не выдан и production infrastructure evidence ещё не имеют `LIVE_VERIFIED` | Сохранить R2E в CI; перейти к B4.3 |
-| Transactional outbox      | `INTEGRATION_VERIFIED` | ADR 005, status/lease/retry/DLQ; `pnpm verify:outbox` — 8/8; B4.1 экспортирует depth, oldest age, expired lease, attempts/errors из PostgreSQL                                                                 | Защищённый operator replay остаётся B4.3; production dashboard не развёрнут                               | Сохранять B4.1 metrics; закрыть replay в B4.3                                                           |
-| Автоматические тесты      | `E2E_VERIFIED`         | `pnpm test`: API 167, schemas 39, api-client 7, Buyer 5, Supplier 1; `verify:outbound-security` — 25/25; `verify:web` — 17/17; PostgreSQL, security, runtime, contract и outbox gates проходят | Admin/Landing UI без unit coverage; B4.3–B4.4 и B4.6 ещё не пройдены | Следующая задача — B4.3 |
+| Application security      | `E2E_VERIFIED`         | Dependency finding и все source findings закрыты; R2A–R2E regressions, полный gate stack и complete-coverage scan `64b65075-d7f3-4c23-b6e2-1535e6067b80` зелёные | TAC не выдан и production infrastructure evidence ещё не имеют `LIVE_VERIFIED` | Сохранить R2E в CI; B4.3 закрыт, перейти к B4.4 |
+| Transactional outbox      | `E2E_VERIFIED`         | ADR 005, status/lease/retry/DLQ; B4.3 protected list/replay, dedicated permissions, Serializable idempotency и audit trail; `pnpm verify:outbox` включает replay regressions | Production dashboard не развёрнут; live operator drill не проведён | Сохранять B4.1 metrics; следующий hardening — B4.4 |
+| Автоматические тесты      | `E2E_VERIFIED`         | `pnpm test`: API 171, schemas 39, api-client 7, Buyer 5, Supplier 1; `verify:outbox` — 14/14; `verify:pilot-backend` — full purchase + protected replay; `verify:outbound-security` — 25/25; `verify:web` — 17/17 | Admin/Landing UI без unit coverage; B4.4 и B4.6 ещё не пройдены | Следующая задача — B4.4 |
 | Typecheck и build         | `UNIT_VERIFIED`        | `pnpm typecheck`: 12/12 задач; `pnpm build`: 8/8 задач, API и четыре web-приложения собраны на Next 16.2.11                                                                                                    | Cold sequential build занял около 10 минут; Next предупреждает о deprecated middleware convention         | Сделать merge-gate и отдельно оптимизировать Buyer bundle/build                                         |
 | Настоящий lint            | `SPEC_ONLY`            | `lint` во фронтендах и API фактически запускает только `tsc --noEmit`                                                                                                                                          | Нет ESLint/Biome-проверок качества и опасных паттернов                                                    | После стабилизации подключить ESLint или Biome отдельной задачей                                        |
 
@@ -287,7 +290,10 @@ R2E завершён на commit `8f450ea`: complete-coverage scan
       inventory) закрыты кодом и targeted regression tests.
 - [x] Workspace, PostgreSQL, runtime, contract, outbound, storage, dependency
       и browser gates прошли.
-- [ ] B4.3 — dead-letter operations и защищённый replay; это следующая
+- [x] B4.3 — dead-letter operations и защищённый replay: operator list/replay,
+      dedicated permissions, payload-preserving transactional reset,
+      idempotency и audit trail подтверждены targeted regressions.
+- [ ] B4.4 — rate limiting и production auth runbook — следующая
       реализационная задача.
 
 ## Current security gate override (2026-08-20)
@@ -298,4 +304,4 @@ complete-coverage result at commit `8f450ea` (scan
 and inventory residuals from the prior scan were remediated, all affected
 regressions and workspace gates passed, and the new scan reviewed `1055/1055`
 tracked files with `0` reportable findings. Application security is now
-`E2E_VERIFIED`; B4.5-R2E is closed and B4.3 may begin.
+`E2E_VERIFIED`; B4.5-R2E and B4.3 are closed, and B4.4 is next.

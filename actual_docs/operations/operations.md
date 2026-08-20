@@ -68,7 +68,13 @@ recovery с заменой schema остаётся отдельной maintenanc
 4. Не изменять ledger и signed documents вручную; использовать compensating operation/version.
 5. После устранения выполнить targeted retry и записать incident decision в audit/operations log.
 
-До B4.3 ручной replay `OutboxEvent.DEAD_LETTER` не является штатной кнопкой:
-нельзя менять payload или статус напрямую без отдельной проверяемой процедуры.
-При диагностике фиксируются event ID, `eventType`, `attempts`, `lastError`,
-`lockedBy` и связанный aggregate.
+Операторский replay `OutboxEvent.DEAD_LETTER` выполняется только через
+защищённые операции `GET /api/operations/outbox/dead-letter` и
+`POST /api/operations/outbox/dead-letter/{eventId}/replay`. Доступ требуют
+permissions `operations.outbox.view`/`operations.outbox.replay` и capability
+`MARKETPLACE_OPERATOR`; причина и idempotency key обязательны. Payload нельзя
+редактировать, replay атомарно возвращает событие в `PENDING`, сбрасывает
+attempts и lease, а audit trail фиксирует actor, tenant, причину и старое
+состояние. Повтор того же ключа безопасен, reuse для другого события
+отклоняется. При диагностике фиксируются event ID, `eventType`, `attempts`,
+`lastError`, `lockedBy` и связанный aggregate.

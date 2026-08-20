@@ -40,7 +40,7 @@
     "verify:search-commerce": "node scripts/verify-search-commerce.mjs",
     "verify:core-contract": "pnpm --filter @marketplace/schemas build && pnpm --filter @marketplace/api build && node scripts/verify-pilot-backend.mjs --contract-only",
     "verify:runtime-split": "pnpm --filter @marketplace/api build && node scripts/verify-runtime-split.mjs",
-    "verify:outbox": "pnpm --filter @marketplace/api exec vitest run src/platform/outbox/outbox-dispatcher.service.spec.ts src/modules/integrations/payment-captured.outbox-handler.spec.ts",
+    "verify:outbox": "pnpm --filter @marketplace/api exec vitest run src/platform/outbox/outbox-dispatcher.service.spec.ts src/modules/integrations/payment-captured.outbox-handler.spec.ts src/modules/operations/operations.service.spec.ts",
     "verify:seed-profiles": "pnpm db:seed:reference && pnpm db:seed:operator && pnpm db:seed:test && pnpm db:seed:pilot",
     "verify:postgres": "pnpm --filter @marketplace/schemas build && pnpm --filter @marketplace/api build && node scripts/verify-postgres-integration.mjs",
     "verify:pilot-backend": "pnpm --filter @marketplace/schemas build && pnpm --filter @marketplace/api build && node scripts/verify-pilot-backend.mjs",

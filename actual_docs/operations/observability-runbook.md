@@ -48,8 +48,10 @@
   attempts/errors по `event_type` и worker readiness.
 - Для expired lease проверить жив ли worker и не превышает ли handler 60 секунд.
   Повторный claim допустим только потому, что handlers идемпотентны.
-- `DEAD_LETTER` не удалять и не переводить вручную SQL-командой. До B4.3 replay
-  выполняется только утверждённой операторской процедурой с сохранением payload.
+- `DEAD_LETTER` не удалять и не переводить вручную SQL-командой. Для B4.3
+  используйте защищённый operator replay через `/api/operations/outbox/dead-letter`;
+  операция проверяет capability/permissions, идемпотентность и пишет audit trail,
+  при этом payload сохраняется неизменным.
 - После восстановления убедиться, что oldest age уменьшается, leases равны нулю,
   а обязательные side effects не задублированы.
 

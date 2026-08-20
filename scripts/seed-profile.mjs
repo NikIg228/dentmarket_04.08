@@ -33,6 +33,8 @@ const permissionCodes = [
   "organization.members.manage",
   "organization.roles.manage",
   "organization.view",
+  "operations.outbox.view",
+  "operations.outbox.replay",
   "organization.create",
   "approval.manage",
   "audit.view",
@@ -237,7 +239,8 @@ async function ensureReference() {
       name: "Спецификация к заказу",
       format: "PDF",
       requiredSignatureCount: 1,
-      templateBody: "СПЕЦИФИКАЦИЯ № {{order.number}}\n\nПоставщик: {{supplier.name}}\nБИН поставщика: {{supplier.bin}}\nПокупатель: {{buyer.name}}\nБИН покупателя: {{buyer.bin}}\nСумма: {{order.total}} {{order.currency}}\n\nСостав заказа:\n{{order.items}}\n\nДокумент сформирован DentMarket KZ из подтверждённого заказа.",
+      templateBody:
+        "СПЕЦИФИКАЦИЯ № {{order.number}}\n\nПоставщик: {{supplier.name}}\nБИН поставщика: {{supplier.bin}}\nПокупатель: {{buyer.name}}\nБИН покупателя: {{buyer.bin}}\nСумма: {{order.total}} {{order.currency}}\n\nСостав заказа:\n{{order.items}}\n\nДокумент сформирован DentMarket KZ из подтверждённого заказа.",
     },
     {
       code: "INVOICE_RU",
@@ -245,7 +248,8 @@ async function ensureReference() {
       name: "Счёт на оплату",
       format: "PDF",
       requiredSignatureCount: 0,
-      templateBody: "СЧЁТ № {{invoice.number}}\n\nПоставщик: {{supplier.name}}\nБИН поставщика: {{supplier.bin}}\nПокупатель: {{buyer.name}}\nБИН покупателя: {{buyer.bin}}\nИтого к оплате: {{invoice.total}} {{invoice.currency}}.\n\nОснование: заказ {{order.number}}.",
+      templateBody:
+        "СЧЁТ № {{invoice.number}}\n\nПоставщик: {{supplier.name}}\nБИН поставщика: {{supplier.bin}}\nПокупатель: {{buyer.name}}\nБИН покупателя: {{buyer.bin}}\nИтого к оплате: {{invoice.total}} {{invoice.currency}}.\n\nОснование: заказ {{order.number}}.",
     },
     {
       code: "WAYBILL_RU",
@@ -253,7 +257,8 @@ async function ensureReference() {
       name: "Накладная",
       format: "DOCX",
       requiredSignatureCount: 2,
-      templateBody: "НАКЛАДНАЯ № {{shipment.number}}\n\nПоставщик: {{supplier.name}}\nПолучатель: {{recipient.name}}\nАдрес доставки: {{recipient.address}}\nТрек-номер: {{shipment.trackingNumber}}\n\nТовары:\n{{shipment.items}}",
+      templateBody:
+        "НАКЛАДНАЯ № {{shipment.number}}\n\nПоставщик: {{supplier.name}}\nПолучатель: {{recipient.name}}\nАдрес доставки: {{recipient.address}}\nТрек-номер: {{shipment.trackingNumber}}\n\nТовары:\n{{shipment.items}}",
     },
   ]) {
     await prisma.documentTemplate.upsert({
@@ -494,7 +499,14 @@ async function manifest(name) {
     prisma.permission.count({ where: { code: { in: permissionCodes } } }),
     prisma.documentTemplate.count({
       where: {
-        code: { in: ["MARKETPLACE_SUPPLIER_AGREEMENT_RU", "ORDER_SPECIFICATION_RU", "INVOICE_RU", "WAYBILL_RU"] },
+        code: {
+          in: [
+            "MARKETPLACE_SUPPLIER_AGREEMENT_RU",
+            "ORDER_SPECIFICATION_RU",
+            "INVOICE_RU",
+            "WAYBILL_RU",
+          ],
+        },
         version: 1,
       },
     }),

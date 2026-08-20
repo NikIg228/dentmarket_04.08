@@ -543,6 +543,47 @@ export const checkoutResponseSchema = z
   })
   .passthrough();
 
+export const outboxDeadLetterQuerySchema = z.object({
+  eventType: z.string().trim().min(1).max(120).optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+});
+
+export const outboxEventIdSchema = z.uuid();
+
+export const outboxDeadLetterItemSchema = z.object({
+  id: z.uuid(),
+  aggregateType: z.string(),
+  aggregateId: z.string(),
+  eventType: z.string(),
+  status: z.literal("DEAD_LETTER"),
+  attempts: z.number().int().nonnegative(),
+  maxAttempts: z.number().int().positive(),
+  availableAt: dateTimeSchema,
+  lockedAt: nullableDateTimeSchema,
+  publishedAt: nullableDateTimeSchema,
+  lastError: z.string().nullable(),
+  createdAt: dateTimeSchema,
+});
+
+export const outboxDeadLetterListResponseSchema = z.object({
+  items: z.array(outboxDeadLetterItemSchema),
+  total: z.number().int().nonnegative(),
+  limit: z.number().int().positive(),
+  generatedAt: dateTimeSchema,
+});
+
+export const outboxReplaySchema = z.object({
+  idempotencyKey: z.string().trim().min(8).max(160),
+  reason: z.string().trim().min(10).max(500),
+});
+
+export const outboxReplayResponseSchema = z.object({
+  eventId: z.uuid(),
+  status: z.literal("PENDING"),
+  attempts: z.literal(0),
+  replayedAt: dateTimeSchema,
+});
+
 export type CatalogSearchResponse = z.infer<typeof catalogSearchResponseSchema>;
 export type OfferComparisonResponse = z.infer<
   typeof offerComparisonResponseSchema
@@ -554,6 +595,18 @@ export type CartValidationResponse = z.infer<
   typeof cartValidationResponseSchema
 >;
 export type CheckoutResponse = z.infer<typeof checkoutResponseSchema>;
+export type OutboxDeadLetterQuery = z.output<
+  typeof outboxDeadLetterQuerySchema
+>;
+export type OutboxDeadLetterQueryInput = z.input<
+  typeof outboxDeadLetterQuerySchema
+>;
+export type OutboxDeadLetterItem = z.infer<typeof outboxDeadLetterItemSchema>;
+export type OutboxDeadLetterListResponse = z.infer<
+  typeof outboxDeadLetterListResponseSchema
+>;
+export type OutboxReplayInput = z.infer<typeof outboxReplaySchema>;
+export type OutboxReplayResponse = z.infer<typeof outboxReplayResponseSchema>;
 export type SupplierOrderResponse = z.infer<typeof supplierOrderResponseSchema>;
 export type ShipmentResponse = z.infer<typeof shipmentResponseSchema>;
 export type GenerateOrderDocumentPackRequest = z.input<

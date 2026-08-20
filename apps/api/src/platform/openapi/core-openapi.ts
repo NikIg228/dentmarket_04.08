@@ -38,6 +38,10 @@ import {
   healthResponseSchema,
   offerComparisonResponseSchema,
   orderDocumentPackResponseSchema,
+  outboxDeadLetterQuerySchema,
+  outboxDeadLetterListResponseSchema,
+  outboxReplaySchema,
+  outboxReplayResponseSchema,
   publicCityListResponseSchema,
   readinessResponseSchema,
   searchCatalogSchema,
@@ -88,6 +92,8 @@ const coreZodSchemas = {
   CreateShipmentRequest: createShipmentSchema,
   TransitionShipmentRequest: transitionShipmentSchema,
   GenerateOrderDocumentPackRequest: generateOrderDocumentPackSchema,
+  OutboxDeadLetterQuery: outboxDeadLetterQuerySchema,
+  OutboxReplayRequest: outboxReplaySchema,
   CatalogSearchResponse: catalogSearchResponseSchema,
   OfferComparisonResponse: offerComparisonResponseSchema,
   CartResponse: cartResponseSchema,
@@ -106,6 +112,8 @@ const coreZodSchemas = {
   ShipmentResponse: shipmentResponseSchema,
   ShipmentListResponse: shipmentListResponseSchema,
   OrderDocumentPackResponse: orderDocumentPackResponseSchema,
+  OutboxDeadLetterListResponse: outboxDeadLetterListResponseSchema,
+  OutboxReplayResponse: outboxReplayResponseSchema,
 } satisfies Record<string, ZodType>;
 
 export type CoreOpenApiSchemaName = keyof typeof coreZodSchemas;

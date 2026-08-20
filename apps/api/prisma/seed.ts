@@ -38,6 +38,8 @@ const permissionCodes = [
   "organization.members.manage",
   "organization.roles.manage",
   "organization.view",
+  "operations.outbox.view",
+  "operations.outbox.replay",
   "organization.create",
   "approval.manage",
   "audit.view",
