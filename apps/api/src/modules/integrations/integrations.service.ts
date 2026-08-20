@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import type { CreateIntegrationBindingInput, CreateIntegrationConnectionInput, ReconciliationQueryInput, ResolveReconciliationInput, UpdateIntegrationConnectionInput, UpsertIntegrationMappingInput } from "@marketplace/schemas";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../platform/prisma/prisma.service";
@@ -107,6 +107,7 @@ export class IntegrationsService {
   }
 
   async create(supplierOrganizationId: string, input: CreateIntegrationConnectionInput, context: SupplierActorContext) {
+    if (input.enableWebhook && input.provider === "ONE_C") throw new BadRequestException("ONE_C webhooks require the connector agent transport");
     await this.access.assertCanManage(supplierOrganizationId, context);
     await this.access.requireProfile(supplierOrganizationId);
     const enrollmentToken = input.provider === "ONE_C" ? this.crypto.token() : undefined;

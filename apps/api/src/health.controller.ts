@@ -21,7 +21,13 @@ export class HealthController {
   @ApiCoreResponse("ReadinessResponse")
   async ready() {
     const snapshot = await this.readiness.snapshot();
-    if (snapshot.status !== "ready") throw new ServiceUnavailableException(snapshot);
+    if (snapshot.status !== "ready") {
+      throw new ServiceUnavailableException({
+        code: "SERVICE_NOT_READY",
+        message: "Service dependencies are not ready",
+        status: snapshot.status,
+      });
+    }
     return snapshot;
   }
 }

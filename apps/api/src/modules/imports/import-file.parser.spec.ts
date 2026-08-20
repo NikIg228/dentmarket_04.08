@@ -27,6 +27,18 @@ describe("ImportFileParser", () => {
     })).rejects.toThrow("CSV file exceeds 5,000 rows");
   });
 
+  it("rejects CSV files above the parser-level column limit", async () => {
+    const header = Array.from({ length: 101 }, (_, index) => `column-${index}`).join(",");
+    const row = Array.from({ length: 101 }, () => "value").join(",");
+    await expect(new ImportFileParser().parse({
+      sourceId: "00000000-0000-4000-8000-000000000022",
+      fileName: "too-wide.csv",
+      fileType: "CSV",
+      contentBase64: Buffer.from(`${header}\n${row}\n`).toString("base64"),
+      columnMapping: { externalId: "column-0", name: "column-1" },
+    })).rejects.toThrow("CSV file exceeds 100 columns");
+  });
+
   it.each([
     { name: "supplier-title", rows: [["Прайс-лист на 17.07.2026"], [], ["Артикул", "Наименование", "Цена", "Остаток"], ["A-1", "Композит A2", 125000, 14]], expected: { Артикул: "A-1", Наименование: "Композит A2", Цена: 125000, Остаток: 14 } },
     { name: "metadata-preamble", rows: [["Поставщик", "ТОО Dental"], ["Валюта", "KZT"], ["SKU", "Товар", "Цена, KZT", "Ед. изм."], ["G-10", "Перчатки M", 4900, "уп"]], expected: { SKU: "G-10", Товар: "Перчатки M", "Цена, KZT": 4900, "Ед. изм.": "уп" } },

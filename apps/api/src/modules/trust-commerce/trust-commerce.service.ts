@@ -35,7 +35,10 @@ export class TrustCommerceService {
   async createIncident(input: CreateProductGapInput, context: SupplierActorContext) {
     if (input.actionType === "HARD_BLOCK" && !(await this.isOperator(context.organizationId))) throw new ForbiddenException("Only the marketplace operator may apply a hard block");
     const existing = await this.prisma.productGapIncident.findUnique({ where: { idempotencyKey: input.idempotencyKey } });
-    if (existing) return existing;
+    if (existing) {
+      if (existing.ownerOrganizationId !== context.organizationId && !(await this.isOperator(context.organizationId))) throw new ConflictException("Incident idempotency key is already used");
+      return existing;
+    }
     const status = input.actionType === "HARD_BLOCK" ? "HARD_BLOCKED" : input.actionType === "NONE" ? "OPEN" : "SOFT_ACTION_ACTIVE";
     return this.prisma.$transaction(async (tx) => {
       const incident = await tx.productGapIncident.create({ data: { ...input, ownerOrganizationId: context.organizationId, impactedOrganizationId: input.impactedOrganizationId, actionExpiresAt: input.actionExpiresAt ? new Date(input.actionExpiresAt) : null, status, createdById: context.actorId } });
@@ -60,8 +63,11 @@ export class TrustCommerceService {
   async appealIncident(id: string, input: CreateTrustAppealInput, context: SupplierActorContext) {
     const incident = await this.prisma.productGapIncident.findUnique({ where: { id } });
     if (!incident || (incident.impactedOrganizationId !== context.organizationId && incident.ownerOrganizationId !== context.organizationId && !(await this.isOperator(context.organizationId)))) throw new NotFoundException("Product incident not found");
-    const existing = await this.prisma.productGapAppeal.findUnique({ where: { idempotencyKey: input.idempotencyKey } });
-    if (existing) return existing;
+    const existing = await this.prisma.productGapAppeal.findUnique({ where: { idempotencyKey: input.idempotencyKey }, include: { incident: true } });
+    if (existing) {
+      if (existing.incidentId !== id || existing.appellantOrganizationId !== context.organizationId) throw new ConflictException("Appeal idempotency key is already used");
+      return existing;
+    }
     return this.prisma.$transaction(async (tx) => {
       const appeal = await tx.productGapAppeal.create({ data: { incidentId: id, appellantOrganizationId: context.organizationId, appellantUserId: context.actorId, reason: input.reason, evidence: json(input.evidence), idempotencyKey: input.idempotencyKey } });
       await tx.productGapIncident.update({ where: { id }, data: { status: "UNDER_APPEAL", version: { increment: 1 } } });
@@ -92,7 +98,10 @@ export class TrustCommerceService {
   async createOrderComment(orderId: string, input: { body: string; idempotencyKey: string }, context: SupplierActorContext) {
     await this.requireOrderParticipant(orderId, context);
     const existing = await this.prisma.orderPrivateComment.findUnique({ where: { idempotencyKey: input.idempotencyKey } });
-    if (existing) return existing;
+    if (existing) {
+      if (existing.supplierOrderId !== orderId || existing.authorOrganizationId !== context.organizationId || existing.authorUserId !== context.actorId) throw new ConflictException("Comment idempotency key is already used");
+      return existing;
+    }
     const comment = await this.prisma.orderPrivateComment.create({ data: { supplierOrderId: orderId, authorOrganizationId: context.organizationId, authorUserId: context.actorId, body: input.body, idempotencyKey: input.idempotencyKey } });
     await this.prisma.auditLog.create({ data: { ...context, action: "trust.order_comment.created", entityType: "OrderPrivateComment", entityId: comment.id, after: { supplierOrderId: orderId } } });
     return comment;
@@ -120,7 +129,10 @@ export class TrustCommerceService {
     if (input.productVariantId && !order.items.some(({ productVariantId }) => productVariantId === input.productVariantId)) throw new NotFoundException("Purchased product variant not found in this order");
     const targetKey = input.productVariantId ? `PRODUCT:${input.productVariantId}` : "SUPPLIER";
     const existing = await this.prisma.verifiedReview.findUnique({ where: { idempotencyKey: input.idempotencyKey } });
-    if (existing) return existing;
+    if (existing) {
+      if (existing.supplierOrderId !== order.id || existing.reviewerOrganizationId !== context.organizationId || existing.targetKey !== targetKey) throw new ConflictException("Review idempotency key is already used");
+      return existing;
+    }
     if (await this.prisma.verifiedReview.findUnique({ where: { supplierOrderId_reviewerOrganizationId_targetKey: { supplierOrderId: order.id, reviewerOrganizationId: context.organizationId, targetKey } } })) throw new ConflictException("This organization already reviewed this order execution");
     const recentCount = await this.prisma.verifiedReview.count({ where: { reviewerOrganizationId: context.organizationId, supplierOrganizationId: order.supplierOrganizationId, createdAt: { gte: new Date(Date.now() - 60 * 60_000) } } });
     const anomalyFlags = this.reviewAnomalies(input.comment, recentCount);
@@ -171,8 +183,11 @@ export class TrustCommerceService {
   async appealReview(reviewId: string, input: CreateTrustAppealInput, context: SupplierActorContext) {
     const review = await this.prisma.verifiedReview.findFirst({ where: { id: reviewId, supplierOrganizationId: context.organizationId } });
     if (!review) throw new NotFoundException("Verified review not found");
-    const existing = await this.prisma.productGapAppeal.findUnique({ where: { idempotencyKey: input.idempotencyKey } });
-    if (existing) return existing;
+    const existing = await this.prisma.productGapAppeal.findUnique({ where: { idempotencyKey: input.idempotencyKey }, include: { incident: true } });
+    if (existing) {
+      if (existing.incident.subjectType !== "VerifiedReview" || existing.incident.subjectId !== review.id || existing.appellantOrganizationId !== context.organizationId) throw new ConflictException("Appeal idempotency key is already used");
+      return existing;
+    }
     return this.prisma.$transaction(async (tx) => {
       const incident = await tx.productGapIncident.create({ data: { ownerOrganizationId: context.organizationId, impactedOrganizationId: context.organizationId, subjectType: "VerifiedReview", subjectId: review.id, type: "FAKE_REVIEW", severity: "MEDIUM", status: "UNDER_APPEAL", reasonCode: "supplier_review_dispute", explanation: "Поставщик оспаривает достоверность подтверждённого отзыва.", actionType: "HOLD_FOR_REVIEW", remediation: "Оператор проверяет заказ, историю изменений и представленные доказательства.", restorationCondition: "Решение апелляции с сохранением или корректировкой статуса отзыва.", sourceEntityType: "VerifiedReview", sourceEntityId: review.id, createdById: context.actorId, idempotencyKey: `review-incident:${input.idempotencyKey}` } });
       const appeal = await tx.productGapAppeal.create({ data: { incidentId: incident.id, appellantOrganizationId: context.organizationId, appellantUserId: context.actorId, reason: input.reason, evidence: json(input.evidence), idempotencyKey: input.idempotencyKey } });
@@ -240,7 +255,10 @@ export class TrustCommerceService {
     const snapshot = await this.prisma.supplierTrustSnapshot.findUnique({ where: { supplierOrganizationId } });
     if (!snapshot) throw new NotFoundException("Supplier rating has not been calculated yet");
     const existing = await this.prisma.supplierTrustAppeal.findUnique({ where: { idempotencyKey: input.idempotencyKey } });
-    if (existing) return existing;
+    if (existing) {
+      if (existing.snapshotId !== snapshot.id || existing.supplierOrganizationId !== supplierOrganizationId) throw new ConflictException("Rating appeal idempotency key is already used");
+      return existing;
+    }
     return this.prisma.$transaction(async (tx) => {
       const appeal = await tx.supplierTrustAppeal.create({ data: { snapshotId: snapshot.id, supplierOrganizationId, appellantUserId: context.actorId, eventIds: input.eventIds, reason: input.reason, evidence: json(input.evidence), idempotencyKey: input.idempotencyKey } });
       await tx.supplierTrustSnapshot.update({ where: { id: snapshot.id }, data: { status: "UNDER_REVIEW", version: { increment: 1 } } });

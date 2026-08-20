@@ -36,11 +36,12 @@ export class SignatureCallbacksService {
 
   async process(input: CallbackInput, rawBody: Buffer, headers: { eventId: string; timestamp: string; signature: string }) {
     const verified = this.verify(rawBody, headers.eventId, headers.timestamp, headers.signature);
+    const idempotencyKey = verified.payloadHash;
     try {
-      await this.prisma.idempotencyRecord.create({ data: { scope: "signature-gateway-callback", key: headers.eventId, requestHash: verified.payloadHash, expiresAt: verified.expiresAt } });
+      await this.prisma.idempotencyRecord.create({ data: { scope: "signature-gateway-callback", key: idempotencyKey, requestHash: verified.payloadHash, expiresAt: verified.expiresAt } });
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-        await this.prisma.securityEvent.create({ data: { severity: "HIGH", type: "signature.callback.replay", fingerprint: headers.eventId, metadata: { payloadHash: verified.payloadHash } } });
+        await this.prisma.securityEvent.create({ data: { severity: "HIGH", type: "signature.callback.replay", fingerprint: idempotencyKey, metadata: { gatewayEventId: headers.eventId, payloadHash: verified.payloadHash } } });
         throw new ConflictException("Signature callback replay was rejected");
       }
       throw error;

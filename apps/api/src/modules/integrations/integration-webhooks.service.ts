@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, PayloadTooLargeException, UnauthorizedException } from "@nestjs/common";
+import { BadRequestException, ConflictException, Injectable, NotFoundException, PayloadTooLargeException, UnauthorizedException } from "@nestjs/common";
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../platform/prisma/prisma.service";
@@ -14,14 +14,17 @@ export class IntegrationWebhooksService {
   async ingest(endpointId: string, body: unknown, rawBody: Buffer | undefined, headers: Record<string, string | string[] | undefined>) {
     const connection = await this.prisma.integrationConnection.findUnique({ where: { webhookEndpointId: endpointId } });
     if (!connection || connection.status === "REVOKED") throw new NotFoundException("Integration webhook endpoint not found");
+    if (!rawBody) throw new BadRequestException("Raw webhook body is required");
     const payload = Array.isArray(body) ? body : asRecord(body);
-    const payloadBytes = rawBody ?? Buffer.from(JSON.stringify(payload));
+    const payloadBytes = rawBody;
     if (payloadBytes.length > INTEGRATION_WEBHOOK_MAX_BODY_BYTES) throw new PayloadTooLargeException("Integration webhook payload exceeds 1 MB");
     const signature = this.header(headers, "x-marketplace-signature");
     const timestamp = this.header(headers, "x-marketplace-timestamp");
-    const signatureStatus = this.verify(connection.encryptedWebhookSecret, payloadBytes, signature, timestamp) ? "VERIFIED" : "INVALID";
-    const externalEventId = this.header(headers, "x-event-id") ?? this.header(headers, "x-request-id") ?? createHash("sha256").update(payloadBytes).digest("hex");
-    const eventType = this.header(headers, "x-event-type") ?? this.eventType(payload);
+    if (!this.verify(connection.encryptedWebhookSecret, payloadBytes, signature, timestamp)) throw new UnauthorizedException("Webhook signature is invalid");
+    const signatureStatus = "VERIFIED" as const;
+    const payloadRecord = asRecord(Array.isArray(payload) ? payload[0] : payload);
+    const externalEventId = [payloadRecord.id, payloadRecord.eventId, payloadRecord.event_id].find((value): value is string => typeof value === "string" && value.length > 0) ?? createHash("sha256").update(payloadBytes).digest("hex");
+    const eventType = this.eventType(payload);
     const safeHeaders = Object.fromEntries(["user-agent", "x-event-id", "x-event-type", "x-request-id", "x-lognex-webhook-id", "x-marketplace-timestamp"].map((name) => [name, this.header(headers, name)]).filter((entry) => entry[1]));
 
     let event;
@@ -33,20 +36,38 @@ export class IntegrationWebhooksService {
           externalEventId,
           eventType,
           signatureStatus,
-          status: signatureStatus === "INVALID" ? "DEAD_LETTER" : "RECEIVED",
+          status: "RECEIVED",
           payload: payload as Prisma.InputJsonValue,
           headers: safeHeaders,
-          lastError: signatureStatus === "INVALID" ? "Webhook signature verification failed" : undefined,
         },
       });
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-        event = await this.prisma.integrationWebhookEvent.findUniqueOrThrow({ where: { connectionId_externalEventId: { connectionId: connection.id, externalEventId } } });
+        const existing = await this.prisma.integrationWebhookEvent.findUniqueOrThrow({ where: { connectionId_externalEventId: { connectionId: connection.id, externalEventId } } });
+        if (existing.signatureStatus !== "VERIFIED") {
+          event = await this.prisma.integrationWebhookEvent.update({
+            where: { id: existing.id },
+            data: {
+              provider: connection.provider,
+              eventType,
+              signatureStatus: "VERIFIED",
+              status: "RECEIVED",
+              payload: payload as Prisma.InputJsonValue,
+              headers: safeHeaders,
+              attempt: 0,
+              availableAt: new Date(),
+              processedAt: null,
+              lastError: null,
+            },
+          });
+        } else {
+          if (JSON.stringify(existing.payload) !== JSON.stringify(payload)) throw new ConflictException("Webhook event ID was already used with a different payload");
+          event = existing;
+        }
       } else {
         throw error;
       }
     }
-    if (signatureStatus === "INVALID") throw new UnauthorizedException("Webhook signature is invalid");
     await this.jobs.enqueue(connection.id, { type: "WEBHOOK_PROCESS", idempotencyKey: `webhook:${externalEventId}`, payload: { webhookEventId: event.id, eventType }, maxAttempts: 5 }, "WEBHOOK");
     return { accepted: true, duplicate: event.status !== "RECEIVED", eventId: event.id };
   }

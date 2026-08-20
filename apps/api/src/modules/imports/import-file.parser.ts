@@ -7,7 +7,9 @@ import { assertSafeZipPackage } from "../../platform/security/zip-resource-polic
 type RawRow = Record<string, string | number | boolean | null>;
 export type ImportParseResult = { rows: RawRow[]; metadata: Record<string, unknown>; requiresReview: boolean };
 const MAX_IMPORT_ROWS = 5_000;
+const MAX_IMPORT_COLUMNS = 100;
 class CsvRowLimitExceeded extends Error {}
+class CsvColumnLimitExceeded extends Error {}
 
 function primitive(value: unknown): string | number | boolean | null {
   if (value === null || typeof value === "string" || typeof value === "number" || typeof value === "boolean") return value;
@@ -59,7 +61,10 @@ export class ImportFileParser {
       try {
         let parsedRows = 0;
         const rows = parse(buffer, {
-          columns: true,
+          columns(header) {
+            if (header.length > MAX_IMPORT_COLUMNS) throw new CsvColumnLimitExceeded();
+            return header;
+          },
           skip_empty_lines: true,
           bom: true,
           relax_column_count: true,
@@ -74,6 +79,7 @@ export class ImportFileParser {
         return { rows: rows.map((row) => Object.fromEntries(Object.entries(row).map(([key, value]) => [key, primitive(value)]))), metadata: { method: "csv" }, requiresReview: false };
       } catch (error) {
         if (error instanceof CsvRowLimitExceeded) throw new BadRequestException(`CSV file exceeds ${MAX_IMPORT_ROWS.toLocaleString("en-US")} rows`);
+        if (error instanceof CsvColumnLimitExceeded) throw new BadRequestException(`CSV file exceeds ${MAX_IMPORT_COLUMNS.toLocaleString("en-US")} columns`);
         throw new BadRequestException("CSV file could not be parsed");
       }
     }
@@ -85,8 +91,10 @@ export class ImportFileParser {
         await workbook.xlsx.load(buffer as unknown as Parameters<typeof workbook.xlsx.load>[0]);
         const sheet = workbook.worksheets[0];
         if (!sheet) throw new Error("Worksheet missing");
+        if (sheet.columnCount > MAX_IMPORT_COLUMNS) throw new Error("Column limit exceeded");
         const detected = findHeaderRow(sheet);
         const headers = detected.headers;
+        if (headers.length > MAX_IMPORT_COLUMNS) throw new Error("Column limit exceeded");
         const rows: RawRow[] = [];
         for (let rowNumber = detected.row + 1; rowNumber <= Math.min(sheet.rowCount, detected.row + 5_000); rowNumber += 1) {
           const row: RawRow = {};

@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, NotFoundException } from "@nestjs/common";
+import { ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import type { CreatePromotionInput, EvaluatePromotionInput, RedeemPromotionInput } from "@marketplace/schemas";
 import { createHash } from "node:crypto";
 import { Prisma } from "@prisma/client";
@@ -91,6 +91,15 @@ export class PromotionsService {
   }
 
   async redeem(input: RedeemPromotionInput, context: SupplierActorContext) {
+    if (input.buyerOrganizationId !== context.organizationId) throw new ForbiddenException("Promotion redemption belongs to another buyer organization");
+    if (input.checkoutId) {
+      const checkout = await this.prisma.checkout.findFirst({ where: { id: input.checkoutId, buyerOrganizationId: context.organizationId } });
+      if (!checkout) throw new NotFoundException("Checkout not found");
+    }
+    if (input.supplierOrderId) {
+      const order = await this.prisma.supplierOrder.findFirst({ where: { id: input.supplierOrderId, buyerOrganizationId: context.organizationId } });
+      if (!order) throw new NotFoundException("Supplier order not found");
+    }
     const evaluation = await this.evaluate(input);
     const applied = evaluation.find(({ promotionId }) => promotionId === input.promotionId);
     if (!applied) throw new ConflictException("Promotion is not eligible for this order");

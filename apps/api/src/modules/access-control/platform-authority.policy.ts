@@ -108,6 +108,17 @@ export class PlatformAuthorityPolicy {
     }
   }
 
+  async allowedAiRoles(
+    context: AuthorityActorContext,
+    roles: readonly AuthorityAiRole[],
+  ) {
+    const membership = await this.activeMembership(context);
+    const capabilities = new Set(
+      membership.organization.capabilities.map(({ capability }) => capability),
+    );
+    return roles.filter((role) => capabilities.has(aiRoleCapability[role]));
+  }
+
   async assertAiToolPermissions(
     context: AuthorityActorContext,
     role: AuthorityAiRole,

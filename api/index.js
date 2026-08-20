@@ -13,9 +13,11 @@ module.exports = async function handler(request, response) {
     }
     return expressApp(request, response);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "runtime initialization failed";
+    console.error("Serverless API initialization failed", error);
     response.setHeader("content-type", "application/json; charset=utf-8");
     response.statusCode = String(request.url || "").startsWith("/api/health") ? 200 : 503;
-    return response.end(JSON.stringify({ status: "degraded", service: "marketplace-api", database: "unavailable", error: message }));
+    return response.end(JSON.stringify(response.statusCode === 200
+      ? { status: "degraded", service: "marketplace-api", database: "unavailable" }
+      : { statusCode: 503, error: "Service Unavailable", message: "API dependencies are temporarily unavailable" }));
   }
 };

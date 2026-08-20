@@ -75,6 +75,13 @@ describe("PlatformAuthorityPolicy", () => {
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
+  it("filters stored AI conversations to capabilities still active", async () => {
+    const fixture = policyFixture(membership(["BUYER"], ["ai.use"]));
+    await expect(
+      fixture.policy.allowedAiRoles(context, ["BUYER", "SUPPLIER", "OPERATOR"]),
+    ).resolves.toEqual(["BUYER"]);
+  });
+
   it("prevents a role from granting permissions the actor does not hold", async () => {
     const fixture = policyFixture(
       membership(

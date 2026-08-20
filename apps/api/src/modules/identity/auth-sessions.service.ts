@@ -135,7 +135,14 @@ export class AuthSessionsService {
     const user = await this.prisma.user.findUnique({ where: { email: input.email } });
     if (user?.lockedUntil && user.lockedUntil > new Date()) throw new UnauthorizedException("Слишком много попыток. Попробуйте позже");
     if (!user || !passwordMatches(input.password, user.passwordHash)) {
-      if (user) await this.prisma.user.update({ where: { id: user.id }, data: { failedLoginAttempts: { increment: 1 }, lockedUntil: user.failedLoginAttempts >= 4 ? new Date(Date.now() + 15 * 60_000) : user.lockedUntil } });
+      if (user) {
+        const nextFailures = user.failedLoginAttempts + 1;
+        const recorded = await this.prisma.user.updateMany({
+          where: { id: user.id, failedLoginAttempts: user.failedLoginAttempts, lockedUntil: user.lockedUntil },
+          data: { failedLoginAttempts: { increment: 1 }, lockedUntil: nextFailures >= 5 ? new Date(Date.now() + 15 * 60_000) : user.lockedUntil },
+        });
+        if (recorded.count !== 1) throw new UnauthorizedException("Email или пароль указаны неверно");
+      }
       throw new UnauthorizedException("Email или пароль указаны неверно");
     }
     if (!user.emailVerifiedAt) throw new UnauthorizedException("Сначала подтвердите email");
@@ -249,12 +256,41 @@ export class AuthSessionsService {
       await this.prisma.$transaction([this.prisma.authSession.updateMany({ where: { familyId: session.familyId, status: "ACTIVE" }, data: { status: "REVOKED", revokedAt: new Date(), revokeReason: "refresh_replay" } }), this.prisma.securityEvent.create({ data: { severity: "CRITICAL", type: "auth.refresh_replay", actorId: session.userId, sessionId: session.id, ipAddress: metadata.ipAddress, userAgent: metadata.userAgent, correlationId: metadata.correlationId } })]);
       throw new UnauthorizedException("Refresh token replay detected; session family revoked");
     }
-    if (session.status !== "ACTIVE" || session.expiresAt <= new Date()) throw new UnauthorizedException("Refresh session is revoked or expired");
+    const now = new Date();
+    if (session.status !== "ACTIVE" || session.expiresAt <= now) throw new UnauthorizedException("Refresh session is revoked or expired");
     const memberships = await this.memberships(session.userId);
     const organizationIds = memberships.map(({ organizationId }) => organizationId);
     const activeOrganizationId = session.activeOrganizationId && organizationIds.includes(session.activeOrganizationId) ? session.activeOrganizationId : organizationIds[0] ?? null;
     const next = randomBytes(48).toString("base64url");
-    const updated = await this.prisma.authSession.update({ where: { id: session.id }, data: { previousTokenHash: session.refreshTokenHash, refreshTokenHash: hash(next), organizationIds, activeOrganizationId, lastUsedAt: new Date(), ipAddress: metadata.ipAddress, userAgent: metadata.userAgent } });
+    const claimed = await this.prisma.authSession.updateMany({
+      where: {
+        id: session.id,
+        status: "ACTIVE",
+        refreshTokenHash: tokenHash,
+        expiresAt: { gt: now },
+      },
+      data: {
+        previousTokenHash: tokenHash,
+        refreshTokenHash: hash(next),
+        organizationIds,
+        activeOrganizationId,
+        lastUsedAt: now,
+        ipAddress: metadata.ipAddress,
+        userAgent: metadata.userAgent,
+      },
+    });
+    if (claimed.count !== 1) {
+      const raced = await this.prisma.authSession.findUnique({ where: { id: session.id } });
+      if (raced?.previousTokenHash && secureEqual(raced.previousTokenHash, tokenHash)) {
+        await this.prisma.$transaction([
+          this.prisma.authSession.updateMany({ where: { familyId: session.familyId, status: "ACTIVE" }, data: { status: "REVOKED", revokedAt: new Date(), revokeReason: "refresh_replay" } }),
+          this.prisma.securityEvent.create({ data: { severity: "CRITICAL", type: "auth.refresh_replay", actorId: session.userId, sessionId: session.id, ipAddress: metadata.ipAddress, userAgent: metadata.userAgent, correlationId: metadata.correlationId } }),
+        ]);
+        throw new UnauthorizedException("Refresh token replay detected; session family revoked");
+      }
+      throw new UnauthorizedException("Refresh session is no longer active");
+    }
+    const updated = await this.prisma.authSession.findUniqueOrThrow({ where: { id: session.id } });
     return this.sessionPayload(updated, next);
   }
 

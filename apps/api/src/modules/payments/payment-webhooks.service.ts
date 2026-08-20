@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from "@nestjs/common";
+import { BadRequestException, ConflictException, Injectable, UnauthorizedException } from "@nestjs/common";
 import { Cron } from "@nestjs/schedule";
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { Prisma } from "@prisma/client";
@@ -10,6 +10,7 @@ export class PaymentWebhooksService {
   constructor(private readonly prisma: PrismaService) {}
 
   async receive(providerCode: string, rawBody: Buffer, headers: Record<string, string | string[] | undefined>) {
+    if (!rawBody || rawBody.length > 1_048_576) throw new BadRequestException("Payment webhook body is missing or exceeds 1 MB");
     const provider = await this.prisma.paymentProvider.findUnique({ where: { code: providerCode.toUpperCase() } });
     if (!provider || provider.status !== "ACTIVE") throw new UnauthorizedException("Unknown payment provider");
     const payload = this.parse(rawBody);
@@ -17,12 +18,20 @@ export class PaymentWebhooksService {
     const timestamp = this.header(headers, "x-payment-timestamp");
     const secret = process.env[`PAYMENT_WEBHOOK_SECRET_${provider.code}`];
     const verified = secret ? this.verify(rawBody, signature, secret, timestamp) : provider.code === "MOCK" && process.env.NODE_ENV !== "production";
-    const externalEventId = this.header(headers, "x-payment-event-id") ?? (typeof payload.id === "string" ? payload.id : createHash("sha256").update(rawBody).digest("hex"));
+    if (!verified) throw new UnauthorizedException("Invalid payment webhook signature");
+    const externalEventId = typeof payload.id === "string" && payload.id.length > 0 ? payload.id : createHash("sha256").update(rawBody).digest("hex");
     const eventType = typeof payload.type === "string" ? payload.type : "unknown";
     const existing = await this.prisma.paymentWebhookEvent.findUnique({ where: { providerId_externalEventId: { providerId: provider.id, externalEventId } } });
-    if (existing) return { duplicate: true, eventId: existing.id, status: existing.status };
-    const event = await this.prisma.paymentWebhookEvent.create({ data: { providerId: provider.id, externalEventId, eventType, signatureStatus: verified ? "VERIFIED" : "INVALID", status: verified ? "RECEIVED" : "FAILED", payload: payload as Prisma.InputJsonValue, headers: this.safeHeaders(headers) as Prisma.InputJsonValue, lastError: verified ? null : "Invalid webhook signature" } });
-    if (!verified) throw new UnauthorizedException("Invalid payment webhook signature");
+    if (existing) {
+      if (existing.signatureStatus !== "VERIFIED") {
+        const repaired = await this.prisma.paymentWebhookEvent.update({ where: { id: existing.id }, data: { eventType, signatureStatus: "VERIFIED", status: "RECEIVED", payload: payload as Prisma.InputJsonValue, headers: this.safeHeaders(headers) as Prisma.InputJsonValue, attempt: 0, processedAt: null, lastError: null } });
+        await this.process(repaired.id);
+        return { duplicate: false, eventId: repaired.id, status: "PROCESSED" };
+      }
+      if (JSON.stringify(existing.payload) !== JSON.stringify(payload)) throw new ConflictException("Payment event ID was already used with a different payload");
+      return { duplicate: true, eventId: existing.id, status: existing.status };
+    }
+    const event = await this.prisma.paymentWebhookEvent.create({ data: { providerId: provider.id, externalEventId, eventType, signatureStatus: "VERIFIED", status: "RECEIVED", payload: payload as Prisma.InputJsonValue, headers: this.safeHeaders(headers) as Prisma.InputJsonValue } });
     await this.process(event.id);
     return { duplicate: false, eventId: event.id, status: "PROCESSED" };
   }
@@ -39,7 +48,7 @@ export class PaymentWebhooksService {
 
   async process(eventId: string) {
     const event = await this.prisma.paymentWebhookEvent.findUnique({ where: { id: eventId }, include: { provider: true } });
-    if (!event || event.status === "PROCESSED") return event;
+    if (!event || event.status === "PROCESSED" || event.signatureStatus !== "VERIFIED") return event;
     const claimed = await this.prisma.paymentWebhookEvent.updateMany({ where: { id: event.id, status: { in: ["RECEIVED", "FAILED"] } }, data: { status: "PROCESSING", attempt: { increment: 1 }, lastError: null } });
     if (claimed.count !== 1) return event;
     try {

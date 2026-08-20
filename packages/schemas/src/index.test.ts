@@ -138,6 +138,23 @@ describe("iteration 1A schemas", () => {
     expect(result.rows?.[0]).toMatchObject({ price: 125000 });
   });
 
+  it("bounds explicit import row width and cell size", () => {
+    const base = {
+      sourceId: "00000000-0000-4000-8000-000000000022",
+      fileName: "manual.csv",
+      fileType: "MANUAL" as const,
+      columnMapping: { externalId: "id", name: "name" },
+    };
+    expect(createImportBatchSchema.safeParse({
+      ...base,
+      rows: [{ id: "row-1", name: "x".repeat(4_001) }],
+    }).success).toBe(false);
+    expect(createImportBatchSchema.safeParse({
+      ...base,
+      rows: [Object.fromEntries(Array.from({ length: 101 }, (_, index) => [`column-${index}`, "value"]))],
+    }).success).toBe(false);
+  });
+
   it("validates supplier import batch and diagnostics responses", () => {
     const batchId = "00000000-0000-4000-8000-000000000091";
     const now = "2026-08-19T00:00:00.000Z";

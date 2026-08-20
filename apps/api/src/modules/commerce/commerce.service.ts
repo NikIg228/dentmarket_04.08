@@ -3,6 +3,7 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from "@nestjs/common";
 import type {
@@ -33,6 +34,8 @@ import { MarketplaceAgreementsService } from "../agreements/marketplace-agreemen
 
 @Injectable()
 export class CommerceService {
+  private readonly logger = new Logger(CommerceService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly inventory: InventoryService,
@@ -863,7 +866,8 @@ export class CommerceService {
           data: { status: "ABANDONED", version: { increment: 1 } },
         }),
       ]);
-      throw new ConflictException(`Checkout failed: ${reason}`);
+      this.logger.warn(`Checkout reservation failed: ${reason}`);
+      throw new ConflictException("Checkout failed because inventory could not be reserved");
     }
 
     await this.prisma.$transaction(async (tx) => {

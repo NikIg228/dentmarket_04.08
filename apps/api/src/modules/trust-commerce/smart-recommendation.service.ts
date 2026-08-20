@@ -19,9 +19,9 @@ export class SmartRecommendationService {
   }
 
   async recommend(input: SmartRecommendationInput, context: SupplierActorContext) {
+    const address = await this.assertBuyer(input, context);
     const existing = await this.prisma.recommendationDecision.findUnique({ where: { idempotencyKey: input.idempotencyKey } });
     if (existing && existing.buyerOrganizationId === input.buyerOrganizationId) return existing.result;
-    const address = await this.assertBuyer(input, context);
     const now = new Date();
     const product = await this.prisma.product.findFirst({ where: { id: input.productId, status: "ACTIVE" }, include: {
       categories: true,

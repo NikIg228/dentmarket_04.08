@@ -54,6 +54,10 @@ export class InventoryService {
     await this.access.assertCanManage(supplierOrganizationId, context);
     const balance = await this.prisma.inventoryBalance.findFirst({ where: { id: input.inventoryBalanceId, supplierOrganizationId } });
     if (!balance) throw new NotFoundException("Inventory balance not found");
+    if (input.offerId) {
+      const offer = await this.prisma.supplierOffer.findFirst({ where: { id: input.offerId, supplierOrganizationId, productVariantId: balance.productVariantId } });
+      if (!offer) throw new NotFoundException("Supplier offer not found for this inventory balance");
+    }
     const allocatedLots = await this.prisma.inventoryLot.aggregate({ where: { inventoryBalanceId: balance.id, status: { notIn: ["DEPLETED", "EXPIRED", "RECALLED"] } }, _sum: { quantityOnHand: true } });
     if (Number(allocatedLots._sum.quantityOnHand ?? 0) + input.quantityOnHand > Number(balance.quantityOnHand)) throw new BadRequestException("Total lot quantity cannot exceed warehouse balance");
     const quantityAvailable = input.quantityOnHand - input.quantityReserved;
@@ -273,7 +277,7 @@ export class InventoryService {
         const recalledLot = await tx.inventoryLot.update({ where: { id: lot.id }, data: { status: "RECALLED", quantityAvailable: 0, version: { increment: 1 } } });
         const affectedReservationIds = lot.reservations.map(({ id }) => id);
         const recall = await tx.lotRecall.create({ data: { inventoryLotId: lot.id, supplierOrganizationId, reason: input.reason, source: input.source, severity: input.severity, comment: input.comment ?? null, affectedReservations: affectedReservationIds, createdById: context.actorId } });
-        if (lot.offerId && Number(balance.quantityAvailable) <= 0) await tx.offerPublication.updateMany({ where: { offerId: lot.offerId, status: "PUBLISHED" }, data: { status: "PAUSED", marketplaceVisible: false, blockedReason: `Lot recall ${recall.id}` } });
+        if (lot.offerId && Number(balance.quantityAvailable) <= 0) await tx.offerPublication.updateMany({ where: { offerId: lot.offerId, status: "PUBLISHED", offer: { supplierOrganizationId } }, data: { status: "PAUSED", marketplaceVisible: false, blockedReason: `Lot recall ${recall.id}` } });
         await tx.auditLog.create({ data: { ...context, action: "inventory.lot.recalled", entityType: "InventoryLot", entityId: lot.id, before: lot, after: { lot: recalledLot, recall, affectedReservationIds } } });
         await tx.outboxEvent.create({ data: { aggregateType: "InventoryLot", aggregateId: lot.id, eventType: "InventoryLotRecalled", payload: { supplierOrganizationId, lotId: lot.id, recallId: recall.id, severity: input.severity, affectedReservationIds } } });
         return { recall, lot: recalledLot, balance, affectedReservationIds };

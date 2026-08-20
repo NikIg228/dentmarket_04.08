@@ -2,6 +2,7 @@ import { NestFactory } from "@nestjs/core";
 import type { NestExpressApplication } from "@nestjs/platform-express";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import helmet from "helmet";
+import express from "express";
 import { AppModule } from "./app.module";
 import { environment } from "./platform/config/environment";
 import { jsonSafeReplacer } from "./platform/http/json-safe-replacer";
@@ -16,7 +17,7 @@ import { runtimeCapabilities } from "./platform/runtime/process-role";
 import { MetricsService } from "./platform/observability/metrics.service";
 import { httpMetricsMiddleware } from "./platform/observability/metrics.middleware";
 import { SessionRevocationService } from "./platform/security/session-revocation.service";
-import { INTEGRATION_WEBHOOK_MAX_BODY_BYTES } from "./modules/integrations/integration-webhooks.constants";
+import { WEBHOOK_MAX_BODY_BYTES } from "./modules/integrations/integration-webhooks.constants";
 import type { NextFunction, Request, Response } from "express";
 
 export async function createMarketplaceApp(
@@ -64,10 +65,19 @@ export async function createMarketplaceApp(
   app.use(httpLoggerMiddleware());
   app.use(httpMetricsMiddleware(app.get(MetricsService)));
   app.useGlobalFilters(new ApiExceptionFilter());
+  const rawWebhookJsonParser = express.json({
+    limit: `${WEBHOOK_MAX_BODY_BYTES}b`,
+    verify: (request, _response, buffer) => {
+      (request as Request & { rawBody?: Buffer }).rawBody = Buffer.from(buffer);
+    },
+  });
+  app.use("/api/integrations/webhooks", rawWebhookJsonParser);
+  app.use("/api/payments/webhooks", rawWebhookJsonParser);
+  app.use("/api/documents/signatures/callback", rawWebhookJsonParser);
   app.use("/api/integrations/webhooks", (request: Request, response: Response, next: NextFunction) => {
     const contentLengthHeader = request.headers["content-length"];
     const contentLength = typeof contentLengthHeader === "string" ? Number(contentLengthHeader) : undefined;
-    if (contentLength !== undefined && (!Number.isFinite(contentLength) || contentLength > INTEGRATION_WEBHOOK_MAX_BODY_BYTES)) {
+    if (contentLength !== undefined && (!Number.isFinite(contentLength) || contentLength > WEBHOOK_MAX_BODY_BYTES)) {
       response.status(413).json({ code: "PAYLOAD_TOO_LARGE", message: "Integration webhook payload exceeds 1 MB" });
       return;
     }

@@ -1,4 +1,4 @@
-import { PayloadTooLargeException, UnauthorizedException } from "@nestjs/common";
+import { BadRequestException, PayloadTooLargeException, UnauthorizedException } from "@nestjs/common";
 import { createHmac } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import { IntegrationWebhooksService } from "./integration-webhooks.service";
@@ -20,8 +20,14 @@ describe("integration webhook security", () => {
   it("rejects an unsigned payload and does not enqueue it", async () => {
     const { service, jobs, prisma } = fixture();
     await expect(service.ingest("endpoint-1", { type: "catalog.updated" }, Buffer.from('{"type":"catalog.updated"}'), { "x-event-id": "event-1" })).rejects.toBeInstanceOf(UnauthorizedException);
-    expect(prisma.integrationWebhookEvent.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ signatureStatus: "INVALID", status: "DEAD_LETTER" }) }));
+    expect(prisma.integrationWebhookEvent.create).not.toHaveBeenCalled();
     expect(jobs.enqueue).not.toHaveBeenCalled();
+  });
+
+  it("requires the wire body so signatures cannot be reconstructed from parsed JSON", async () => {
+    const { service, prisma } = fixture();
+    await expect(service.ingest("endpoint-1", { type: "catalog.updated" }, undefined, {})).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.integrationWebhookEvent.create).not.toHaveBeenCalled();
   });
 
   it("accepts only a current HMAC signature over the raw body", async () => {

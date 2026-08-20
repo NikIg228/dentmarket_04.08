@@ -50,11 +50,28 @@ export class MfaService {
     const totpValid = recoveryIndex < 0 && verifyTotp(this.crypto.decrypt(factor.encryptedSecret), normalized);
     if (!totpValid && recoveryIndex < 0) {
       const nextFailures = factor.failedAttempts + 1;
-      await this.prisma.userMfaFactor.update({ where: { id: factor.id }, data: { failedAttempts: nextFailures, lockedUntil: nextFailures >= 5 ? new Date(Date.now() + 15 * 60_000) : null } });
+      const recorded = await this.prisma.userMfaFactor.updateMany({
+        where: {
+          id: factor.id,
+          status: "ACTIVE",
+          failedAttempts: factor.failedAttempts,
+          lockedUntil: factor.lockedUntil,
+        },
+        data: { failedAttempts: { increment: 1 }, lockedUntil: nextFailures >= 5 ? new Date(Date.now() + 15 * 60_000) : null },
+      });
+      if (recorded.count !== 1) throw new UnauthorizedException("Invalid MFA code");
       throw new UnauthorizedException("Invalid MFA code");
     }
     const hashes = recoveryIndex >= 0 ? factor.recoveryCodeHashes.filter((_, index) => index !== recoveryIndex) : factor.recoveryCodeHashes;
-    await this.prisma.userMfaFactor.update({ where: { id: factor.id }, data: { recoveryCodeHashes: hashes, failedAttempts: 0, lockedUntil: null, lastUsedAt: new Date() } });
+    if (recoveryIndex >= 0) {
+      const consumed = await this.prisma.userMfaFactor.updateMany({
+        where: { id: factor.id, status: "ACTIVE", recoveryCodeHashes: { has: recoveryHash } },
+        data: { recoveryCodeHashes: hashes, failedAttempts: 0, lockedUntil: null, lastUsedAt: new Date() },
+      });
+      if (consumed.count !== 1) throw new UnauthorizedException("Recovery code has already been used");
+    } else {
+      await this.prisma.userMfaFactor.update({ where: { id: factor.id }, data: { recoveryCodeHashes: hashes, failedAttempts: 0, lockedUntil: null, lastUsedAt: new Date() } });
+    }
     await this.audit(context, "identity.mfa.challenge.succeeded", factor.id, { method: recoveryIndex >= 0 ? "RECOVERY_CODE" : "TOTP" });
     return { verified: true, method: recoveryIndex >= 0 ? "RECOVERY_CODE" : "TOTP", challengeId: randomUUID(), recoveryCodesRemaining: hashes.length };
   }

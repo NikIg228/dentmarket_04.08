@@ -239,7 +239,8 @@ export const supplierColumnMappingSchema = z.object({
   expirationDate: z.string().trim().min(1).max(120).optional(),
 });
 
-const rawImportRowSchema = z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]));
+const rawImportCellSchema = z.union([z.string().max(4_000), z.number(), z.boolean(), z.null()]);
+const rawImportRowSchema = z.record(z.string().max(200), rawImportCellSchema).refine((row) => Object.keys(row).length <= 100, "Import rows cannot contain more than 100 columns");
 
 export const createImportBatchSchema = z.object({
   sourceId: z.uuid(),

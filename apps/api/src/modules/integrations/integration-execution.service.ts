@@ -1110,6 +1110,10 @@ export class IntegrationExecutionService {
     });
     if (!event)
       throw new NotFoundException("Integration webhook event not found");
+    if (event.signatureStatus !== "VERIFIED")
+      throw new PermanentIntegrationError(
+        "Integration webhook event is not HMAC verified",
+      );
     if (event.status === "PROCESSED") return { duplicate: true, eventId };
     await this.prisma.integrationWebhookEvent.update({
       where: { id: eventId },

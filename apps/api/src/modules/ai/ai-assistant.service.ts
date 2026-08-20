@@ -55,7 +55,7 @@ export class AiAssistantService {
 
   async list(context: SupplierActorContext) {
     await this.enabled(context.organizationId);
-    return this.prisma.aiConversation.findMany({
+    const conversations = await this.prisma.aiConversation.findMany({
       where: {
         organizationId: context.organizationId,
         userId: context.actorId,
@@ -63,6 +63,15 @@ export class AiAssistantService {
       orderBy: { updatedAt: "desc" },
       take: 50,
     });
+    const allowedRoles = new Set(
+      await this.authority.allowedAiRoles(
+        context,
+        conversations.map((conversation) => conversation.role as AiRole),
+      ),
+    );
+    return conversations.filter((conversation) =>
+      allowedRoles.has(conversation.role as AiRole),
+    );
   }
 
   private async conversation(id: string, context: SupplierActorContext) {
@@ -81,6 +90,7 @@ export class AiAssistantService {
   }
 
   async messages(id: string, context: SupplierActorContext) {
+    await this.enabled(context.organizationId);
     await this.conversation(id, context);
     return this.prisma.aiMessage.findMany({
       where: { conversationId: id },
@@ -353,6 +363,7 @@ export class AiAssistantService {
     },
     context: SupplierActorContext,
   ) {
+    await this.enabled(context.organizationId);
     await this.conversation(conversationId, context);
     if (
       input.messageId &&

@@ -17,7 +17,7 @@ export class HttpPaymentAdapter implements PaymentProviderAdapter {
       headers: { "content-type": "application/json", authorization: `Bearer ${token}`, "idempotency-key": idempotencyKey, "x-marketplace-provider": context.providerCode },
       body: JSON.stringify({ providerId: context.providerId, capabilities: context.capabilities, ...input }),
       signal: AbortSignal.timeout(15_000),
-    }).catch((cause) => { throw new BadGatewayException(`Payment gateway request failed: ${cause instanceof Error ? cause.message : "network error"}`); });
+    }).catch(() => { throw new BadGatewayException("Payment gateway request failed"); });
     const payload = await response.json().catch(() => null) as GatewayResponse | null;
     if (!response.ok || !payload?.externalId) throw new BadGatewayException(`Payment gateway returned HTTP ${response.status}`);
     const status: PaymentAdapterResult["status"] = payload.status === "SUCCEEDED" ? "SUCCEEDED" : payload.status === "FAILED" ? "FAILED" : "PENDING";
