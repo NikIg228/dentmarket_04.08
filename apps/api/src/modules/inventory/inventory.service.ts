@@ -23,31 +23,34 @@ export class InventoryService {
   async setBalance(supplierOrganizationId: string, input: SetInventoryBalanceInput, context: SupplierActorContext) {
     await this.access.assertCanManage(supplierOrganizationId, context);
     await this.access.requireProfile(supplierOrganizationId);
-    const [warehouse, variant, offer, before] = await Promise.all([
+    const [warehouse, variant, offer] = await Promise.all([
       this.prisma.warehouse.findFirst({ where: { id: input.warehouseId, supplierOrganizationId } }),
       this.prisma.productVariant.findUnique({ where: { id: input.productVariantId } }),
       input.offerId ? this.prisma.supplierOffer.findFirst({ where: { id: input.offerId, supplierOrganizationId, productVariantId: input.productVariantId } }) : Promise.resolve(null),
-      this.prisma.inventoryBalance.findUnique({ where: { supplierOrganizationId_warehouseId_productVariantId: { supplierOrganizationId, warehouseId: input.warehouseId, productVariantId: input.productVariantId } } }),
     ]);
     if (!warehouse) throw new NotFoundException("Warehouse not found");
     if (!variant) throw new NotFoundException("Product variant not found");
     if (input.offerId && !offer) throw new NotFoundException("Supplier offer not found for this variant");
-    const effectiveReserved = before ? Number(before.quantityReserved) : input.quantityReserved;
-    if (effectiveReserved + input.safetyStock > input.quantityOnHand) throw new ConflictException("On-hand update cannot invalidate existing reservations and safety stock");
-    const quantityAvailable = input.quantityOnHand - effectiveReserved - input.safetyStock;
     const now = new Date();
     const freshnessPolicy = await this.freshness.resolvePolicy(supplierOrganizationId, input.source, "INVENTORY");
     const freshnessExpiresAt = new Date(now.getTime() + freshnessPolicy.staleAfterMinutes * 60_000);
     return this.prisma.$transaction(async (tx) => {
-      const balance = await tx.inventoryBalance.upsert({
-        where: { supplierOrganizationId_warehouseId_productVariantId: { supplierOrganizationId, warehouseId: input.warehouseId, productVariantId: input.productVariantId } },
-        update: { offerId: input.offerId ?? null, quantityOnHand: input.quantityOnHand, safetyStock: input.safetyStock, quantityAvailable, availabilityStatus: availability(quantityAvailable), freshnessStatus: "FRESH", freshnessExpiresAt, source: input.source, externalUpdatedAt: now, lastSuccessfulSyncAt: now, version: { increment: 1 } },
-        create: { supplierOrganizationId, warehouseId: input.warehouseId, productVariantId: input.productVariantId, offerId: input.offerId ?? null, quantityOnHand: input.quantityOnHand, quantityReserved: effectiveReserved, safetyStock: input.safetyStock, quantityAvailable, availabilityStatus: availability(quantityAvailable), freshnessStatus: "FRESH", freshnessExpiresAt, source: input.source, externalUpdatedAt: now, lastSuccessfulSyncAt: now },
-      });
+      const before = await tx.inventoryBalance.findUnique({ where: { supplierOrganizationId_warehouseId_productVariantId: { supplierOrganizationId, warehouseId: input.warehouseId, productVariantId: input.productVariantId } } });
+      const effectiveReserved = before ? Number(before.quantityReserved) : input.quantityReserved;
+      if (effectiveReserved + input.safetyStock > input.quantityOnHand) throw new ConflictException("On-hand update cannot invalidate existing reservations and safety stock");
+      const quantityAvailable = input.quantityOnHand - effectiveReserved - input.safetyStock;
+      let balance;
+      if (before) {
+        const updated = await tx.inventoryBalance.updateMany({ where: { id: before.id, version: before.version }, data: { offerId: input.offerId ?? null, quantityOnHand: input.quantityOnHand, safetyStock: input.safetyStock, quantityAvailable, availabilityStatus: availability(quantityAvailable), freshnessStatus: "FRESH", freshnessExpiresAt, source: input.source, externalUpdatedAt: now, lastSuccessfulSyncAt: now, version: { increment: 1 } } });
+        if (updated.count !== 1) throw new ConflictException("Inventory balance changed concurrently; retry the update");
+        balance = await tx.inventoryBalance.findUniqueOrThrow({ where: { id: before.id } });
+      } else {
+        balance = await tx.inventoryBalance.create({ data: { supplierOrganizationId, warehouseId: input.warehouseId, productVariantId: input.productVariantId, offerId: input.offerId ?? null, quantityOnHand: input.quantityOnHand, quantityReserved: effectiveReserved, safetyStock: input.safetyStock, quantityAvailable, availabilityStatus: availability(quantityAvailable), freshnessStatus: "FRESH", freshnessExpiresAt, source: input.source, externalUpdatedAt: now, lastSuccessfulSyncAt: now } });
+      }
       await tx.auditLog.create({ data: { ...context, action: "inventory.balance.set", entityType: "InventoryBalance", entityId: balance.id, before: before ?? Prisma.JsonNull, after: balance } });
       await tx.outboxEvent.create({ data: { aggregateType: "InventoryBalance", aggregateId: balance.id, eventType: "InventoryBalanceChanged", payload: { supplierOrganizationId, balanceId: balance.id, quantityAvailable } } });
       return balance;
-    });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   }
 
   async createLot(supplierOrganizationId: string, input: CreateInventoryLotInput, context: SupplierActorContext) {

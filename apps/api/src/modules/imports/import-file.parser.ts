@@ -8,6 +8,8 @@ type RawRow = Record<string, string | number | boolean | null>;
 export type ImportParseResult = { rows: RawRow[]; metadata: Record<string, unknown>; requiresReview: boolean };
 const MAX_IMPORT_ROWS = 5_000;
 const MAX_IMPORT_COLUMNS = 100;
+const MAX_PDF_TEXT_ITEMS_PER_PAGE = 20_000;
+const MAX_PDF_TEXT_CHARACTERS = 2_000_000;
 class CsvRowLimitExceeded extends Error {}
 class CsvColumnLimitExceeded extends Error {}
 
@@ -139,10 +141,13 @@ export class ImportFileParser {
         const page = await document.getPage(pageNumber);
         const viewport = page.getViewport({ scale: 1 });
         const content = await page.getTextContent();
+        if (content.items.length > MAX_PDF_TEXT_ITEMS_PER_PAGE) throw new Error("PDF text item limit exceeded");
+        const pageCharacters = content.items.reduce((sum, item) => sum + ("str" in item && typeof item.str === "string" ? item.str.length : 0), 0);
+        textCharacters += pageCharacters;
+        if (textCharacters > MAX_PDF_TEXT_CHARACTERS) throw new Error("PDF text character limit exceeded");
         const items = content.items
           .filter((item): item is typeof item & { str: string; transform: number[]; width: number } => "str" in item && Boolean(item.str.trim()))
           .map((item) => ({ text: item.str.trim(), x: item.transform[4] ?? 0, y: item.transform[5] ?? 0, width: item.width ?? 0 }));
-        textCharacters += items.reduce((sum, item) => sum + item.text.length, 0);
         const headerYs = this.pdfHeaderRows(items);
         for (let section = 0; section < headerYs.length; section += 1) {
           const headerY = headerYs[section]!;
@@ -163,6 +168,7 @@ export class ImportFileParser {
             const nameParts = band.filter((item) => item.x < price.x - 4 && item !== unitItem && !/^\d{1,4}$/.test(item.text));
             const name = nameParts.map((item) => item.text).join(" ").replace(/\s+/g, " ").trim();
             if (name.length < 2) continue;
+            if (rows.length >= MAX_IMPORT_ROWS) throw new Error("PDF row limit exceeded");
             const notes = band.filter((item) => item.x > price.x + price.width + 8).map((item) => item.text).join(" ").replace(/\s+/g, " ").trim();
             rows.push({
               externalId: `pdf-${pageNumber}-${section + 1}-${index + 1}`,
@@ -183,7 +189,7 @@ export class ImportFileParser {
       const warnings = ["Валюта PDF не подтверждена: исходная цена сохранена, priceMinor не заполняется автоматически."];
       if (rows.length === 0) warnings.push("Машиночитаемая таблица не найдена. Требуется OCR или ручной маппинг.");
       return {
-        rows: rows.slice(0, 5_000),
+        rows,
         requiresReview: rows.length === 0,
         metadata: { method: rows.length > 0 ? "pdf_text_table" : "pdf_no_table", pages: document.numPages, textCharacters, extractedRows: rows.length, warnings },
       };

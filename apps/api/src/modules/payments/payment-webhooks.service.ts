@@ -3,11 +3,12 @@ import { Cron } from "@nestjs/schedule";
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../platform/prisma/prisma.service";
+import { PaymentSettlementService } from "./payment-settlement.service";
 
 @Injectable()
 export class PaymentWebhooksService {
   private running = false;
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly settlement: PaymentSettlementService) {}
 
   async receive(providerCode: string, rawBody: Buffer, headers: Record<string, string | string[] | undefined>) {
     if (!rawBody || rawBody.length > 1_048_576) throw new BadRequestException("Payment webhook body is missing or exceeds 1 MB");
@@ -58,7 +59,7 @@ export class PaymentWebhooksService {
         const transaction = await this.prisma.paymentTransaction.findFirst({ where: { providerId: event.providerId, externalTransactionId } });
         if (transaction) {
           const status = payload.status === "SUCCEEDED" ? "SUCCEEDED" : payload.status === "FAILED" ? "FAILED" : payload.status === "CANCELLED" ? "CANCELLED" : "PROCESSING";
-          await this.prisma.paymentTransaction.update({ where: { id: transaction.id }, data: { status, responsePayload: payload as Prisma.InputJsonValue, processedAt: status === "SUCCEEDED" ? new Date() : transaction.processedAt, failureReason: status === "FAILED" && typeof payload.error === "string" ? payload.error : null } });
+          await this.settlement.applyProviderWebhook(transaction.id, status, payload);
         } else {
           await this.prisma.paymentReconciliationEntry.create({ data: { providerId: event.providerId, externalRef: externalTransactionId, status: "MISSING_INTERNAL", expected: payload as Prisma.InputJsonValue, actual: { webhookEventId: event.id } } });
         }

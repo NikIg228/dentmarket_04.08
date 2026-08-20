@@ -378,7 +378,7 @@ export class DocumentsService {
     if (["EDS", "EGOV_QR", "EXTERNAL"].includes(signature.method) && !trustedExternalCallback) throw new ForbiddenException("External signature status is accepted only through a verified gateway callback");
     if (!["PENDING", "SESSION_CREATED"].includes(signature.status)) throw new ConflictException("Signature session is already final");
     if (signature.expiresAt && signature.expiresAt < new Date()) throw new ConflictException("Signature session has expired");
-    const updated = await this.prisma.documentSignature.update({ where: { id: signatureId }, data: {
+    const claimed = await this.prisma.documentSignature.updateMany({ where: { id: signatureId, status: { in: ["PENDING", "SESSION_CREATED"] } }, data: {
       status: input.status,
       externalSignatureId: input.externalSignatureId,
       signatureHash: input.status === "SIGNED" ? input.signatureHash ?? createHash("sha256").update(`${signature.document.checksumSha256}:${signature.externalSessionId}:${Date.now()}`).digest("hex") : null,
@@ -386,6 +386,12 @@ export class DocumentsService {
       rejectionReason: input.status === "REJECTED" ? input.rejectionReason : null,
       evidence: input.evidence == null ? Prisma.JsonNull : input.evidence as Prisma.InputJsonValue,
     } });
+    if (claimed.count !== 1) {
+      const current = await this.prisma.documentSignature.findUniqueOrThrow({ where: { id: signatureId }, include: { document: { include: { supplierOrder: true } } } });
+      if (current.status !== input.status || (input.externalSignatureId && current.externalSignatureId !== input.externalSignatureId)) throw new ConflictException("Signature session already has a conflicting terminal status");
+      return { signature: current, document: current.document };
+    }
+    const updated = await this.prisma.documentSignature.findUniqueOrThrow({ where: { id: signatureId } });
     const document = input.status === "SIGNED" ? await this.refreshDocumentSignatureStatus(signature.documentId) : await this.prisma.document.update({ where: { id: signature.documentId }, data: { status: input.status === "REJECTED" ? "REJECTED" : "AWAITING_SIGNATURE" } });
     await this.prisma.$transaction([
       this.prisma.auditLog.create({ data: { ...context, action: "document.signature.completed", entityType: "DocumentSignature", entityId: signature.id, before: { status: signature.status }, after: { status: updated.status, documentStatus: document.status } } }),

@@ -5,7 +5,7 @@ import { PaymentWebhooksService } from "./payment-webhooks.service";
 
 describe("payment webhook signatures", () => {
   it("accepts only the matching HMAC-SHA256 signature", () => {
-    const service = new PaymentWebhooksService({} as PrismaService);
+    const service = new PaymentWebhooksService({} as PrismaService, {} as never);
     const body = Buffer.from(JSON.stringify({ id: "evt-1", type: "capture.succeeded" }));
     const now = Date.UTC(2026, 6, 17, 0, 0, 0);
     const timestamp = String(Math.floor(now / 1_000));

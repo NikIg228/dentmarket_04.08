@@ -37,15 +37,26 @@ export class SignatureCallbacksService {
   async process(input: CallbackInput, rawBody: Buffer, headers: { eventId: string; timestamp: string; signature: string }) {
     const verified = this.verify(rawBody, headers.eventId, headers.timestamp, headers.signature);
     const idempotencyKey = verified.payloadHash;
-    try {
-      await this.prisma.idempotencyRecord.create({ data: { scope: "signature-gateway-callback", key: idempotencyKey, requestHash: verified.payloadHash, expiresAt: verified.expiresAt } });
-    } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-        await this.prisma.securityEvent.create({ data: { severity: "HIGH", type: "signature.callback.replay", fingerprint: idempotencyKey, metadata: { gatewayEventId: headers.eventId, payloadHash: verified.payloadHash } } });
-        throw new ConflictException("Signature callback replay was rejected");
-      }
-      throw error;
+    const existing = await this.prisma.idempotencyRecord.findUnique({ where: { scope_key: { scope: "signature-gateway-callback", key: idempotencyKey } } });
+    let idempotencyRecordId = existing?.id;
+    if (existing?.responseCode === 200) {
+      await this.prisma.securityEvent.create({ data: { severity: "HIGH", type: "signature.callback.replay", fingerprint: idempotencyKey, metadata: { gatewayEventId: headers.eventId, payloadHash: verified.payloadHash } } });
+      throw new ConflictException("Signature callback replay was rejected");
     }
+    if (!existing) {
+      try {
+        const created = await this.prisma.idempotencyRecord.create({ data: { scope: "signature-gateway-callback", key: idempotencyKey, requestHash: verified.payloadHash, responseCode: null, expiresAt: verified.expiresAt } });
+        idempotencyRecordId = created.id;
+      } catch (error) {
+        if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2002") throw error;
+        const raced = await this.prisma.idempotencyRecord.findUnique({ where: { scope_key: { scope: "signature-gateway-callback", key: idempotencyKey } } });
+        if (!raced) throw error;
+        if (raced.responseCode === 200) throw new ConflictException("Signature callback replay was rejected");
+        idempotencyRecordId = raced.id;
+      }
+    }
+    if (!idempotencyRecordId) throw new ConflictException("Signature callback idempotency state is unavailable");
+    try {
     const signature = await this.prisma.documentSignature.findUnique({ where: { id: input.signatureId }, include: { document: { include: { marketplaceAgreement: true, buyerSupplierAgreement: true } }, signerOrganization: true } });
     if (!signature || signature.method !== "EDS") throw new NotFoundException("EDS signature session not found");
     if (signature.externalSessionId !== input.externalSessionId) throw new UnauthorizedException("Signature callback session does not match");
@@ -60,6 +71,11 @@ export class SignatureCallbacksService {
     if (signature.document.marketplaceAgreement) await this.agreements.reconcile(signature.document.marketplaceAgreement.id);
     if (signature.document.buyerSupplierAgreement) await this.buyerSupplierAgreements.reconcile(signature.document.buyerSupplierAgreement.id);
     await this.prisma.securityEvent.create({ data: { severity: "INFO", type: "signature.callback.verified", actorId: context.actorId, organizationId: context.organizationId, sessionId: signature.id, fingerprint: headers.eventId, metadata: { documentId: signature.documentId, status: input.status, certificateSerial: input.certificate.serialNumber } } });
+    await this.prisma.idempotencyRecord.update({ where: { id: idempotencyRecordId }, data: { responseCode: 200, responseBody: { signatureId: signature.id, status: result.signature.status, documentId: result.document.id } as Prisma.InputJsonValue } });
     return { accepted: true, signature: result.signature, document: result.document };
+    } catch (error) {
+      await this.prisma.idempotencyRecord.deleteMany({ where: { id: idempotencyRecordId, responseCode: null } }).catch(() => undefined);
+      throw error;
+    }
   }
 }
