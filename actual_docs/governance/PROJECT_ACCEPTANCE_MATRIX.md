@@ -296,3 +296,13 @@ infrastructure evidence также остаётся явно открытым. �
       canonical report, но coverage `partial` (27/1049 focused files).
 - [ ] В fallback открыты 3 Medium findings (`CWE-862`, `CWE-306`, `CWE-400`):
       исправить их и повторить R2E с complete coverage до перехода к B4.3.
+
+## Current security gate override (2026-08-20)
+
+See `actual_docs/governance/SECURITY_R2E_2026-08-20.md` for the canonical
+complete-coverage result at commit `ad66e39` (scan
+`797606a1-946e-4c7c-ae43-22b304b4fc0f`). The requested AI permission map,
+mandatory webhook HMAC/body/rate controls, and parser-level CSV limits are
+implemented and verified. Application security remains `BLOCKED`: two High
+and three Medium residual findings remain. Do not start B4.3 or mark R2E `[x]`
+until remediation and a new green complete-coverage scan.

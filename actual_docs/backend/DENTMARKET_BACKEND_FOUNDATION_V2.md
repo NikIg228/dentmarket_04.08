@@ -938,3 +938,13 @@ pnpm dev:local
 Текущий backend сложнее, чем нужно пилоту, но не является бесполезным или фиктивным. Его сильная часть — доменные правила, PostgreSQL-модель, транзакции, tenant/RBAC и защитные паттерны. Его слабая часть — управление границами, контракт API, integration evidence и эксплуатационная ясность.
 
 Правильная стратегия: **не переписывать, а вырезать понятное ядро внутри текущего modular monolith, поставить вокруг него жёсткие gates и не развивать остальной scope до завершения базовой покупки**.
+
+### Current security gate override (2026-08-20)
+
+`actual_docs/governance/SECURITY_R2E_2026-08-20.md` is the current R2E
+evidence. The complete-coverage scan `797606a1-946e-4c7c-ae43-22b304b4fc0f`
+on `ad66e39` is finished but reports two High and three Medium residual
+findings. Requested AI authorization, webhook HMAC/body/rate controls, and
+CSV parser limits are checked off there. Keep B4.3 and the R2E completion
+checkbox unchecked until the residual payment, signature, PDF, and inventory
+risks are remediated and rescanned.

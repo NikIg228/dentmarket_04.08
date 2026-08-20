@@ -249,3 +249,14 @@ B4.3 защищённый operator dead-letter replay.
       принимают unsigned payloads по умолчанию (`CWE-306`), CSV parser
       материализует все строки до row limit (`CWE-400`). Сначала нужны
       remediation patches и regressions, затем полный R2E scan с complete coverage.
+
+## Current R2E override (2026-08-20)
+
+The authoritative current result is recorded in
+`actual_docs/governance/SECURITY_R2E_2026-08-20.md`. Scan
+`797606a1-946e-4c7c-ae43-22b304b4fc0f` completed with complete coverage on
+commit `ad66e39`, but reported two High and three Medium residual findings.
+The AI permission map, mandatory webhook HMAC/body/rate controls, and
+parser-level CSV limits are implemented and tested. The R2E checkbox remains
+`[ ]`; B4.3 is blocked until the residual findings are fixed and a new complete
+coverage scan is green.
