@@ -9,7 +9,7 @@
   gap: clamp(16px, 2vw, 30px);
   padding: 0 clamp(20px, 5vw, 72px);
   border-bottom: 1px solid rgb(23 32 30 / 13%);
-  background: rgb(255 253 249 / 94%);
+  background: rgb(250 253 251 / 94%);
   backdrop-filter: blur(18px);
 }
 
@@ -22,7 +22,7 @@
   align-items: center;
   gap: 11px;
   margin-right: 6px;
-  color: #17201e;
+  color: #12382d;
   text-decoration: none;
 }
 
@@ -32,8 +32,8 @@
   display: grid;
   place-items: center;
   border-radius: 9px;
-  background: #234d41;
-  color: #fffdf9;
+  background: #007a59;
+  color: #ffffff;
   font-size: 13px;
   font-weight: 850;
   letter-spacing: -.05em;
@@ -69,7 +69,7 @@
 
 .nav a:hover,
 .nav .active {
-  color: #234d41;
+  color: #007a59;
 }
 
 .nav .active {
@@ -83,8 +83,8 @@
   justify-content: center;
   padding: 0 20px;
   border-radius: 6px;
-  background: #17201e;
-  color: #fffdf9;
+  background: #00543e;
+  color: #ffffff;
   font-size: 13px;
   font-weight: 800;
   text-decoration: none;
@@ -92,7 +92,7 @@
 }
 
 .login:hover {
-  background: #234d41;
+  background: #007a59;
   transform: translateY(-1px);
 }
 
@@ -111,7 +111,7 @@
   padding: 0 7px 0 13px;
   border: 1px solid #d9e1dd;
   border-radius: 10px;
-  background: #f7f9f7;
+  background: #f3f9f6;
 }
 
 .search > svg {
@@ -124,7 +124,7 @@
   border: 0;
   outline: 0;
   background: transparent;
-  color: #17201e;
+  color: #12382d;
   font: inherit;
   font-size: 13px;
 }
@@ -138,8 +138,8 @@
   padding: 0 12px;
   border: 0;
   border-radius: 7px;
-  background: #e7efeb;
-  color: #234d41;
+  background: #ddf8eb;
+  color: #00543e;
   cursor: pointer;
   font: inherit;
   font-size: 11px;
@@ -147,7 +147,7 @@
 }
 
 .search button:hover {
-  background: #d9e7e0;
+  background: #b9efd5;
 }
 
 .search button:disabled {
@@ -165,7 +165,7 @@
   padding: 6px;
   border: 1px solid #d9e1dd;
   border-radius: 12px;
-  background: #fffdf9;
+  background: #ffffff;
   box-shadow: 0 18px 42px rgb(23 32 30 / 14%);
 }
 
@@ -186,8 +186,8 @@
 .suggestions button:hover,
 .suggestions button:focus-visible {
   outline: 0;
-  background: #edf4f0;
-  color: #234d41;
+  background: #ddf8eb;
+  color: #00543e;
 }
 
 .suggestions svg {
@@ -199,7 +199,7 @@
 .nav a:focus-visible,
 .login:focus-visible,
 .search:focus-within {
-  outline: 3px solid #9fc5b7;
+  outline: 3px solid #4fd49a;
   outline-offset: 3px;
 }
 

@@ -3,12 +3,13 @@
 import {
   Avatar,
   Button,
+  createLightTheme,
   FluentProvider,
   Spinner,
   Tag,
   Tooltip,
   webDarkTheme,
-  webLightTheme,
+  type BrandVariants,
 } from "@fluentui/react-components";
 import {
   Dismiss24Regular,
@@ -31,6 +32,27 @@ const ThemeContext = createContext<ThemeContextValue>({
   mode: "light",
   toggle: () => undefined,
 });
+
+const dentMarketBrand: BrandVariants = {
+  10: "#f3fff9",
+  20: "#ddf8eb",
+  30: "#b9efd5",
+  40: "#87e3b8",
+  50: "#4fd49a",
+  60: "#1fbe7d",
+  70: "#009f67",
+  80: "#007a59",
+  90: "#00664b",
+  100: "#00543e",
+  110: "#004530",
+  120: "#003a29",
+  130: "#002f22",
+  140: "#00261b",
+  150: "#001e15",
+  160: "#00180f",
+};
+
+const dentMarketLightTheme = createLightTheme(dentMarketBrand);
 
 export function MarketplaceProvider({ children }: { children: ReactNode }) {
   const [mode, setMode] = useState<ThemeMode>("light");
@@ -59,7 +81,7 @@ export function MarketplaceProvider({ children }: { children: ReactNode }) {
     <ThemeContext.Provider value={value}>
       <FluentProvider
         className="mp-provider"
-        theme={mode === "dark" ? webDarkTheme : webLightTheme}
+        theme={mode === "dark" ? webDarkTheme : dentMarketLightTheme}
       >
         {children}
       </FluentProvider>
@@ -114,6 +136,7 @@ export function AppShell({
   return (
     <div className="mp-shell">
       <aside
+        id="mp-sidebar"
         className={`mp-sidebar${mobileOpen ? " is-open" : ""}`}
         aria-label="Основная навигация"
       >
@@ -184,6 +207,8 @@ export function AppShell({
             appearance="subtle"
             icon={<Navigation24Regular />}
             aria-label="Открыть меню"
+            aria-expanded={mobileOpen}
+            aria-controls="mp-sidebar"
             onClick={() => setMobileOpen(true)}
           />
           <span className="mp-topbar-context">
@@ -337,7 +362,7 @@ export function ErrorState({
   action?: ReactNode;
 }) {
   return (
-    <div className="mp-state mp-error">
+    <div className="mp-state mp-error" role="alert">
       <strong>{title}</strong>
       <p>{description}</p>
       {action}

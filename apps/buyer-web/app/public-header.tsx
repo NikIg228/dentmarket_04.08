@@ -9,6 +9,7 @@ type PublicSection = "catalog" | "suppliers" | "about";
 
 type PublicHeaderProps = {
   active: PublicSection;
+  baseHref?: string;
   query?: string;
   searching?: boolean;
   onQueryChange?: (value: string) => void;
@@ -33,7 +34,7 @@ const searchSuggestions = [
   "абатменты",
 ];
 
-export function PublicHeader({ active, query = "", searching = false, onQueryChange, onSearch, recentSearches = [] }: PublicHeaderProps) {
+export function PublicHeader({ active, baseHref = "/", query = "", searching = false, onQueryChange, onSearch, recentSearches = [] }: PublicHeaderProps) {
   const normalizedQuery = query.trim().toLocaleLowerCase("ru");
   const suggestions = normalizedQuery.length < 2
     ? recentSearches.slice(0, 4)
@@ -48,7 +49,7 @@ export function PublicHeader({ active, query = "", searching = false, onQueryCha
 
   return (
     <header className={`${styles.header} ${onSearch ? styles.headerCatalog : styles.headerSimple}`}>
-      <Link className={styles.brand} href="/" aria-label="DentMarket, магазин">
+      <Link className={styles.brand} href={baseHref} aria-label="DentMarket, магазин">
         <span className={styles.mark}>DM</span>
         <span className={styles.brandCopy}>
           <strong>DentMarket</strong>
@@ -56,7 +57,7 @@ export function PublicHeader({ active, query = "", searching = false, onQueryCha
         </span>
       </Link>
       <nav className={styles.nav} aria-label="Основная навигация">
-        <Link className={active === "catalog" ? styles.active : undefined} href="/">
+        <Link className={active === "catalog" ? styles.active : undefined} href={baseHref}>
           Каталог
         </Link>
         <Link className={active === "suppliers" ? styles.active : undefined} href="/suppliers">

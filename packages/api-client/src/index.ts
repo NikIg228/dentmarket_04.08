@@ -34,6 +34,7 @@ import type {
 } from "@marketplace/schemas";
 
 export type {
+  CatalogSearchResponse,
   CatalogImportReview,
   CatalogImportReviewQueueResponse,
   OrderDocumentResponse,
