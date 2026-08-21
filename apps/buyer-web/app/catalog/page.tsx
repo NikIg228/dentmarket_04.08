@@ -11,6 +11,8 @@ import {
   VehicleTruckProfile24Regular,
 } from "@fluentui/react-icons";
 import {
+  DmButton,
+  DmSelect,
   EmptyState,
   ErrorState,
   LoadingState,
@@ -238,26 +240,26 @@ export default function CatalogPage() {
               </div>
               <label className={styles.sortControl}>
                 <span>Сортировка</span>
-                <select value={sort} onChange={(event) => changeSort(event.currentTarget.value as SortOption)}>
+                <DmSelect value={sort} onChange={(_, data) => changeSort(data.value as SortOption)}>
                   <option value="RELEVANCE">По релевантности</option>
                   <option value="PRICE_ASC">Сначала дешевле</option>
                   <option value="PRICE_DESC">Сначала дороже</option>
                   <option value="NAME_ASC">По названию</option>
                   <option value="UPDATED_DESC">Недавно обновлённые</option>
-                </select>
+                </DmSelect>
               </label>
             </div>
 
             {loading ? (
               <div className={styles.loadingArea}><LoadingState label="Загружаем предложения поставщиков" /></div>
             ) : error ? (
-              <div className={styles.stateArea}><ErrorState description={error} action={<button className={styles.retry} type="button" onClick={() => void loadCatalog(request())}>Повторить загрузку</button>} /></div>
+              <div className={styles.stateArea}><ErrorState description={error} action={<DmButton appearance="primary" type="button" onClick={() => void loadCatalog(request())}>Повторить загрузку</DmButton>} /></div>
             ) : response?.items.length ? (
               <div className={styles.grid}>
                 {response.items.map((product) => <CatalogCard key={product.id} product={product} />)}
               </div>
             ) : (
-              <div className={styles.stateArea}><EmptyState title="Ничего не нашли" description="Измените запрос или уберите часть фильтров — мы попробуем подобрать другие предложения." action={<button className={styles.retry} type="button" onClick={() => { setQuery(""); selectCategory(undefined); }}>Сбросить фильтры</button>} /></div>
+              <div className={styles.stateArea}><EmptyState title="Ничего не нашли" description="Измените запрос или уберите часть фильтров — мы попробуем подобрать другие предложения." action={<DmButton appearance="primary" type="button" onClick={() => { setQuery(""); selectCategory(undefined); }}>Сбросить фильтры</DmButton>} /></div>
             )}
 
             {response?.facets.suppliers.length ? (

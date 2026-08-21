@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Search24Regular } from "@fluentui/react-icons";
+import { DmButton, DmInput } from "@marketplace/ui";
 import type { FormEvent } from "react";
 import { loginUrl } from "./public-links";
 import { CityLocation } from "./city-location";
@@ -70,12 +71,12 @@ export function PublicHeader({ active, baseHref = "/", query = "", searching = f
       {onSearch ? (
         <form className={styles.search} role="search" method="get" action="/" onSubmit={submit}>
           <Search24Regular aria-hidden="true" />
-          <input
+          <DmInput
             type="search"
             name="q"
             value={query}
             list="dentmarket-search-suggestions"
-            onChange={(event) => onQueryChange?.(event.currentTarget.value)}
+            onChange={(_, data) => onQueryChange?.(data.value)}
             onKeyDown={(event) => {
               if (event.key === "ArrowDown" && suggestions.length) {
                 event.preventDefault();
@@ -85,9 +86,9 @@ export function PublicHeader({ active, baseHref = "/", query = "", searching = f
             placeholder="Найти товар, бренд или артикул"
             aria-label="Поиск по каталогу"
           />
-          <button type="submit" disabled={searching}>
+          <DmButton type="submit" appearance="secondary" disabled={searching}>
             {searching ? "Ищем" : "Найти"}
-          </button>
+          </DmButton>
           <datalist id="dentmarket-search-suggestions">
             {[...new Set([...searchSuggestions, ...recentSearches])].map((suggestion) => <option key={suggestion} value={suggestion} />)}
           </datalist>
@@ -110,7 +111,7 @@ export function PublicHeader({ active, baseHref = "/", query = "", searching = f
                       onSearch?.(suggestion);
                     }
                     if (event.key === "Escape") {
-                      (event.currentTarget.closest("form")?.querySelector("input[name='q']") as HTMLInputElement | null)?.focus();
+                    (event.currentTarget.closest("form")?.querySelector("input[name='q']") as HTMLInputElement | null)?.focus();
                     }
                   }}
                 >

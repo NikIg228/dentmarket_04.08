@@ -428,3 +428,17 @@ Evidence текущего slice: `output/playwright/supplier-corrections-redesig
 - mobile smoke на 390px повторно проверен после исправления auto-min-width overflow.
 
 Known limitation: dev browser console по-прежнему содержит CSP/Next refresh noise и предупреждения интеграций Google/Apple. Favicon добавлен в этот slice; оставшийся console noise относится к dev/runtime-hardening, не скрыт как UI success.
+
+## 15. Implementation checkpoint: public Marketplace catalog
+
+Третий implementation slice выполнен в `apps/buyer-web`:
+
+- public catalog header search переведён на shared `DmInput` и `DmButton`;
+- catalog sort и error/empty actions переведены на shared `DmSelect` и `DmButton`;
+- buyer typography переведена с Inter на Manrope с Cyrillic/Latin subsets;
+- catalog/header colors, borders and brand accents используют semantic tokens из `packages/ui`;
+- сохранены query params, typed `/catalog/search`, category/stock/sort behavior и product links;
+- production build buyer-web прошёл;
+- mobile smoke на 390px показал `viewport=390`, `scroll=390`, `bodyScroll=390`.
+
+Runtime note: на момент browser smoke API `127.0.0.1:4012` не был запущен, поэтому populated catalog response/card grid не утверждается как проверенная часть этого slice. Реально проверены header, search/select semantics, responsive layout и catalog error/retry state; card-state QA требует поднятого API.

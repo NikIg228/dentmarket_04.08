@@ -8,8 +8,8 @@
   align-items: center;
   gap: clamp(16px, 2vw, 30px);
   padding: 0 clamp(20px, 5vw, 72px);
-  border-bottom: 1px solid rgb(23 32 30 / 13%);
-  background: rgb(250 253 251 / 94%);
+  border-bottom: 1px solid var(--dm-border);
+  background: color-mix(in srgb, var(--dm-page-surface) 94%, transparent);
   backdrop-filter: blur(18px);
 }
 
@@ -22,7 +22,7 @@
   align-items: center;
   gap: 11px;
   margin-right: 6px;
-  color: #12382d;
+  color: var(--dm-text-primary);
   text-decoration: none;
 }
 
@@ -32,7 +32,7 @@
   display: grid;
   place-items: center;
   border-radius: 9px;
-  background: #007a59;
+  background: var(--dm-brand-primary);
   color: #ffffff;
   font-size: 13px;
   font-weight: 850;
@@ -50,7 +50,7 @@
 }
 
 .brandCopy small {
-  color: #65706c;
+  color: var(--dm-text-muted);
   font-size: 10px;
 }
 
@@ -62,14 +62,14 @@
 
 .nav a {
   padding: 8px 0;
-  color: #65706c;
+  color: var(--dm-text-muted);
   font-size: 13px;
   text-decoration: none;
 }
 
 .nav a:hover,
 .nav .active {
-  color: #007a59;
+  color: var(--dm-brand-primary);
 }
 
 .nav .active {
@@ -83,7 +83,7 @@
   justify-content: center;
   padding: 0 20px;
   border-radius: 6px;
-  background: #00543e;
+  background: var(--dm-brand-deep);
   color: #ffffff;
   font-size: 13px;
   font-weight: 800;
@@ -92,7 +92,7 @@
 }
 
 .login:hover {
-  background: #007a59;
+  background: var(--dm-brand-primary);
   transform: translateY(-1px);
 }
 
@@ -109,9 +109,9 @@
   gap: 9px;
   min-height: 44px;
   padding: 0 7px 0 13px;
-  border: 1px solid #d9e1dd;
+  border: 1px solid var(--dm-border);
   border-radius: 10px;
-  background: #f3f9f6;
+  background: var(--dm-surface-subtle);
 }
 
 .search > svg {
@@ -124,13 +124,27 @@
   border: 0;
   outline: 0;
   background: transparent;
-  color: #12382d;
+  color: var(--dm-text-primary);
   font: inherit;
   font-size: 13px;
 }
 
+.search .dm-input {
+  width: 100%;
+  min-height: 32px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.search .dm-input:focus-within {
+  border: 0;
+  box-shadow: none;
+}
+
 .search input::placeholder {
-  color: #7a8581;
+  color: var(--dm-text-muted);
 }
 
 .search button {
@@ -138,8 +152,8 @@
   padding: 0 12px;
   border: 0;
   border-radius: 7px;
-  background: #ddf8eb;
-  color: #00543e;
+  background: var(--dm-brand-surface);
+  color: var(--dm-brand-deep);
   cursor: pointer;
   font: inherit;
   font-size: 11px;
@@ -147,12 +161,30 @@
 }
 
 .search button:hover {
-  background: #b9efd5;
+  background: var(--dm-brand-surface-strong);
 }
 
 .search button:disabled {
   cursor: wait;
   opacity: .65;
+}
+
+.search .dm-button {
+  min-height: 32px;
+  padding-inline: 12px;
+  border: 0;
+  border-radius: 7px;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.search .dm-button[data-appearance="secondary"] {
+  background: var(--dm-brand-surface);
+  color: var(--dm-brand-deep);
+}
+
+.search .dm-button[data-appearance="secondary"]:hover:not(:disabled) {
+  background: var(--dm-brand-surface-strong);
 }
 
 .suggestions {
@@ -163,7 +195,7 @@
   left: 0;
   display: grid;
   padding: 6px;
-  border: 1px solid #d9e1dd;
+  border: 1px solid var(--dm-border);
   border-radius: 12px;
   background: #ffffff;
   box-shadow: 0 18px 42px rgb(23 32 30 / 14%);
@@ -177,7 +209,7 @@
   padding: 0 10px;
   border-radius: 8px;
   background: transparent;
-  color: #26332f;
+  color: var(--dm-text-primary);
   text-align: left;
   font-size: 12px;
   font-weight: 550;
@@ -186,8 +218,8 @@
 .suggestions button:hover,
 .suggestions button:focus-visible {
   outline: 0;
-  background: #ddf8eb;
-  color: #00543e;
+  background: var(--dm-brand-surface);
+  color: var(--dm-brand-deep);
 }
 
 .suggestions svg {
@@ -199,7 +231,7 @@
 .nav a:focus-visible,
 .login:focus-visible,
 .search:focus-within {
-  outline: 3px solid #4fd49a;
+  outline: 3px solid var(--dm-brand-surface-strong);
   outline-offset: 3px;
 }
 
