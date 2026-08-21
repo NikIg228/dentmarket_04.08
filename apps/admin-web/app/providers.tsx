@@ -1,8 +1,8 @@
 "use client";
 
-import { FluentProvider, webLightTheme } from "@fluentui/react-components";
+import { MarketplaceProvider } from "@marketplace/ui";
 import type { ReactNode } from "react";
 
 export function Providers({ children }: { children: ReactNode }) {
-  return <FluentProvider theme={webLightTheme}>{children}</FluentProvider>;
+  return <MarketplaceProvider>{children}</MarketplaceProvider>;
 }

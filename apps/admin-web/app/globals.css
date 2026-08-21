@@ -1,6 +1,6 @@
 :root {
   color-scheme: light;
-  background: #f5f6f8;
+  background: var(--dm-page-surface);
 }
 
 * {
@@ -12,9 +12,9 @@ body {
   min-height: 100%;
 }
 body {
-  color: #172033;
-  background: #f5f6f8;
-  font-family: var(--font-sans), Arial, sans-serif;
+  color: var(--dm-text-primary);
+  background: var(--dm-page-surface);
+  font-family: var(--dm-font-ui), sans-serif;
 }
 button,
 input {
@@ -23,6 +23,6 @@ input {
 a:focus-visible,
 button:focus-visible,
 input:focus-visible {
-  outline: 3px solid #5b8bc5;
+  outline: 3px solid var(--dm-brand-accent);
   outline-offset: 2px;
 }

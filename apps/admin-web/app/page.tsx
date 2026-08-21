@@ -1,6 +1,5 @@
 "use client";
 
-import { Button, Input, Select } from "@fluentui/react-components";
 import {
   BuildingShop24Regular,
   Cart24Regular,
@@ -12,6 +11,7 @@ import {
   Settings24Regular,
   ShieldLock24Regular,
 } from "@fluentui/react-icons";
+import { AppShell, DmButton, DmInput, DmSelect } from "@marketplace/ui";
 import { useEffect, useState, type ReactNode } from "react";
 import styles from "./page.module.css";
 import { AgreementOperations } from "./agreement-operations";
@@ -51,6 +51,7 @@ const navigation: Array<{ id: SectionId; label: string; icon: ReactNode }> = [
   { id: "imports", label: "Загрузка товаров", icon: <Database24Regular /> },
   { id: "orders", label: "Заказы и договоры", icon: <Cart24Regular /> },
   { id: "security", label: "Контроль и доверие", icon: <ShieldLock24Regular /> },
+  { id: "settings", label: "Настройки", icon: <Settings24Regular /> },
 ];
 
 const sectionMeta: Record<SectionId, { title: string; description: string }> = {
@@ -117,7 +118,7 @@ export default function OperationsWorkspace() {
           <div className={styles.statusTitle}>Магазин работает</div>
           <div className={styles.statusText}>Поиск, корзина, заказы и документы доступны.</div>
         </div>
-        <Button className={styles.buttonOutline} appearance="outline" onClick={() => setActive("orders")}>Открыть очередь</Button>
+        <DmButton className={styles.buttonOutline} appearance="outline" onClick={() => setActive("orders")}>Открыть очередь</DmButton>
       </section>
 
       <div className={styles.grid}>
@@ -171,46 +172,40 @@ export default function OperationsWorkspace() {
   };
 
   return (
-    <div className={styles.shell}>
-      <aside className={styles.sidebar}>
-        <div className={styles.brand}>
-          <span className={styles.brandName}>DentMarket</span>
-          <span className={styles.brandMeta}>Для команды</span>
-        </div>
-        <nav className={styles.nav} aria-label="Основная навигация">
-          {navigation.map((item) => (
-            <button key={item.id} type="button" className={`${styles.navItem} ${active === item.id ? styles.navItemActive : ""}`} onClick={() => setActive(item.id)}>
-              {item.icon}<span>{item.label}</span>
-            </button>
-          ))}
-        </nav>
-        <div className={styles.sidebarFooter}>
-          <button type="button" className={`${styles.navItem} ${active === "settings" ? styles.navItemActive : ""}`} onClick={() => setActive("settings")}>
-            <Settings24Regular /><span>Настройки</span>
-          </button>
-        </div>
-      </aside>
-
-      <main className={styles.main}>
-        <header className={styles.topbar}>
-          <Select className={styles.mobileSection} value={active} onChange={(_, data) => setActive(data.value as SectionId)} aria-label="Раздел админки">
-            {[...navigation, { id: "settings" as const, label: "Настройки", icon: null }].map((item) => <option value={item.id} key={item.id}>{item.label}</option>)}
-          </Select>
-          <Input className={styles.search} contentBefore={<Search24Regular />} placeholder="Поиск" aria-label="Поиск" />
-          <Button className={styles.buttonSubtle} appearance="subtle" onClick={() => { clearAdminSession(); window.location.assign("/login"); }}>Выйти</Button>
-        </header>
-
-        <div className={styles.content}>
-          <div className={styles.heading}>
-            <div className={styles.headingCopy}>
-              <h1 className={styles.pageTitle}>{meta.title}</h1>
-              <span className={styles.muted}>{meta.description}</span>
-            </div>
-            {active === "organizations" ? <OrganizationQuickCreate /> : null}
+    <AppShell
+      productName="DentMarket"
+      productMark="DM"
+      workspaceLabel="Операторский кабинет"
+      userName="Команда DentMarket"
+      userMeta="Оператор"
+      navigation={navigation}
+      activeNavigation={active}
+      onNavigate={(id) => setActive(id as SectionId)}
+      onLogout={() => { clearAdminSession(); window.location.assign("/login"); }}
+      actions={
+        <>
+          <DmSelect
+            className={styles.mobileSection}
+            value={active}
+            onChange={(_, data) => setActive(data.value as SectionId)}
+            aria-label="Раздел админки"
+          >
+            {navigation.map((item) => <option value={item.id} key={item.id}>{item.label}</option>)}
+          </DmSelect>
+          <DmInput className={styles.search} contentBefore={<Search24Regular />} placeholder="Поиск" aria-label="Поиск" />
+        </>
+      }
+    >
+      <div className={styles.content}>
+        <div className={styles.heading}>
+          <div className={styles.headingCopy}>
+            <h1 className={styles.pageTitle}>{meta.title}</h1>
+            <span className={styles.muted}>{meta.description}</span>
           </div>
-          <div className={styles.sectionStack}>{content[active]}</div>
+          {active === "organizations" ? <OrganizationQuickCreate /> : null}
         </div>
-      </main>
-    </div>
+        <div className={styles.sectionStack}>{content[active]}</div>
+      </div>
+    </AppShell>
   );
 }

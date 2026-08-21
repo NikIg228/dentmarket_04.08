@@ -442,3 +442,19 @@ Known limitation: dev browser console по-прежнему содержит CSP
 - mobile smoke на 390px показал `viewport=390`, `scroll=390`, `bodyScroll=390`.
 
 Runtime note: на момент browser smoke API `127.0.0.1:4012` не был запущен, поэтому populated catalog response/card grid не утверждается как проверенная часть этого slice. Реально проверены header, search/select semantics, responsive layout и catalog error/retry state; card-state QA требует поднятого API.
+
+## 16. Implementation checkpoint: admin shell
+
+Четвёртый implementation slice выполнен в `apps/admin-web`:
+
+- admin подключён к `MarketplaceProvider` и общим `packages/ui` styles;
+- shell переведён на общий `AppShell` с emerald brand, sidebar, mobile drawer, topbar и theme toggle;
+- admin typography переведена с Inter на Manrope;
+- shell search, section select и action controls используют shared primitives;
+- overview-level colors и states переведены на semantic tokens;
+- сохранены admin auth gate, section navigation, API routes и feature composition;
+- admin typecheck и production build прошли;
+- desktop visual smoke подтвердил styled shell;
+- mobile smoke на 390px подтвердил `390/390/390`, drawer navigation открывается и закрывается.
+
+Ограничения этого slice: feature-панели admin и их legacy CSS/native controls ещё не мигрированы целиком. Browser console показывает только `ERR_CONNECTION_REFUSED` к API `127.0.0.1:4012` в окружении без поднятого backend; это не ошибка shell-рендера. Дальнейшая миграция контролов и populated-data QA остаются отдельными bounded-срезами.
