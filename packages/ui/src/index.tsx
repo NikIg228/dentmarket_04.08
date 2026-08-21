@@ -3,6 +3,7 @@
 import {
   Avatar,
   Button,
+  Checkbox,
   createLightTheme,
   Field,
   FluentProvider,
@@ -15,6 +16,7 @@ import {
   webDarkTheme,
   type BrandVariants,
   type ButtonProps,
+  type CheckboxProps,
   type FieldProps,
   type InputProps,
   type SelectProps,
@@ -90,6 +92,11 @@ export function DmSelect({ className, ...props }: SelectProps) {
 /** Shared action control. Keep action hierarchy in one component boundary. */
 export function DmButton({ className, ...props }: ButtonProps) {
   return <Button {...props} className={joinClasses("dm-button", className)} />;
+}
+
+/** Shared checkbox control for filters and capability selections. */
+export function DmCheckbox({ className, ...props }: CheckboxProps) {
+  return <Checkbox {...props} className={joinClasses("dm-checkbox", className)} />;
 }
 
 export function MarketplaceProvider({ children }: { children: ReactNode }) {

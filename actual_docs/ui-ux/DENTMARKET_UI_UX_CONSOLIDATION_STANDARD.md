@@ -458,3 +458,16 @@ Runtime note: на момент browser smoke API `127.0.0.1:4012` не был �
 - mobile smoke на 390px подтвердил `390/390/390`, drawer navigation открывается и закрывается.
 
 Ограничения этого slice: feature-панели admin и их legacy CSS/native controls ещё не мигрированы целиком. Browser console показывает только `ERR_CONNECTION_REFUSED` к API `127.0.0.1:4012` в окружении без поднятого backend; это не ошибка shell-рендера. Дальнейшая миграция контролов и populated-data QA остаются отдельными bounded-срезами.
+
+## 17. Implementation checkpoint: admin organization form
+
+Пятый implementation slice выполнен в `apps/admin-web` и `packages/ui`:
+
+- добавлен shared `DmCheckbox` для capability selections;
+- `OrganizationQuickCreate` переведён с native input/button controls на `DmField`, `DmInput`, `DmCheckbox` и `DmButton`;
+- обязательные labels, required markers, БИН hint и keyboard-friendly dialog semantics сохранены;
+- error feedback получил `role="alert"`, success feedback сохраняет `role="status"`;
+- API endpoint `/organizations`, request payload и 409/error semantics не изменены;
+- modal и recoverable API error проверены браузером с заполненными полями.
+
+Ограничения: остальные admin feature-панели пока содержат legacy controls и будут переноситься отдельными небольшими срезами.

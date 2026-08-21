@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { DmButton, DmCheckbox, DmField, DmInput } from "@marketplace/ui";
 import styles from "./organization-quick-create.module.css";
 import { adminAuthHeaders } from "./admin-auth";
 
@@ -63,9 +64,9 @@ export function OrganizationQuickCreate() {
 
   return (
     <>
-      <button className={styles.primaryButton} onClick={() => setOpen(true)}>
+      <DmButton className={styles.primaryButton} appearance="primary" type="button" onClick={() => setOpen(true)}>
         Создать организацию
-      </button>
+      </DmButton>
       {open && (
         <div
           className={styles.backdrop}
@@ -85,71 +86,72 @@ export function OrganizationQuickCreate() {
                 <h2 id="organization-dialog-title">Новая организация</h2>
                 <p>Реквизиты и доступные кабинеты.</p>
               </div>
-              <button
+              <DmButton
                 className={styles.closeButton}
+                appearance="secondary"
+                type="button"
                 onClick={() => setOpen(false)}
                 aria-label="Закрыть"
               >
                 Закрыть
-              </button>
+              </DmButton>
             </div>
             <form className={styles.form} onSubmit={submit}>
-              <label>
-                Юридическое название
-                <input name="legalName" required minLength={2} />
-              </label>
-              <label>
-                Название в DentMarket
-                <input name="displayName" required minLength={2} />
-              </label>
-              <label>
-                БИН
-                <input
+              <DmField label="Юридическое название" required>
+                <DmInput name="legalName" required minLength={2} />
+              </DmField>
+              <DmField label="Название в DentMarket" required>
+                <DmInput name="displayName" required minLength={2} />
+              </DmField>
+              <DmField label="БИН" hint="12 цифр" required>
+                <DmInput
                   name="bin"
                   required
                   inputMode="numeric"
                   pattern="[0-9]{12}"
                   maxLength={12}
                 />
-              </label>
+              </DmField>
               <fieldset>
                 <legend>Возможности организации</legend>
                 <div className={styles.capabilities}>
                   {capabilities.map(([value, label], index) => (
-                    <label className={styles.checkbox} key={value}>
-                      <input
-                        type="checkbox"
-                        name="capabilities"
-                        value={value}
-                        defaultChecked={index === 0}
-                      />
-                      {label}
-                    </label>
+                    <DmCheckbox
+                      className={styles.checkbox}
+                      key={value}
+                      label={label}
+                      name="capabilities"
+                      value={value}
+                      defaultChecked={index === 0}
+                    />
                   ))}
                 </div>
               </fieldset>
               {message && (
                 <div
                   className={status === "error" ? styles.error : styles.success}
-                  role="status"
+                  role={status === "error" ? "alert" : "status"}
                 >
                   {message}
                 </div>
               )}
               <div className={styles.actions}>
-                <button
+                <DmButton
                   type="button"
+                  appearance="secondary"
                   className={styles.secondaryButton}
                   onClick={() => setOpen(false)}
                 >
                   Отмена
-                </button>
-                <button
+                </DmButton>
+                <DmButton
+                  type="submit"
+                  appearance="primary"
                   className={styles.primaryButton}
                   disabled={status === "saving"}
                 >
                   {status === "saving" ? "Сохранение..." : "Создать"}
-                </button>
+                </DmButton>
               </div>
             </form>
           </section>
