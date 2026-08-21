@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
+import { DmButton, DmCheckbox, DmField, DmInput, DmSelect } from "@marketplace/ui";
 import styles from "./foundation-management.module.css";
 import { adminAuthHeaders } from "./admin-auth";
 
@@ -179,7 +180,7 @@ export function FoundationManagement() {
           <h2>Роли и справочники</h2>
           <p>Роли, участники и конфигурация динамических атрибутов.</p>
         </div>
-        <button onClick={() => void load()}>Обновить данные</button>
+        <DmButton type="button" appearance="secondary" onClick={() => void load()}>Обновить данные</DmButton>
       </div>
       {message && (
         <div className={styles.notice} role="status">
@@ -196,48 +197,43 @@ export function FoundationManagement() {
           <div className={styles.panel}>
             <h3>Роли и участники</h3>
             <form className={styles.form} onSubmit={submitRole}>
-              <label>
-                Код роли
-                <input name="code" required placeholder="procurement_manager" />
-              </label>
-              <label>
-                Название
-                <input name="name" required placeholder="Закупщик" />
-              </label>
-              <label className={styles.wide}>
-                Permissions через запятую
-                <input
+              <DmField label="Код роли" required>
+                <DmInput name="code" required placeholder="procurement_manager" />
+              </DmField>
+              <DmField label="Название" required>
+                <DmInput name="name" required placeholder="Закупщик" />
+              </DmField>
+              <DmField className={styles.wide} label="Permissions через запятую" hint="Разделяйте коды запятыми" required>
+                <DmInput
                   name="permissions"
                   required
                   placeholder="order.create, catalog.product.view"
                 />
-              </label>
-              <button className={styles.primary}>Создать роль</button>
+              </DmField>
+              <DmButton type="submit" appearance="primary" className={styles.primary}>Создать роль</DmButton>
             </form>
             <form className={styles.form} onSubmit={assignRole}>
-              <label>
-                Участник
-                <select name="membershipId" required>
+              <DmField label="Участник" required>
+                <DmSelect name="membershipId" required>
                   <option value="">Выберите</option>
                   {memberships.map((membership) => (
                     <option value={membership.id} key={membership.id}>
                       {membership.user.displayName}
                     </option>
                   ))}
-                </select>
-              </label>
-              <label>
-                Роль
-                <select name="roleId" required>
+                </DmSelect>
+              </DmField>
+              <DmField label="Роль" required>
+                <DmSelect name="roleId" required>
                   <option value="">Выберите</option>
                   {roles.map((role) => (
                     <option value={role.id} key={role.id}>
                       {role.name}
                     </option>
                   ))}
-                </select>
-              </label>
-              <button className={styles.secondary}>Назначить</button>
+                </DmSelect>
+              </DmField>
+              <DmButton type="submit" appearance="secondary" className={styles.secondary}>Назначить</DmButton>
             </form>
             <div className={styles.records}>
               {memberships.length === 0 ? (
@@ -263,13 +259,11 @@ export function FoundationManagement() {
           <div className={styles.panel}>
             <h3>Атрибуты каталога</h3>
             <form className={styles.form} onSubmit={submitAttribute}>
-              <label>
-                Код
-                <input name="code" required placeholder="glove_material" />
-              </label>
-              <label>
-                Тип
-                <select name="valueType" defaultValue="TEXT">
+              <DmField label="Код" required>
+                <DmInput name="code" required placeholder="glove_material" />
+              </DmField>
+              <DmField label="Тип">
+                <DmSelect name="valueType" defaultValue="TEXT">
                   <option>TEXT</option>
                   <option>INTEGER</option>
                   <option>DECIMAL</option>
@@ -278,67 +272,50 @@ export function FoundationManagement() {
                   <option>MULTI_OPTION</option>
                   <option>RANGE</option>
                   <option>NUMBER_WITH_UNIT</option>
-                </select>
-              </label>
-              <label>
-                Название RU
-                <input name="nameRu" required />
-              </label>
-              <label>
-                Название KZ
-                <input name="nameKk" required />
-              </label>
-              <label className={styles.check}>
-                <input type="checkbox" name="isSearchable" />
-                Поиск
-              </label>
-              <label className={styles.check}>
-                <input type="checkbox" name="isFilterable" />
-                Фильтр
-              </label>
-              <button className={styles.primary}>Создать атрибут</button>
+                </DmSelect>
+              </DmField>
+              <DmField label="Название RU" required>
+                <DmInput name="nameRu" required />
+              </DmField>
+              <DmField label="Название KZ" required>
+                <DmInput name="nameKk" required />
+              </DmField>
+              <DmCheckbox className={styles.check} name="isSearchable" label="Поиск" />
+              <DmCheckbox className={styles.check} name="isFilterable" label="Фильтр" />
+              <DmButton type="submit" appearance="primary" className={styles.primary}>Создать атрибут</DmButton>
             </form>
             <form className={styles.form} onSubmit={submitRule}>
-              <label>
-                Категория
-                <select name="categoryId" required>
+              <DmField label="Категория" required>
+                <DmSelect name="categoryId" required>
                   <option value="">Выберите</option>
                   {categories.map((category) => (
                     <option value={category.id} key={category.id}>
                       {category.nameRu}
                     </option>
                   ))}
-                </select>
-              </label>
-              <label>
-                Атрибут
-                <select name="attributeId" required>
+                </DmSelect>
+              </DmField>
+              <DmField label="Атрибут" required>
+                <DmSelect name="attributeId" required>
                   <option value="">Выберите</option>
                   {attributes.map((attribute) => (
                     <option value={attribute.id} key={attribute.id}>
                       {attribute.nameRu}
                     </option>
                   ))}
-                </select>
-              </label>
-              <label>
-                Порядок
-                <input
+                </DmSelect>
+              </DmField>
+              <DmField label="Порядок" hint="Неотрицательное число">
+                <DmInput
                   name="sortOrder"
                   type="number"
                   min="0"
                   defaultValue="0"
                 />
-              </label>
-              <label className={styles.check}>
-                <input type="checkbox" name="isRequired" />
-                Обязательный
-              </label>
-              <label className={styles.check}>
-                <input type="checkbox" name="isVariant" />
-                Для варианта
-              </label>
-              <button className={styles.secondary}>Сохранить правило</button>
+              </DmField>
+              <DmCheckbox className={styles.check} name="isRequired" label="Обязательный" />
+              <DmCheckbox className={styles.check} name="isVariant" label="Для варианта" />
+              <DmButton type="submit" appearance="secondary" className={styles.secondary}>Сохранить правило</DmButton>
             </form>
             <div className={styles.records}>
               {attributes.length === 0 ? (

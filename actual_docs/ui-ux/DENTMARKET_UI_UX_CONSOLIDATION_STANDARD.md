@@ -471,3 +471,19 @@ Runtime note: на момент browser smoke API `127.0.0.1:4012` не был �
 - modal и recoverable API error проверены браузером с заполненными полями.
 
 Ограничения: остальные admin feature-панели пока содержат legacy controls и будут переноситься отдельными небольшими срезами.
+
+## 18. Implementation checkpoint: admin foundation management
+
+Шестой implementation slice выполнен в `apps/admin-web` и `packages/ui`:
+
+- роли, memberships, атрибуты каталога и правила атрибутов переведены на общий контракт `DmField`, `DmInput`, `DmSelect`, `DmCheckbox` и `DmButton`;
+- labels, required markers, hints для permissions и порядка, видимый focus и единые control states теперь одинаковы с auth, supplier corrections и organization form;
+- native input/select/button controls в этом feature-блоке удалены без изменения backend endpoints, payloads и role/catalog semantics;
+- checked state capability-флагов и catalog flags использует shared checkbox styling;
+- desktop visual smoke подтверждает unified emerald controls и grid form density;
+- mobile smoke на 390px показал `bodyScroll=390` и `documentScroll=390`, без горизонтального overflow;
+- при недоступном API пользователь видит явный recoverable status, empty memberships/attribute definitions и сохраняет доступ к форме для повторной попытки после запуска backend.
+
+Evidence текущего slice: `output/playwright/admin-foundation-management.png` и `output/playwright/admin-foundation-management-mobile.png`.
+
+Ограничения: populated roles, memberships, attributes и category rules не прошли end-to-end проверку, потому что browser environment не содержит запущенного API `127.0.0.1:4012`; остальные admin feature-панели по-прежнему требуют отдельных миграционных срезов.
