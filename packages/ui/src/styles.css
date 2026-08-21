@@ -101,6 +101,9 @@ button, input, select, textarea { font: inherit; }
 .dm-field .fui-Field__validationMessage { margin-top: 2px; color: var(--dm-danger-text); font-size: 12px; line-height: 1.4; }
 .dm-field .fui-Field__hint { color: var(--dm-text-muted); font-size: 12px; line-height: 1.45; }
 .dm-control { width: 100%; min-height: 44px; }
+.dm-control .fui-Input__input,
+.dm-control .fui-Textarea__textarea,
+.dm-control .fui-Select__select { width: 100%; }
 .dm-control.fui-Input,
 .dm-control.fui-Select,
 .dm-control.fui-Textarea { border-radius: 6px; }

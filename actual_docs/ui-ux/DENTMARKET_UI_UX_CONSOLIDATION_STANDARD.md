@@ -414,3 +414,17 @@ pnpm verify:web
 - сохранены endpoint, payload и supplier role semantics.
 
 Evidence текущего slice: `output/playwright/supplier-corrections-redesign-full.png` и `output/playwright/supplier-corrections-redesign-mobile.png`. Остальные buyer/admin/auth поверхности пока не мигрированы и не должны считаться автоматически унифицированными.
+
+## 14. Implementation checkpoint: auth login
+
+Второй implementation slice выполнен в `apps/landing-web`:
+
+- login подключен к `MarketplaceProvider` и shared `packages/ui` controls;
+- email/password получили видимые labels, required semantics, единый focus и 44px control contract;
+- auth typography переведена на Manrope с Cyrillic/Latin subsets;
+- login headline больше не использует Georgia/Times New Roman;
+- основной login, Apple и demo actions используют общий button contract;
+- сохранены `/auth/login`, `/auth/password/forgot`, social exchange, demo handoff и role routing;
+- mobile smoke на 390px повторно проверен после исправления auto-min-width overflow.
+
+Known limitation: dev browser console по-прежнему содержит CSP/Next refresh noise и предупреждения интеграций Google/Apple. Favicon добавлен в этот slice; оставшийся console noise относится к dev/runtime-hardening, не скрыт как UI success.
