@@ -28,7 +28,12 @@ Google и Apple OIDC проверяются по issuer, audience, сроку и
 - Payment/integration/signature webhooks подписывают `timestamp.rawBody`; окно по умолчанию 300 секунд, event id обеспечивает replay protection.
 - AI не имеет прямого доступа к Prisma: модель получает только результат allowlisted tenant-tools. Prompt injection блокируется, секреты редактируются, medical advice и autonomous critical commerce actions получают safe refusal.
 - Trust/Geo writes проходят permission, membership и tenant checks, optimistic versioning, idempotency и audit. Полная история отзывов и рейтинговых апелляций сохраняется; dispute не удаляет исходное событие.
-- HTTP использует Helmet, строгий CORS allowlist, rate limiting и request IDs.
+- HTTP использует Helmet, строгий CORS allowlist, request IDs и многоуровневый
+  rate limiting по IP/user/tenant. В `go_live` состояние лимитов хранится в
+  общем Redis; process-local fallback разрешён только для development/test и
+  не используется при горизонтальном production deployment.
+- При превышении лимита API возвращает `429`, `RATE_LIMIT_EXCEEDED`,
+  `Retry-After` и dimension-specific `X-RateLimit-*` headers.
 - Structured logger redacts authorization, cookies, passwords, tokens, secrets и credentials.
 
 ## Production minimum
@@ -39,6 +44,7 @@ Google и Apple OIDC проверяются по issuer, audience, сроку и
 - `JWT_REQUIRE_MFA=true` для операторов и финансовых ролей;
 - `AV_SCAN_MODE=required` и доступный ClamAV;
 - TLS termination, `TRUST_PROXY=true` только за доверенным proxy;
+- production Redis с TLS обязателен для shared rate limiting и BullMQ;
 - Sentry DSN и OTLP endpoint без передачи PII;
 - секреты из secret manager, не из image или Git;
 - регулярная ротация webhook/provider keys и проверка restore.

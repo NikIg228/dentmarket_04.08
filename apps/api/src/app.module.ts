@@ -45,6 +45,7 @@ import { runtimeCapabilities } from "./platform/runtime/process-role";
 import { RuntimeReadinessService } from "./platform/runtime/runtime-readiness.service";
 import { OutboxModule } from "./platform/outbox/outbox.module";
 import { ObservabilityModule } from "./platform/observability/observability.module";
+import { RedisThrottlerStorage } from "./platform/security/rate-limit.storage";
 
 const config = environment();
 const runtime = runtimeCapabilities(config.PROCESS_ROLE);
@@ -52,28 +53,34 @@ const runtime = runtimeCapabilities(config.PROCESS_ROLE);
 @Module({
   imports: [
     ...(runtime.schedules ? [ScheduleModule.forRoot()] : []),
-    ThrottlerModule.forRoot([
-      {
-        name: "ip",
-        ttl: config.RATE_LIMIT_TTL_MS,
-        limit: config.RATE_LIMIT_REQUESTS,
-        getTracker: (request) => `ip:${request.ip}`,
-      },
-      {
-        name: "user",
-        ttl: config.RATE_LIMIT_TTL_MS,
-        limit: config.RATE_LIMIT_REQUESTS * 2,
-        getTracker: (request) =>
-          `user:${request.headers["x-user-id"] ?? `anonymous:${request.ip}`}`,
-      },
-      {
-        name: "tenant",
-        ttl: config.RATE_LIMIT_TTL_MS,
-        limit: config.RATE_LIMIT_REQUESTS * 5,
-        getTracker: (request) =>
-          `tenant:${request.headers["x-organization-id"] ?? `anonymous:${request.ip}`}`,
-      },
-    ]),
+    ThrottlerModule.forRoot({
+      storage: new RedisThrottlerStorage({
+        nodeEnv: config.NODE_ENV,
+        redisUrl: config.REDIS_URL,
+      }),
+      throttlers: [
+        {
+          name: "ip",
+          ttl: config.RATE_LIMIT_TTL_MS,
+          limit: config.RATE_LIMIT_REQUESTS,
+          getTracker: (request) => `ip:${request.ip}`,
+        },
+        {
+          name: "user",
+          ttl: config.RATE_LIMIT_TTL_MS,
+          limit: config.RATE_LIMIT_REQUESTS * 2,
+          getTracker: (request) =>
+            `user:${request.headers["x-user-id"] ?? `anonymous:${request.ip}`}`,
+        },
+        {
+          name: "tenant",
+          ttl: config.RATE_LIMIT_TTL_MS,
+          limit: config.RATE_LIMIT_REQUESTS * 5,
+          getTracker: (request) =>
+            `tenant:${request.headers["x-organization-id"] ?? `anonymous:${request.ip}`}`,
+        },
+      ],
+    }),
     BackgroundJobsModule,
     OutboxModule,
     ObservabilityModule,

@@ -406,8 +406,9 @@ High source-code backlog B4.5-R1 закрыт фазами R1A и R1B. B4.5-R2A�
 session revocation, notification webhook SSRF, payment side-effect claims,
 pending finalization, signature races, PDF resource budgets и stale inventory.
 Complete-coverage scan `64b65075-d7f3-4c23-b6e2-1535e6067b80` на `8f450ea`
-проверил `1055/1055` файлов и сообщил `0` reportable findings. Следующая
-Следующая задача — **B4.4: rate limiting и production auth runbook**.
+проверил `1055/1055` файлов и сообщил `0` reportable findings. B4.4 также
+реализован и подтверждён targeted/full backend gates; следующая задача —
+**B4.6: нагрузочный профиль каталога и checkout**.
 
 ### B1 — покупка клиникой
 
@@ -656,7 +657,7 @@ production connectors не входят в фазу; compensating rollback за�
 - [x] B4.1 — metrics и alerts;
 - [x] B4.2 — backup/restore rehearsal;
 - [x] B4.3 — dead-letter operations и защищённый replay;
-- [ ] B4.4 — rate limiting и production auth runbook;
+- [x] B4.4 — rate limiting и production auth runbook;
 - [x] B4.5 — security/dependency scan;
 - [ ] B4.6 — нагрузочный профиль каталога и checkout.
 
@@ -851,6 +852,27 @@ patches, focused regressions, полный gate stack и complete-coverage R2E.
       защищённый operator list/replay, отдельные permissions, Serializable
       idempotency, audit trail и payload-preserving reset в `PENDING`.
 
+### B4.4 — rate limiting и production auth runbook
+
+- [x] `RedisThrottlerStorage` использует атомарное Redis-окно и является shared storage
+      для горизонтально масштабируемого API; локальный fallback разрешён только в
+      development/test и не является production HA-механизмом.
+- [x] В production отсутствие или недоступность Redis fail-closed: запрос получает
+      контролируемый `503`, а не незащищённый проход без rate limit.
+- [x] Throttler возвращает стабильный error code `RATE_LIMIT_EXCEEDED` и общий
+      `Retry-After`; лимиты и окна имеют bounded environment contract.
+- [x] Production auth contract требует `AUTH_MODE=jwt`, MFA, issuer/audience,
+      trusted proxy и Redis для `go_live`; эти правила закреплены в
+      `actual_docs/operations/production-auth-runbook.md`.
+- [x] Targeted rate-limit/auth tests, `pnpm typecheck`, `pnpm test`, `pnpm build`,
+      `pnpm verify:rate-limit-auth`, `pnpm verify:production-config`,
+      `pnpm verify:security`, `pnpm verify:postgres`, `pnpm verify:runtime-split`,
+      `pnpm verify:core-contract` и `pnpm verify:pilot-backend` прошли.
+
+Ограничение B4.4: локальные gates подтверждают контракт и поведение приложения.
+Redis HA, alerting и multi-instance soak остаются deployment evidence и входят в
+нагрузочный профиль B4.6.
+
 ### B5 — frontend unification
 
 Начинать после B0.2 и стабильного B1. Общая дизайн-система должна использовать общий типизированный API client, общие состояния loading/error/empty и одинаковую терминологию. Marketplace, кабинет клиники, поставщика и оператора сохраняют разные задачи, но не разные визуальные языки.
@@ -956,5 +978,5 @@ pnpm dev:local
 `actual_docs/governance/SECURITY_R2E_2026-08-20.md` is the current R2E
 evidence. The complete-coverage scan `64b65075-d7f3-4c23-b6e2-1535e6067b80`
 on `8f450ea` is green with `0` reportable findings. Keep the R2E checkbox
-checked; B4.3 is complete and the next implementation phase is B4.4. Live
+checked; B4.3 and B4.4 are complete and the next implementation phase is B4.6. Live
 production infrastructure evidence remains a separate deployment concern.

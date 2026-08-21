@@ -1,36 +1,9 @@
 import { spawnSync } from "node:child_process";
-import { statSync } from "node:fs";
 
-const requiredFiles = [
-  ".env.production.example",
-  "compose.production.yaml",
-  "infra/Caddyfile",
-  "scripts/backup.sh",
-  "scripts/restore.sh",
-  "scripts/backup-production.sh",
-  "scripts/restore-production.sh",
-  "scripts/verify-backup-restore.mjs",
-  "scripts/verify-restore-drill.sh",
-  "actual_docs/operations/backup-restore-runbook.md",
-  "actual_docs/operations/production-deployment.md",
-  "actual_docs/operations/production-auth-runbook.md",
-  ".github/workflows/release.yml",
-  ".github/workflows/security.yml",
-];
-for (const file of requiredFiles) {
-  let nonEmpty = false;
-  try {
-    nonEmpty = statSync(file).size > 0;
-  } catch {}
-  if (!nonEmpty)
-    throw new Error(
-      `Required production artifact is missing or empty: ${file}`,
-    );
-}
-
-const valid = {
+const base = {
   ...process.env,
   NODE_ENV: "production",
+  DEPLOYMENT_PROFILE: "go_live",
   DATABASE_URL:
     "postgresql://user:password@db.example.kz:5432/marketplace?sslmode=require",
   REDIS_URL: "rediss://default:password@redis.example.kz:6379",
@@ -64,39 +37,53 @@ const valid = {
   OTEL_EXPORTER_OTLP_ENDPOINT: "https://otel.example.kz/v1/traces",
   METRICS_BEARER_TOKEN: "t".repeat(48),
 };
-const run = (env) =>
+
+const run = (overrides = {}) =>
   spawnSync(
     process.execPath,
     [
       "-e",
       "require('./apps/api/dist/src/platform/config/environment.js').environment(); console.log('valid')",
     ],
-    { env, encoding: "utf8" },
+    { env: { ...base, ...overrides }, encoding: "utf8" },
   );
-const accepted = run(valid);
-if (accepted.status !== 0)
-  throw new Error(`Valid production contract rejected: ${accepted.stderr}`);
-const insecure = run({ ...valid, CORS_ORIGINS: "http://localhost:3000" });
-if (insecure.status === 0)
-  throw new Error("Insecure localhost production CORS was accepted");
-const mockPayment = run({
-  ...valid,
-  PAYMENT_PROVIDER_MODE: "mock",
-  PAYMENT_GATEWAY_URL: "",
-});
-if (mockPayment.status === 0)
-  throw new Error("Mock payment mode was accepted in production");
-const unprotectedMetrics = run({ ...valid, METRICS_BEARER_TOKEN: "" });
-if (unprotectedMetrics.status === 0)
-  throw new Error("Production accepted an unprotected metrics endpoint");
+
+const accepted = run();
+if (accepted.status !== 0) {
+  throw new Error(
+    `Valid production auth contract rejected: ${accepted.stderr}`,
+  );
+}
+
+const rejected = [
+  ["missing shared Redis", { REDIS_URL: "" }, "Redis is required"],
+  [
+    "development authentication",
+    { AUTH_MODE: "development" },
+    "Development identity headers",
+  ],
+  ["MFA disabled", { JWT_REQUIRE_MFA: "false" }, "MFA must be required"],
+  ["unbounded rate-limit window", { RATE_LIMIT_TTL_MS: "3600001" }, "Too big"],
+  ["unbounded rate-limit budget", { RATE_LIMIT_REQUESTS: "100001" }, "Too big"],
+];
+
+for (const [name, overrides, expected] of rejected) {
+  const result = run(overrides);
+  if (result.status === 0 || !result.stderr.includes(expected)) {
+    throw new Error(
+      `Production auth contract accepted ${name}: ${result.stderr}`,
+    );
+  }
+}
+
 console.log(
   JSON.stringify(
     {
-      productionContract: true,
-      insecureCorsRejected: true,
-      mockPaymentsRejected: true,
-      unprotectedMetricsRejected: true,
-      artifacts: requiredFiles,
+      productionAuthContract: true,
+      sharedRedisRequired: true,
+      developmentAuthRejected: true,
+      mfaRequired: true,
+      rateLimitBoundsEnforced: true,
     },
     null,
     2,

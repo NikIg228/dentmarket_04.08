@@ -7,6 +7,7 @@ import {
   type ExceptionFilter,
 } from "@nestjs/common";
 import type { Request, Response } from "express";
+import { ThrottlerException } from "@nestjs/throttler";
 
 const statusCodes: Record<number, string> = {
   400: "BAD_REQUEST",
@@ -36,7 +37,8 @@ function objectResponse(value: unknown): Record<string, unknown> | null {
 
 export function toApiErrorResponse(exception: unknown, context: ErrorContext) {
   const httpException = exception instanceof HttpException ? exception : null;
-  const statusCode = httpException?.getStatus() ?? HttpStatus.INTERNAL_SERVER_ERROR;
+  const statusCode =
+    httpException?.getStatus() ?? HttpStatus.INTERNAL_SERVER_ERROR;
   const raw = httpException?.getResponse();
   const payload = objectResponse(raw);
   const rawMessage = typeof raw === "string" ? raw : payload?.message;
@@ -47,7 +49,8 @@ export function toApiErrorResponse(exception: unknown, context: ErrorContext) {
         ? rawMessage
         : httpException?.message || "Request failed";
   const error = typeof payload?.error === "string" ? payload.error : undefined;
-  const explicitCode = typeof payload?.code === "string" ? payload.code : undefined;
+  const explicitCode =
+    typeof payload?.code === "string" ? payload.code : undefined;
   const standardKeys = new Set(["statusCode", "message", "error", "code"]);
   const detailEntries = payload
     ? Object.entries(payload).filter(([key]) => !standardKeys.has(key))
@@ -55,13 +58,18 @@ export function toApiErrorResponse(exception: unknown, context: ErrorContext) {
   const details =
     statusCode !== HttpStatus.INTERNAL_SERVER_ERROR && detailEntries.length > 0
       ? Object.fromEntries(detailEntries)
-      : statusCode !== HttpStatus.INTERNAL_SERVER_ERROR && payload && rawMessage === undefined
+      : statusCode !== HttpStatus.INTERNAL_SERVER_ERROR &&
+          payload &&
+          rawMessage === undefined
         ? payload
         : undefined;
 
   return {
     statusCode,
-    code: explicitCode ?? statusCodes[statusCode] ?? `HTTP_${statusCode}`,
+    code:
+      exception instanceof ThrottlerException
+        ? "RATE_LIMIT_EXCEEDED"
+        : (explicitCode ?? statusCodes[statusCode] ?? `HTTP_${statusCode}`),
     message,
     ...(error ? { error } : {}),
     ...(details ? { details } : {}),
@@ -87,6 +95,20 @@ export class ApiExceptionFilter implements ExceptionFilter {
       requestId,
       production: process.env.NODE_ENV === "production",
     });
+    if (
+      body.statusCode === HttpStatus.TOO_MANY_REQUESTS &&
+      !response.getHeader("Retry-After")
+    ) {
+      const retryAfter = [
+        "Retry-After-ip",
+        "Retry-After-user",
+        "Retry-After-tenant",
+      ]
+        .map((header) => response.getHeader(header))
+        .find((value) => value !== undefined && value !== null);
+      if (retryAfter !== undefined && retryAfter !== null)
+        response.setHeader("Retry-After", retryAfter);
+    }
     if (!(exception instanceof HttpException)) {
       this.logger.error(
         `${request.method} ${request.originalUrl || request.url} failed`,
