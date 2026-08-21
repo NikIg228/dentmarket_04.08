@@ -399,4 +399,18 @@ pnpm verify:web
 
 Следующий практический шаг — не перекрашивать все страницы вручную. Сначала реализовать `DmField`/`DmButton`/`DmSelect` и на них полностью переписать supplier corrections. После visual + keyboard QA этого bounded блока переносить auth и shell. Так мы проверим новый язык на реальном рабочем сценарии, сохраним backend-контракт и не создадим параллельно еще один слой случайного CSS.
 
-До начала Phase 2 текущая версия честно считается промежуточной: emerald-направление подтверждено как хорошая база, но единая дизайн-система и единый UX еще не завершены.
+После первого bounded-slice текущая версия все еще считается промежуточной: emerald-направление подтверждено как хорошая база, но buyer/admin/auth поверхности еще не мигрированы.
+
+## 13. Implementation checkpoint: supplier corrections
+
+Первый implementation slice выполнен в `packages/ui` и `apps/supplier-web`:
+
+- добавлены shared wrappers `DmField`, `DmInput`, `DmTextarea`, `DmSelect`, `DmButton`;
+- обновлены control tokens, focus ring, 44px control height, radius и active/pressed states;
+- форма «Исправления карточек» переведена на семантический `<form>` с keyboard submit;
+- обязательные поля, hints, disabled submit и safe success/error feedback вынесены в единый UX-паттерн;
+- история обращений получила loading, empty, error/retry и count states;
+- добавлен regression test для submit guard;
+- сохранены endpoint, payload и supplier role semantics.
+
+Evidence текущего slice: `output/playwright/supplier-corrections-redesign-full.png` и `output/playwright/supplier-corrections-redesign-mobile.png`. Остальные buyer/admin/auth поверхности пока не мигрированы и не должны считаться автоматически унифицированными.

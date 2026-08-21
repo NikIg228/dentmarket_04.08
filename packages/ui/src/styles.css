@@ -1,13 +1,25 @@
 :root {
-  color-scheme: light dark;
-  font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color-scheme: light;
+  font-family: var(--dm-font-ui), ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-synthesis: none;
+  --dm-font-ui: var(--font-sans, "Segoe UI");
+  --dm-font-mono: "Roboto Mono", Consolas, ui-monospace, monospace;
   --dm-brand-primary: #007a59;
   --dm-brand-primary-hover: #00664b;
   --dm-brand-deep: #00543e;
   --dm-brand-surface: #ddf8eb;
   --dm-brand-surface-strong: #b9efd5;
   --dm-page-surface: #f4f8f6;
+  --dm-surface: #ffffff;
+  --dm-surface-subtle: #fbfcfb;
+  --dm-border: #d7e1dc;
+  --dm-text-primary: #17201e;
+  --dm-text-secondary: #4f5e58;
+  --dm-text-muted: #71807a;
+  --dm-success-surface: #eef8f2;
+  --dm-success-text: #237a4a;
+  --dm-danger-surface: #fff0ee;
+  --dm-danger-text: #a33b35;
 }
 
 * { box-sizing: border-box; }
@@ -16,8 +28,8 @@ body { background: var(--colorNeutralBackground2, #f7f7f8); color: var(--colorNe
 button, input, select, textarea { font: inherit; }
 .mp-provider { min-height: 100dvh; background: var(--colorNeutralBackground2); }
 
-.mp-shell { min-height: 100vh; display: grid; grid-template-columns: 250px minmax(0, 1fr); }
-.mp-sidebar { position: sticky; top: 0; z-index: 20; height: 100vh; display: flex; flex-direction: column; padding: 20px 14px 14px; border-right: 1px solid var(--colorNeutralStroke2); background: var(--colorNeutralBackground1); }
+.mp-shell { min-height: 100dvh; display: grid; grid-template-columns: 250px minmax(0, 1fr); }
+.mp-sidebar { position: sticky; top: 0; z-index: 20; min-height: 100dvh; display: flex; flex-direction: column; padding: 20px 14px 14px; border-right: 1px solid var(--colorNeutralStroke2); background: var(--colorNeutralBackground1); }
 .mp-brand { display: flex; align-items: center; gap: 11px; min-height: 44px; padding: 0 8px 20px; }
 .mp-brand-mark { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 10px; background: var(--dm-brand-primary); color: #fff; font-size: 16px; font-weight: 800; letter-spacing: -.04em; box-shadow: 0 8px 18px rgb(0 122 89 / 18%); }
 .mp-brand > span:nth-child(2), .mp-sidebar-footer > span { min-width: 0; display: grid; gap: 2px; }
@@ -81,6 +93,31 @@ button, input, select, textarea { font: inherit; }
 .mp-mobile-close { margin-left: auto; }
 .mp-backdrop { display: none; }
 
+/* Shared controls. Feature screens may compose these primitives, but should not
+   redefine their height, radius, focus, or validation language. */
+.dm-field { display: grid; gap: 6px; min-width: 0; }
+.dm-field .fui-Label { color: var(--dm-text-primary); font-size: 13px; font-weight: 650; line-height: 1.35; }
+.dm-field .fui-Label::after { color: var(--dm-brand-primary); }
+.dm-field .fui-Field__validationMessage { margin-top: 2px; color: var(--dm-danger-text); font-size: 12px; line-height: 1.4; }
+.dm-field .fui-Field__hint { color: var(--dm-text-muted); font-size: 12px; line-height: 1.45; }
+.dm-control { width: 100%; min-height: 44px; }
+.dm-control.fui-Input,
+.dm-control.fui-Select,
+.dm-control.fui-Textarea { border-radius: 6px; }
+.dm-control.fui-Input:hover,
+.dm-control.fui-Select:hover,
+.dm-control.fui-Textarea:hover { border-color: var(--dm-brand-primary); }
+.dm-control.fui-Input:focus-within,
+.dm-control.fui-Select:focus-within,
+.dm-control.fui-Textarea:focus-within { border-color: var(--dm-brand-primary); box-shadow: 0 0 0 2px color-mix(in srgb, var(--dm-brand-primary) 22%, transparent); }
+.dm-textarea { min-height: 112px; }
+.dm-button.fui-Button { min-height: 42px; border-radius: 8px; font-weight: 650; transition: background-color 120ms ease, border-color 120ms ease, transform 120ms ease; }
+.dm-button.fui-Button:active:not(:disabled) { transform: translateY(1px); }
+.dm-button.fui-Button[data-appearance="primary"] { background: var(--dm-brand-primary); }
+.dm-button.fui-Button[data-appearance="primary"]:hover:not(:disabled) { background: var(--dm-brand-primary-hover); }
+.dm-button.fui-Button[data-appearance="primary"]:active:not(:disabled) { background: var(--dm-brand-deep); }
+.dm-button.fui-Button:focus-visible { outline: 2px solid var(--dm-brand-primary); outline-offset: 2px; }
+
 @media (max-width: 1120px) {
   .mp-shell { grid-template-columns: 214px minmax(0, 1fr); }
   .mp-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -89,7 +126,7 @@ button, input, select, textarea { font: inherit; }
 
 @media (max-width: 760px) {
   .mp-shell { display: block; }
-  .mp-sidebar { position: fixed; left: 0; transform: translateX(-105%); width: min(290px, 88vw); box-shadow: var(--shadow16); transition: transform 160ms ease; }
+  .mp-sidebar { position: fixed; left: 0; height: 100dvh; transform: translateX(-105%); width: min(290px, 88vw); box-shadow: var(--shadow16); transition: transform 160ms ease; }
   .mp-sidebar.is-open { transform: translateX(0); }
   .mp-backdrop { position: fixed; inset: 0; z-index: 15; display: block; border: 0; background: rgba(0, 0, 0, .44); }
   .mp-menu-button, .mp-mobile-close { display: inline-flex !important; }

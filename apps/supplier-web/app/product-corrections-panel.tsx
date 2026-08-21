@@ -1,9 +1,20 @@
 "use client";
 
-import { Button, Field, Input, Select, Spinner, Textarea } from "@fluentui/react-components";
 import type { MarketplaceApiClient } from "@marketplace/api-client";
-import { EmptyState, Section, StatusTag, errorMessage, formatDate } from "@marketplace/ui";
+import {
+  DmButton,
+  DmField,
+  DmInput,
+  DmSelect,
+  DmTextarea,
+  EmptyState,
+  LoadingState,
+  Section,
+  StatusTag,
+  formatDate,
+} from "@marketplace/ui";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { canSubmitProductCorrection } from "./product-corrections-validation";
 import styles from "./product-corrections-panel.module.css";
 
 type Product = {
@@ -57,22 +68,30 @@ export function ProductCorrectionsPanel({ api, offers, supplierId }: { api: Mark
   const [evidenceUrl, setEvidenceUrl] = useState("");
   const [items, setItems] = useState<Correction[]>([]);
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(true);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<{ tone: "success" | "error"; text: string } | null>(null);
 
   useEffect(() => { if (!productId && products[0]) setProductId(products[0].id); }, [productId, products]);
 
   const load = useCallback(async () => {
+    setHistoryLoading(true);
+    setHistoryError(null);
     try {
       const data = await api.get<Correction[]>("/moderation/product-corrections");
       setItems(data.filter((item) => item.supplierOrganizationId === supplierId));
-    } catch (cause) { setMessage(errorMessage(cause)); }
+    } catch {
+      setHistoryError("Не удалось загрузить историю исправлений. Повторите попытку.");
+    } finally {
+      setHistoryLoading(false);
+    }
   }, [api, supplierId]);
 
   useEffect(() => { void load(); }, [load]);
 
   const submit = async () => {
     setBusy(true);
-    setMessage(null);
+    setFeedback(null);
     try {
       await api.post("/moderation/product-corrections", {
         productId,
@@ -84,42 +103,53 @@ export function ProductCorrectionsPanel({ api, offers, supplierId }: { api: Mark
       setProposedValue("");
       setReason("");
       setEvidenceUrl("");
-      setMessage("Исправление отправлено на проверку");
+      setFeedback({ tone: "success", text: "Исправление отправлено на проверку." });
       await load();
-    } catch (cause) { setMessage(errorMessage(cause)); }
+    } catch {
+      setFeedback({
+        tone: "error",
+        text: "Не удалось отправить исправление. Проверьте данные и повторите попытку.",
+      });
+    }
     finally { setBusy(false); }
   };
 
   return <Section title="Исправления карточек" description="Нашли ошибку? Предложите исправление и приложите подтверждение.">
     <div className={styles.layout}>
-      <div className={styles.form}>
-        <Field label="Товар">
-          <Select value={productId} onChange={(_, data) => setProductId(data.value)}>
+      <form className={styles.form} onSubmit={(event) => { event.preventDefault(); void submit(); }}>
+        {!products.length ? <EmptyState title="Нет доступных карточек" description="Здесь появятся товары поставщика, для которых можно предложить исправление." /> : null}
+        {products.length ? <>
+        <DmField label="Товар" required>
+          <DmSelect value={productId} onChange={(_, data) => setProductId(data.value)}>
             {products.map((product) => <option value={product.id} key={product.id}>{product.canonicalName}</option>)}
-          </Select>
-        </Field>
-        <Field label="Что исправить">
-          <Select value={field} onChange={(_, data) => setField(data.value as typeof field)}>
+          </DmSelect>
+        </DmField>
+        <DmField label="Что исправить" required>
+          <DmSelect value={field} onChange={(_, data) => setField(data.value as typeof field)}>
             {fields.map(([value, label]) => <option value={value} key={value}>{label}</option>)}
-          </Select>
-        </Field>
-        <Field label="Предлагаемая редакция">
-          <Textarea rows={4} value={proposedValue} onChange={(_, data) => setProposedValue(data.value)} />
-        </Field>
-        <Field label="Почему нужна правка" hint="Укажите, что именно не совпадает с документом или каталогом производителя.">
-          <Textarea rows={3} value={reason} onChange={(_, data) => setReason(data.value)} />
-        </Field>
-        <Field label="Ссылка на подтверждение" hint="Необязательно: сайт производителя, регистрационный документ или каталог.">
-          <Input type="url" value={evidenceUrl} onChange={(_, data) => setEvidenceUrl(data.value)} />
-        </Field>
-        {message ? <div className={styles.message}>{message}</div> : null}
-        <Button appearance="primary" disabled={busy || !productId || proposedValue.trim().length < 2 || reason.trim().length < 10} onClick={() => void submit()}>
-          {busy ? <Spinner size="tiny" /> : "Отправить исправление"}
-        </Button>
-      </div>
+          </DmSelect>
+        </DmField>
+        <DmField label="Предлагаемая редакция" required hint="Укажите точный вариант, который нужно внести в карточку.">
+          <DmTextarea rows={4} value={proposedValue} onChange={(_, data) => setProposedValue(data.value)} />
+        </DmField>
+        <DmField label="Почему нужна правка" required hint="Укажите, что именно не совпадает с документом или каталогом производителя.">
+          <DmTextarea rows={3} value={reason} onChange={(_, data) => setReason(data.value)} />
+        </DmField>
+        <DmField label="Ссылка на подтверждение" hint="Необязательно: сайт производителя, регистрационный документ или каталог.">
+          <DmInput type="url" value={evidenceUrl} onChange={(_, data) => setEvidenceUrl(data.value)} />
+        </DmField>
+        {feedback ? <div className={`${styles.message} ${feedback.tone === "error" ? styles.messageError : styles.messageSuccess}`} role={feedback.tone === "error" ? "alert" : "status"}>{feedback.text}</div> : null}
+        <div className={styles.formFooter}>
+          <span className={styles.formHint}>Поля с отметкой обязательны. Ответ появится в истории после проверки.</span>
+          <DmButton type="submit" appearance="primary" disabled={!canSubmitProductCorrection({ busy, productId, proposedValue, reason })}>
+            {busy ? "Отправляем…" : "Отправить исправление"}
+          </DmButton>
+        </div>
+        </> : null}
+      </form>
       <div className={styles.history}>
-        <h3>Мои исправления</h3>
-        {!items.length ? <EmptyState title="Исправлений пока нет" description="Здесь появятся ваши правки и решения DentMarket." /> : items.slice(0, 12).map((item) => <article className={styles.request} key={item.id}>
+        <div className={styles.historyHeading}><div><span className={styles.kicker}>История обращений</span><h3>Мои исправления</h3></div><span className={styles.historyCount}>{items.length}</span></div>
+        {historyLoading ? <LoadingState label="Загружаем историю исправлений" /> : historyError ? <div className={styles.historyError} role="alert"><strong>{historyError}</strong><DmButton appearance="secondary" onClick={() => void load()}>Повторить</DmButton></div> : !items.length ? <EmptyState title="Исправлений пока нет" description="Здесь появятся ваши правки и решения DentMarket." /> : items.slice(0, 12).map((item) => <article className={styles.request} key={item.id}>
           <div className={styles.requestHeader}><strong>{item.product.canonicalName}</strong><StatusTag tone={item.status === "REJECTED" ? "danger" : item.status === "PENDING" ? "warning" : "success"}>{statusLabel[item.status]}</StatusTag></div>
           <small>{fieldLabel(item.field)} · {formatDate(item.createdAt, true)}</small>
           <p>{item.appliedValue ?? item.proposedValue}</p>

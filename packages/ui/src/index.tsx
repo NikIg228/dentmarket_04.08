@@ -4,12 +4,21 @@ import {
   Avatar,
   Button,
   createLightTheme,
+  Field,
   FluentProvider,
+  Input,
+  Select,
   Spinner,
   Tag,
+  Textarea,
   Tooltip,
   webDarkTheme,
   type BrandVariants,
+  type ButtonProps,
+  type FieldProps,
+  type InputProps,
+  type SelectProps,
+  type TextareaProps,
 } from "@fluentui/react-components";
 import {
   Dismiss24Regular,
@@ -53,6 +62,35 @@ const dentMarketBrand: BrandVariants = {
 };
 
 const dentMarketLightTheme = createLightTheme(dentMarketBrand);
+
+function joinClasses(...classes: Array<string | undefined>) {
+  return classes.filter(Boolean).join(" ");
+}
+
+/** Shared field wrapper for all role workspaces. */
+export function DmField({ className, ...props }: FieldProps) {
+  return <Field {...props} className={joinClasses("dm-field", className)} />;
+}
+
+/** Shared text input with the marketplace control contract. */
+export function DmInput({ className, ...props }: InputProps) {
+  return <Input {...props} className={joinClasses("dm-control", "dm-input", className)} />;
+}
+
+/** Shared multiline input with the marketplace control contract. */
+export function DmTextarea({ className, ...props }: TextareaProps) {
+  return <Textarea {...props} className={joinClasses("dm-control", "dm-textarea", className)} />;
+}
+
+/** Shared native-select based Fluent control. */
+export function DmSelect({ className, ...props }: SelectProps) {
+  return <Select {...props} className={joinClasses("dm-control", "dm-select", className)} />;
+}
+
+/** Shared action control. Keep action hierarchy in one component boundary. */
+export function DmButton({ className, ...props }: ButtonProps) {
+  return <Button {...props} className={joinClasses("dm-button", className)} />;
+}
 
 export function MarketplaceProvider({ children }: { children: ReactNode }) {
   const [mode, setMode] = useState<ThemeMode>("light");
