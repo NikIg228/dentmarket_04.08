@@ -469,15 +469,16 @@ export class ImportsService implements OnModuleInit {
       });
       uploadAssetId = asset.id;
     }
-    const parsedFile = await this.fileParser.parseWithDiagnostics(input);
-    const rows = parsedFile.rows;
-    if (rows.length === 0 && input.fileType !== "PDF")
-      throw new BadRequestException("Import does not contain data rows");
-    const checksum =
-      sourceChecksum ??
-      createHash("sha256").update(JSON.stringify(rows)).digest("hex");
-    return this.prisma.$transaction(
-      async (tx) => {
+    try {
+      const parsedFile = await this.fileParser.parseWithDiagnostics(input);
+      const rows = parsedFile.rows;
+      if (rows.length === 0 && input.fileType !== "PDF")
+        throw new BadRequestException("Import does not contain data rows");
+      const checksum =
+        sourceChecksum ??
+        createHash("sha256").update(JSON.stringify(rows)).digest("hex");
+      return await this.prisma.$transaction(
+        async (tx) => {
         const batch = await tx.importBatch.create({
           data: {
             supplierOrganizationId,
@@ -527,9 +528,13 @@ export class ImportsService implements OnModuleInit {
           },
         });
         return batch;
-      },
-      { maxWait: 15_000, timeout: 60_000 },
-    );
+        },
+        { maxWait: 15_000, timeout: 60_000 },
+      );
+    } catch (error) {
+      if (uploadAssetId) await this.uploads.release(uploadAssetId, "Import batch creation failed");
+      throw error;
+    }
   }
 
   async enqueueBatch(

@@ -51,7 +51,7 @@ export class TrustCommerceController {
   @Post("trust/ratings/events") @RequirePermissions("trust.rating.manage")
   recordMetric(@Body() body: unknown, @Headers("x-user-id") actorId: string, @Headers("x-organization-id") organizationId: string) { return this.trust.recordMetric(this.parse(recordTrustMetricSchema, body), this.context(actorId, organizationId)); }
   @Get("trust/ratings/suppliers/:supplierOrganizationId") @RequirePermissions("trust.rating.view")
-  rating(@Param("supplierOrganizationId") supplierOrganizationId: string) { return this.trust.rating(supplierOrganizationId); }
+  rating(@Param("supplierOrganizationId") supplierOrganizationId: string, @Headers("x-user-id") actorId: string, @Headers("x-organization-id") organizationId: string) { return this.trust.rating(supplierOrganizationId, this.context(actorId, organizationId)); }
   @Post("trust/ratings/suppliers/:supplierOrganizationId/recompute") @RequirePermissions("trust.rating.manage")
   recompute(@Param("supplierOrganizationId") supplierOrganizationId: string, @Headers("x-user-id") actorId: string, @Headers("x-organization-id") organizationId: string) { return this.trust.recomputeRating(supplierOrganizationId, this.context(actorId, organizationId)); }
   @Post("trust/ratings/suppliers/:supplierOrganizationId/appeals") @RequirePermissions("trust.rating.appeal")

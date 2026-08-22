@@ -1,6 +1,8 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
+import { Cron, CronExpression } from "@nestjs/schedule";
 import { createHash, randomUUID } from "node:crypto";
 import { basename, extname } from "node:path";
+import { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { ObjectStorageService } from "../storage/object-storage.service";
 import { FileScannerService } from "./file-scanner.service";
@@ -83,8 +85,31 @@ export class FileUploadPolicyService {
       const scan = await this.scanner.scan(input.body, safeName);
       return await this.prisma.uploadAsset.update({ where: { id: asset.id }, data: { status: "CLEAN", scanProvider: scan.provider, scanResult: "clean", availableAt: new Date() } });
     } catch (error) {
-      await this.prisma.uploadAsset.update({ where: { id: asset.id }, data: { status: "REJECTED", scanResult: "rejected_or_unavailable", rejectionReason: error instanceof Error ? error.message.slice(0, 500) : "Upload scan failed" } });
+      await this.release(asset.id, error instanceof Error ? error.message : "Upload scan failed");
       throw error;
     }
+  }
+
+  async release(assetId: string, reason = "Upload was not linked") {
+    const asset = await this.prisma.uploadAsset.findUnique({ where: { id: assetId }, select: { id: true, storageKey: true, status: true } });
+    if (!asset || asset.status === "REJECTED") return;
+    await this.storage.delete(asset.storageKey);
+    await this.prisma.uploadAsset.update({ where: { id: asset.id }, data: { status: "REJECTED", deletedAt: new Date(), scanResult: "deleted_after_rejection", rejectionReason: reason.slice(0, 500) } });
+  }
+
+  @Cron(CronExpression.EVERY_HOUR)
+  async cleanupUnlinkedAssets() {
+    const cutoff = new Date(Date.now() - 60 * 60_000);
+    const assets = await this.prisma.uploadAsset.findMany({ where: { status: { in: ["QUARANTINED", "CLEAN"] }, metadata: { equals: Prisma.DbNull }, createdAt: { lt: cutoff } }, select: { id: true }, take: 100 });
+    let deleted = 0;
+    for (const asset of assets) {
+      try {
+        await this.release(asset.id, "Unlinked upload asset expired");
+        deleted += 1;
+      } catch {
+        // Keep the asset visible for a later retry when storage cleanup is unavailable.
+      }
+    }
+    return { scanned: assets.length, deleted };
   }
 }

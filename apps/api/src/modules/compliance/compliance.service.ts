@@ -27,24 +27,32 @@ export class ComplianceService {
 
   async createCredential(organizationId: string, input: CreateOrganizationCredentialInput, context: SupplierActorContext) {
     await this.assertOrganizationAccess(organizationId, context);
+    let uploadAssetId: string | null = null;
     let storageKey: string | null = null;
     let checksumSha256: string | null = null;
     if (input.contentBase64 && input.fileName) {
       const body = this.uploads.decodeBase64(input.contentBase64, 10_000_000);
       const asset = await this.uploads.quarantine({ organizationId, actorId: context.actorId, purpose: "compliance-credential", fileName: input.fileName, body, allowedKinds: ["PDF", "PNG", "JPEG"], maxBytes: 10_000_000 });
+      uploadAssetId = asset.id;
       checksumSha256 = asset.checksumSha256;
       storageKey = asset.storageKey;
     }
-    return this.prisma.$transaction(async (tx) => {
-      const credential = await tx.organizationCredential.upsert({
-        where: { organizationId_type_number: { organizationId, type: input.type, number: input.number } },
-        update: { issuer: input.issuer, validFrom: input.validFrom ? new Date(input.validFrom) : null, validTo: input.validTo ? new Date(input.validTo) : null, status: "PENDING", storageKey, checksumSha256, verifiedAt: null, verifiedById: null, rejectionReason: null, metadata: input.metadata == null ? Prisma.JsonNull : input.metadata as Prisma.InputJsonValue },
-        create: { organizationId, type: input.type, number: input.number, issuer: input.issuer, validFrom: input.validFrom ? new Date(input.validFrom) : null, validTo: input.validTo ? new Date(input.validTo) : null, storageKey, checksumSha256, metadata: input.metadata == null ? Prisma.JsonNull : input.metadata as Prisma.InputJsonValue },
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        const credential = await tx.organizationCredential.upsert({
+          where: { organizationId_type_number: { organizationId, type: input.type, number: input.number } },
+          update: { issuer: input.issuer, validFrom: input.validFrom ? new Date(input.validFrom) : null, validTo: input.validTo ? new Date(input.validTo) : null, status: "PENDING", storageKey, checksumSha256, verifiedAt: null, verifiedById: null, rejectionReason: null, metadata: input.metadata == null ? Prisma.JsonNull : input.metadata as Prisma.InputJsonValue },
+          create: { organizationId, type: input.type, number: input.number, issuer: input.issuer, validFrom: input.validFrom ? new Date(input.validFrom) : null, validTo: input.validTo ? new Date(input.validTo) : null, storageKey, checksumSha256, metadata: input.metadata == null ? Prisma.JsonNull : input.metadata as Prisma.InputJsonValue },
+        });
+        await tx.auditLog.create({ data: { ...context, action: "compliance.credential.submitted", entityType: "OrganizationCredential", entityId: credential.id, after: { organizationId, type: credential.type, number: credential.number, validTo: credential.validTo, checksumSha256 } } });
+        await tx.outboxEvent.create({ data: { aggregateType: "OrganizationCredential", aggregateId: credential.id, eventType: "OrganizationCredentialSubmitted", payload: { credentialId: credential.id, organizationId, type: credential.type } } });
+        if (uploadAssetId) await tx.uploadAsset.update({ where: { id: uploadAssetId }, data: { metadata: { credentialId: credential.id, credentialType: credential.type } } });
+        return credential;
       });
-      await tx.auditLog.create({ data: { ...context, action: "compliance.credential.submitted", entityType: "OrganizationCredential", entityId: credential.id, after: { organizationId, type: credential.type, number: credential.number, validTo: credential.validTo, checksumSha256 } } });
-      await tx.outboxEvent.create({ data: { aggregateType: "OrganizationCredential", aggregateId: credential.id, eventType: "OrganizationCredentialSubmitted", payload: { credentialId: credential.id, organizationId, type: credential.type } } });
-      return credential;
-    });
+    } catch (error) {
+      if (uploadAssetId) await this.uploads.release(uploadAssetId, "Compliance credential transaction failed");
+      throw error;
+    }
   }
 
   async reviewCredential(credentialId: string, input: ReviewOrganizationCredentialInput, context: SupplierActorContext) {

@@ -148,34 +148,39 @@ export class DocumentsService {
     const checksum = asset.checksumSha256;
     const key = asset.storageKey;
     const contentType = asset.detectedMime;
-    return this.prisma.$transaction(async (tx) => {
-      const document = await tx.document.create({ data: {
-        ownerOrganizationId: input.ownerOrganizationId,
-        checkoutId: input.checkoutId,
-        supplierOrderId: input.supplierOrderId,
-        shipmentId: input.shipmentId,
-        kind: input.kind,
-        format: input.format,
-        source: "UPLOADED",
-        status: input.requiredSignatureCount > 0 ? "AWAITING_SIGNATURE" : "GENERATED",
-        title: input.title,
-        documentNumber: input.documentNumber,
-        storageKey: key,
-        fileName: input.fileName,
-        contentType,
-        byteSize: body.byteLength,
-        checksumSha256: checksum,
-        requiredSignatureCount: input.requiredSignatureCount,
-        immutableAt: new Date(),
-        expiresAt: input.expiresAt ? new Date(input.expiresAt) : null,
-        externalId: input.externalId,
-        metadata: input.metadata == null ? Prisma.JsonNull : input.metadata as Prisma.InputJsonValue,
-      }, include: { signatures: true } });
-      await tx.auditLog.create({ data: { ...context, action: "document.uploaded", entityType: "Document", entityId: document.id, after: { documentNumber: document.documentNumber, version: document.version, kind: document.kind, checksumSha256: checksum } } });
-      await tx.outboxEvent.create({ data: { aggregateType: "Document", aggregateId: document.id, eventType: "DocumentUploaded", payload: { documentId: document.id, ownerOrganizationId: document.ownerOrganizationId, kind: document.kind } } });
-      await tx.uploadAsset.update({ where: { id: asset.id }, data: { metadata: { documentId: document.id, documentKind: document.kind } } });
-      return document;
-    });
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        const document = await tx.document.create({ data: {
+          ownerOrganizationId: input.ownerOrganizationId,
+          checkoutId: input.checkoutId,
+          supplierOrderId: input.supplierOrderId,
+          shipmentId: input.shipmentId,
+          kind: input.kind,
+          format: input.format,
+          source: "UPLOADED",
+          status: input.requiredSignatureCount > 0 ? "AWAITING_SIGNATURE" : "GENERATED",
+          title: input.title,
+          documentNumber: input.documentNumber,
+          storageKey: key,
+          fileName: input.fileName,
+          contentType,
+          byteSize: body.byteLength,
+          checksumSha256: checksum,
+          requiredSignatureCount: input.requiredSignatureCount,
+          immutableAt: new Date(),
+          expiresAt: input.expiresAt ? new Date(input.expiresAt) : null,
+          externalId: input.externalId,
+          metadata: input.metadata == null ? Prisma.JsonNull : input.metadata as Prisma.InputJsonValue,
+        }, include: { signatures: true } });
+        await tx.auditLog.create({ data: { ...context, action: "document.uploaded", entityType: "Document", entityId: document.id, after: { documentNumber: document.documentNumber, version: document.version, kind: document.kind, checksumSha256: checksum } } });
+        await tx.outboxEvent.create({ data: { aggregateType: "Document", aggregateId: document.id, eventType: "DocumentUploaded", payload: { documentId: document.id, ownerOrganizationId: document.ownerOrganizationId, kind: document.kind } } });
+        await tx.uploadAsset.update({ where: { id: asset.id }, data: { metadata: { documentId: document.id, documentKind: document.kind } } });
+        return document;
+      });
+    } catch (error) {
+      await this.uploads.release(asset.id, "Document upload transaction failed");
+      throw error;
+    }
   }
 
   async generateOrderDocumentPack(orderId: string, input: GenerateOrderDocumentPackRequest, context: SupplierActorContext) {
@@ -404,7 +409,8 @@ export class DocumentsService {
     const document = await this.prisma.document.findUniqueOrThrow({ where: { id: documentId }, include: { signatures: true } });
     const signedCount = document.signatures.filter(({ status }) => status === "SIGNED").length;
     const required = Math.max(1, document.requiredSignatureCount);
-    return this.prisma.document.update({ where: { id: documentId }, data: { status: signedCount >= required ? "SIGNED" : "PARTIALLY_SIGNED", immutableAt: document.immutableAt ?? new Date() } });
+    await this.prisma.document.updateMany({ where: { id: documentId, status: { not: "SIGNED" } }, data: { status: signedCount >= required ? "SIGNED" : "PARTIALLY_SIGNED", immutableAt: document.immutableAt ?? new Date() } });
+    return this.prisma.document.findUniqueOrThrow({ where: { id: documentId } });
   }
 
   async archive(documentId: string, context: SupplierActorContext) {
@@ -426,17 +432,17 @@ export class DocumentsService {
   capabilities() { return this.signatures.capabilities(); }
 
   private async assertReferences(ownerOrganizationId: string, checkoutId?: string | null, supplierOrderId?: string | null, shipmentId?: string | null) {
-    if (checkoutId && !(await this.prisma.checkout.findUnique({ where: { id: checkoutId }, select: { id: true } }))) throw new BadRequestException("Checkout does not exist");
-    if (supplierOrderId) {
-      const order = await this.prisma.supplierOrder.findUnique({ where: { id: supplierOrderId }, select: { supplierOrganizationId: true, buyerOrganizationId: true, checkoutId: true } });
-      if (!order) throw new BadRequestException("Supplier order does not exist");
-      if (![order.supplierOrganizationId, order.buyerOrganizationId].includes(ownerOrganizationId)) throw new BadRequestException("Document owner is not a party to the supplier order");
-      if (checkoutId && order.checkoutId !== checkoutId) throw new BadRequestException("Supplier order belongs to another checkout");
-    }
-    if (shipmentId) {
-      const shipment = await this.prisma.shipment.findUnique({ where: { id: shipmentId }, select: { supplierOrderId: true } });
-      if (!shipment) throw new BadRequestException("Shipment does not exist");
-      if (supplierOrderId && shipment.supplierOrderId !== supplierOrderId) throw new BadRequestException("Shipment belongs to another supplier order");
-    }
+    const checkout = checkoutId ? await this.prisma.checkout.findUnique({ where: { id: checkoutId }, select: { buyerOrganizationId: true, supplierOrders: { select: { supplierOrganizationId: true, buyerOrganizationId: true } } } }) : null;
+    if (checkoutId && !checkout) throw new BadRequestException("Checkout does not exist");
+    const order = supplierOrderId ? await this.prisma.supplierOrder.findUnique({ where: { id: supplierOrderId }, select: { supplierOrganizationId: true, buyerOrganizationId: true, checkoutId: true } }) : null;
+    if (supplierOrderId && !order) throw new BadRequestException("Supplier order does not exist");
+    const shipment = shipmentId ? await this.prisma.shipment.findUnique({ where: { id: shipmentId }, select: { supplierOrderId: true, supplierOrder: { select: { supplierOrganizationId: true, buyerOrganizationId: true, checkoutId: true } } } }) : null;
+    if (shipmentId && !shipment) throw new BadRequestException("Shipment does not exist");
+    if (order && ![order.supplierOrganizationId, order.buyerOrganizationId].includes(ownerOrganizationId)) throw new BadRequestException("Document owner is not a party to the supplier order");
+    if (shipment && ![shipment.supplierOrder.supplierOrganizationId, shipment.supplierOrder.buyerOrganizationId].includes(ownerOrganizationId)) throw new BadRequestException("Document owner is not a party to the shipment order");
+    if (order && shipment && shipment.supplierOrderId !== supplierOrderId) throw new BadRequestException("Shipment belongs to another supplier order");
+    const relatedOrder = order ?? shipment?.supplierOrder ?? null;
+    if (relatedOrder && checkoutId && relatedOrder.checkoutId !== checkoutId) throw new BadRequestException("Document references belong to another checkout");
+    if (checkout && ![checkout.buyerOrganizationId, ...checkout.supplierOrders.flatMap(({ supplierOrganizationId, buyerOrganizationId }) => [supplierOrganizationId, buyerOrganizationId])].includes(ownerOrganizationId)) throw new BadRequestException("Document owner is not a party to the checkout");
   }
 }

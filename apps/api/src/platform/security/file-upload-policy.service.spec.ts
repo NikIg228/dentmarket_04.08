@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { FileUploadPolicyService } from "./file-upload-policy.service";
 
 function centralDirectoryEntry(name: string) {
@@ -39,5 +39,24 @@ describe("file upload magic detection", () => {
     const workbook = fakeZip(["[Content_Types].xml", "_rels/.rels", "xl/workbook.xml"]);
     await expect(policy.quarantine({ organizationId: crypto.randomUUID(), purpose: "import", fileName: "catalog.xlsx", body: workbook, allowedKinds: ["XLSX"], maxBytes: 1_000_000 })).resolves.toMatchObject({ status: "CLEAN" });
     await expect(policy.quarantine({ organizationId: crypto.randomUUID(), purpose: "import", fileName: "catalog.docx", body: workbook, allowedKinds: ["DOCX"], maxBytes: 1_000_000 })).rejects.toThrow();
+  });
+
+  it("deletes the quarantined object when scanning fails", async () => {
+    const asset = { id: "asset", storageKey: "quarantine/org/import/asset.csv", status: "QUARANTINED", checksumSha256: "checksum", detectedMime: "text/csv" };
+    const prisma = {
+      uploadAsset: {
+        create: vi.fn(async ({ data }: any) => ({ ...asset, ...data })),
+        findUnique: vi.fn(async () => asset),
+        update: vi.fn(async ({ data }: any) => ({ ...asset, ...data })),
+      },
+      securityEvent: { create: vi.fn(async () => ({})) },
+    };
+    const storage = { put: vi.fn(async () => ({ key: asset.storageKey })), delete: vi.fn(async () => undefined) };
+    const scanner = { scan: vi.fn(async () => { throw new Error("scanner unavailable"); }) };
+    const policy = new FileUploadPolicyService(prisma as never, storage as never, scanner as never);
+
+    await expect(policy.quarantine({ organizationId: crypto.randomUUID(), purpose: "import", fileName: "catalog.csv", body: Buffer.from("sku,name\n1,Item"), allowedKinds: ["CSV"], maxBytes: 1_000_000 })).rejects.toThrow("scanner unavailable");
+    expect(storage.delete).toHaveBeenCalledWith(asset.storageKey);
+    expect(prisma.uploadAsset.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: "REJECTED", deletedAt: expect.any(Date) }) }));
   });
 });

@@ -12,6 +12,15 @@ import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../platform/prisma/prisma.service";
 import { PlatformAuthorityPolicy } from "./platform-authority.policy";
 
+const membershipUserSelect = {
+  id: true,
+  email: true,
+  displayName: true,
+  status: true,
+  emailVerifiedAt: true,
+  locale: true,
+} as const;
+
 @Injectable()
 export class RoleManagementService {
   constructor(
@@ -90,7 +99,7 @@ export class RoleManagementService {
   listMemberships(organizationId: string) {
     return this.prisma.organizationMembership.findMany({
       where: { organizationId },
-      include: { user: true, roles: { include: { role: true } } },
+      include: { user: { select: membershipUserSelect }, roles: { include: { role: true } } },
       orderBy: { createdAt: "desc" },
     });
   }
@@ -122,7 +131,7 @@ export class RoleManagementService {
                 ? null
                 : undefined,
         },
-        include: { user: true, roles: { include: { role: true } } },
+        include: { user: { select: membershipUserSelect }, roles: { include: { role: true } } },
       });
       await tx.auditLog.create({
         data: {

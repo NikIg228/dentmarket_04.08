@@ -231,12 +231,15 @@ export class TrustCommerceService {
     return snapshot;
   }
 
-  async rating(supplierOrganizationId: string) {
-    const snapshot = await this.prisma.supplierTrustSnapshot.findUnique({
-      where: { supplierOrganizationId },
-      include: { appeals: { orderBy: { createdAt: "desc" }, take: 10 } },
-    });
-    return snapshot ?? {
+  async rating(supplierOrganizationId: string, context: SupplierActorContext) {
+    const operator = await this.isOperator(context.organizationId);
+    const ownerOrOperator = operator || context.organizationId === supplierOrganizationId;
+    const snapshot = await this.prisma.supplierTrustSnapshot.findUnique({ where: { supplierOrganizationId } });
+    if (snapshot) {
+      const appeals = ownerOrOperator ? await this.prisma.supplierTrustAppeal.findMany({ where: { snapshotId: snapshot.id, supplierOrganizationId }, orderBy: { createdAt: "desc" }, take: 10 }) : [];
+      return { ...snapshot, appeals };
+    }
+    return {
       supplierOrganizationId,
       status: "INSUFFICIENT_DATA",
       score: null,

@@ -1,7 +1,7 @@
-import { GetObjectCommand, HeadBucketCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { DeleteObjectCommand, GetObjectCommand, HeadBucketCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { Injectable } from "@nestjs/common";
-import { access, mkdir, readFile, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { resolve, sep } from "node:path";
 
 export type StoredObject = { key: string; size: number; contentType: string };
@@ -61,6 +61,24 @@ export class ObjectStorageService {
     } catch (error) {
       if (this.driver !== "local") throw error;
       return readFile(resolve(process.cwd(), "apps/buyer-web/public", key));
+    }
+  }
+
+  async delete(key: string) {
+    if (this.driver === "supabase") {
+      if (!this.supabaseUrl || !this.supabaseKey) throw new Error("Supabase private storage is not configured");
+      const response = await fetch(`${this.supabaseUrl}/storage/v1/object/${this.bucket}/${key}`, { method: "DELETE", headers: this.supabaseHeaders() });
+      if (!response.ok && response.status !== 404) throw new Error(`Supabase storage delete failed: ${response.status}`);
+      return;
+    }
+    if (this.s3) {
+      await this.s3.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: key }));
+      return;
+    }
+    try {
+      await unlink(this.safePath(key));
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
     }
   }
 
