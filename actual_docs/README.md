@@ -35,10 +35,13 @@
 
 - [Development Workflow](governance/DEVELOPMENT_WORKFLOW.md)
 - [Project Acceptance Matrix](governance/PROJECT_ACCEPTANCE_MATRIX.md)
+- [Security R2E — актуальный complete-coverage checkpoint](governance/SECURITY_R2E_2026-08-20.md)
+- [Security audit B4.5 — исторический dependency checkpoint](governance/SECURITY_AUDIT_B4_5_2026-08-19.md)
 
 ### `ui-ux/` — единый стандарт интерфейсов
 
 - [UI/UX Implementation Standard](ui-ux/UI_UX_IMPLEMENTATION_STANDARD.md)
+- [UI/UX Consolidation Standard](ui-ux/DENTMARKET_UI_UX_CONSOLIDATION_STANDARD.md)
 
 ### `architecture/` — система и ADR
 
@@ -49,6 +52,8 @@
 - [ADR 003: access model](architecture/adr/003-access-model.md)
 - [ADR 004: provider-independent integrations](architecture/adr/004-provider-independent-integrations.md)
 - [ADR 005: transactional outbox delivery](architecture/adr/005-transactional-outbox-delivery.md)
+- [ADR 006: platform authority policy](architecture/adr/006-platform-authority-policy.md)
+- [ADR 007: outbound request gateway](architecture/adr/007-outbound-request-gateway.md)
 
 ### `product-cards/` — карточки товаров и каталог
 
@@ -73,6 +78,9 @@
 - [Production deployment](operations/production-deployment.md)
 - [Production go-live checklist](operations/production-go-live-checklist.md)
 - [SLA и incident response](operations/sla-incident-response.md)
+- [Production auth runbook](operations/production-auth-runbook.md)
+- [Observability runbook](operations/observability-runbook.md)
+- [Backup/restore runbook](operations/backup-restore-runbook.md)
 
 ### `security/` — безопасность
 
