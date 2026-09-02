@@ -1,18 +1,99 @@
 "use client";
 
-import { useEffect, useState } from "react";
-
-const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "https://dentmarket-api.vercel.app/api";
-const buyerUrl = process.env.NEXT_PUBLIC_BUYER_APP_URL ?? "https://dentmarket-store.vercel.app";
+import { DmButton, LoadingState } from "@marketplace/ui";
+import { useEffect, useRef, useState } from "react";
+import { AuthBrand, AuthNotice } from "../auth-components";
+import {
+  type AuthFeedback,
+  type AuthSession,
+  authRequest,
+  feedbackFromError,
+  openWorkspace,
+} from "../auth-client";
 
 export default function VerifyEmailPage() {
-  const [state, setState] = useState("Проверяем ссылку…");
+  const [checking, setChecking] = useState(true);
+  const [feedback, setFeedback] = useState<AuthFeedback | null>(null);
+  const started = useRef(false);
+  const verifiedSession = useRef<AuthSession | null>(null);
+
+  const continueToWorkspace = async (session: AuthSession) => {
+    setChecking(true);
+    setFeedback(null);
+    try {
+      await openWorkspace(session);
+    } catch (cause) {
+      setFeedback(
+        feedbackFromError(
+          cause,
+          "Email подтверждён, но кабинет не открылся. Повторите переход.",
+        ),
+      );
+      setChecking(false);
+    }
+  };
+
   useEffect(() => {
+    if (started.current) return;
+    started.current = true;
     const token = new URLSearchParams(window.location.search).get("token");
-    if (!token) { setState("Ссылка подтверждения не найдена"); return; }
-    void fetch(`${apiUrl}/auth/email/verify`, { method: "POST", headers: { "content-type": "application/json" }, credentials: "include", body: JSON.stringify({ token }) })
-      .then(async (response) => { const data = await response.json() as { organizationId?: string; capability?: string; message?: string }; if (!response.ok) throw new Error(data.message ?? "Ссылка недействительна"); window.location.assign(data.capability === "SUPPLIER" ? (process.env.NEXT_PUBLIC_SUPPLIER_APP_URL ?? buyerUrl) : buyerUrl); })
-      .catch((error: unknown) => setState(error instanceof Error ? error.message : "Не удалось подтвердить email"));
+    if (!token) {
+      setFeedback({
+        kind: "error",
+        message:
+          "Ссылка подтверждения неполная. Откройте ссылку из письма ещё раз.",
+      });
+      setChecking(false);
+      return;
+    }
+
+    void authRequest<AuthSession>("/auth/email/verify", { token })
+      .then(async (session) => {
+        verifiedSession.current = session;
+        await continueToWorkspace(session);
+      })
+      .catch((cause: unknown) => {
+        setFeedback(
+          feedbackFromError(cause, "Не удалось подтвердить рабочий email"),
+        );
+        setChecking(false);
+      });
   }, []);
-  return <main className="registrationPage"><section className="registrationSuccess"><a className="brand" href="/"><span>DM</span><strong>DentMarket <small>KZ</small></strong></a><p className="eyebrow">Подтверждение email</p><div className="successMark">{state.startsWith("Проверяем") ? "…" : "!"}</div><h1>{state}</h1><p>Если ссылка истекла, запросите письмо повторно через восстановление доступа.</p><a className="primary registrationPrimary" href="/login">Перейти ко входу</a></section></main>;
+
+  return (
+    <main className="authUtilityPage">
+      <section className="authUtilityCard" aria-labelledby="verify-title">
+        <AuthBrand />
+        <p className="eyebrow">Подтверждение email</p>
+        <h1 id="verify-title">
+          {checking ? "Проверяем ссылку" : "Нужна ваша помощь"}
+        </h1>
+        {checking ? (
+          <LoadingState label="Подтверждаем email и открываем кабинет" />
+        ) : feedback ? (
+          <AuthNotice feedback={feedback} />
+        ) : null}
+        {!checking && verifiedSession.current ? (
+          <DmButton
+            type="button"
+            appearance="primary"
+            onClick={() => void continueToWorkspace(verifiedSession.current!)}
+          >
+            Повторить переход в кабинет
+          </DmButton>
+        ) : null}
+        {!checking && !verifiedSession.current ? (
+          <p className="authUtilityLead">
+            Если ссылка истекла, войдите с вашим email и запросите восстановление
+            доступа либо повторите регистрацию.
+          </p>
+        ) : null}
+        {!checking ? (
+          <a className="authBackLink" href="/login">
+            Перейти ко входу
+          </a>
+        ) : null}
+      </section>
+    </main>
+  );
 }

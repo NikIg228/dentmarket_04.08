@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Manrope } from "next/font/google";
+import { headers } from "next/headers";
 import type { ReactNode } from "react";
 import { MarketplaceProvider } from "@marketplace/ui";
 import "@marketplace/ui/styles.css";
@@ -14,4 +15,9 @@ export const metadata: Metadata = {
   openGraph: { title: "DentMarket KZ", description: "Прозрачные закупки для клиник и единый канал продаж для поставщиков.", type: "website", locale: "ru_KZ" },
 };
 
-export default function RootLayout({ children }: { children: ReactNode }) { return <html lang="ru"><body className={manrope.variable}><MarketplaceProvider>{children}</MarketplaceProvider></body></html>; }
+export default async function RootLayout({ children }: { children: ReactNode }) {
+  // A request context is required for Next to apply the per-request CSP nonce
+  // supplied by middleware to framework and application scripts.
+  await headers();
+  return <html lang="ru"><body className={manrope.variable}><MarketplaceProvider>{children}</MarketplaceProvider></body></html>;
+}

@@ -91,7 +91,15 @@ export function DmSelect({ className, ...props }: SelectProps) {
 
 /** Shared action control. Keep action hierarchy in one component boundary. */
 export function DmButton({ className, ...props }: ButtonProps) {
-  return <Button {...props} className={joinClasses("dm-button", className)} />;
+  const appearance = props.appearance ?? "secondary";
+  return (
+    <Button
+      {...props}
+      appearance={appearance}
+      data-dm-appearance={appearance}
+      className={joinClasses("dm-button", className)}
+    />
+  );
 }
 
 /** Shared checkbox control for filters and capability selections. */

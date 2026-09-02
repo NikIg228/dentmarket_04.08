@@ -3,112 +3,287 @@
 import Script from "next/script";
 import { DmButton, DmField, DmInput } from "@marketplace/ui";
 import { type FormEvent, useEffect, useRef, useState } from "react";
-
-type Capability = "BUYER" | "SUPPLIER";
-type Session = {
-  accessToken: string;
-  sessionId?: string;
-  activeOrganizationId?: string | null;
-  organizationId?: string;
-  organizationDisplayName?: string;
-  capability?: Capability;
-  user: { id: string; displayName: string; email: string };
-};
+import { AuthBrand, AuthNotice, AuthRolePicker } from "../auth-components";
+import {
+  type AuthCapability,
+  type AuthFeedback,
+  type AuthSession,
+  authRequest,
+  buyerAppUrl,
+  feedbackFromError,
+  openWorkspace,
+} from "../auth-client";
 
 declare global {
   interface Window {
-    google?: { accounts: { id: { initialize(input: { client_id: string; callback: (response: { credential: string }) => void }): void; renderButton(element: HTMLElement, options: Record<string, unknown>): void } } };
-    AppleID?: { auth: { init(input: Record<string, unknown>): void; signIn(): Promise<{ authorization: { id_token: string } }> } };
+    google?: {
+      accounts: {
+        id: {
+          initialize(input: {
+            client_id: string;
+            callback: (response: { credential: string }) => void;
+          }): void;
+          renderButton(
+            element: HTMLElement,
+            options: Record<string, unknown>,
+          ): void;
+        };
+      };
+    };
+    AppleID?: {
+      auth: {
+        init(input: Record<string, unknown>): void;
+        signIn(): Promise<{ authorization: { id_token: string } }>;
+      };
+    };
   }
 }
 
-const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "https://dentmarket-api.vercel.app/api";
-const buyerAppUrl = process.env.NEXT_PUBLIC_BUYER_APP_URL ?? "https://dentmarket-store.vercel.app";
-const supplierAppUrl = process.env.NEXT_PUBLIC_SUPPLIER_APP_URL ?? "https://dentmarket-supplier.vercel.app";
 const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? "";
 const appleClientId = process.env.NEXT_PUBLIC_APPLE_CLIENT_ID ?? "";
 const appleRedirectUri = process.env.NEXT_PUBLIC_APPLE_REDIRECT_URI ?? "";
 
+type BusyAction = "email" | "forgot" | "demo" | "social" | null;
+
 export default function LoginPage() {
-  const [capability, setCapability] = useState<Capability>("BUYER");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [capability, setCapability] = useState<AuthCapability>("BUYER");
+  const [busyAction, setBusyAction] = useState<BusyAction>(null);
+  const [feedback, setFeedback] = useState<AuthFeedback | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const googleButton = useRef<HTMLDivElement>(null);
-
-  const request = async <T,>(path: string, body: unknown): Promise<T> => {
-    const response = await fetch(`${apiUrl}${path}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), credentials: "include" });
-    const payload = await response.json().catch(() => null) as T & { message?: string | string[] };
-    if (!response.ok) throw new Error(Array.isArray(payload?.message) ? payload.message.join(". ") : payload?.message ?? `HTTP ${response.status}`);
-    return payload;
-  };
-
-  const routeSession = async (session: Session) => {
-    const organizationId = session.activeOrganizationId ?? session.organizationId;
-    if (!organizationId) throw new Error("У аккаунта нет активной организации");
-    let resolvedCapability = session.capability;
-    let organizationDisplayName = session.organizationDisplayName;
-    if (!resolvedCapability) {
-      const response = await fetch(`${apiUrl}/organizations/${organizationId}`, { headers: { authorization: `Bearer ${session.accessToken}` }, cache: "no-store" });
-      const organization = await response.json() as { displayName?: string; capabilities?: Array<{ capability: string }>; message?: string };
-      if (!response.ok) throw new Error(organization.message ?? "Не удалось определить организацию");
-      organizationDisplayName = organization.displayName;
-      resolvedCapability = organization.capabilities?.some(({ capability: item }) => item === "SUPPLIER") ? "SUPPLIER" : organization.capabilities?.some(({ capability: item }) => item === "BUYER") ? "BUYER" : undefined;
-    }
-    if (!resolvedCapability) throw new Error("Для аккаунта не найден кабинет клиники или поставщика");
-    const handoffResponse = await fetch(`${apiUrl}/auth/handoff`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${session.accessToken}`, "x-user-id": session.user.id, "x-organization-id": organizationId, ...(session.sessionId ? { "x-session-id": session.sessionId } : {}) }, body: JSON.stringify({ capability: resolvedCapability }), credentials: "include" });
-    const handoffPayload = await handoffResponse.json() as { handoffCode?: string; organizationDisplayName?: string; message?: string };
-    if (!handoffResponse.ok || !handoffPayload.handoffCode) throw new Error(handoffPayload.message ?? "Не удалось открыть кабинет");
-    const handoff = encodeURIComponent(JSON.stringify({ displayName: session.user.displayName, organizationDisplayName: handoffPayload.organizationDisplayName ?? organizationDisplayName, organizationId, handoffCode: handoffPayload.handoffCode, capability: resolvedCapability }));
-    window.location.assign(`${resolvedCapability === "SUPPLIER" ? supplierAppUrl : buyerAppUrl}/#session=${handoff}`);
-  };
+  const busy = busyAction !== null;
+  const hasGoogle = Boolean(googleClientId);
+  const hasApple = Boolean(appleClientId && appleRedirectUri);
+  const hasSocialLogin = hasGoogle || hasApple;
 
   const exchange = async (provider: "GOOGLE" | "APPLE", idToken: string) => {
-    setBusy(true); setError("");
-    try { await routeSession(await request<Session>("/auth/social/exchange", { provider, idToken })); }
-    catch (cause) { setError(cause instanceof Error ? cause.message : "Вход не выполнен"); }
-    finally { setBusy(false); }
+    setBusyAction("social");
+    setFeedback(null);
+    try {
+      await openWorkspace(
+        await authRequest<AuthSession>("/auth/social/exchange", {
+          provider,
+          idToken,
+        }),
+        capability,
+      );
+    } catch (cause) {
+      setFeedback(feedbackFromError(cause, "Вход не выполнен"));
+    } finally {
+      setBusyAction(null);
+    }
   };
 
   const demo = async () => {
-    setBusy(true); setError("");
-    try { await routeSession(await request<Session>("/auth/demo", { capability })); }
-    catch (cause) { setError(cause instanceof Error ? cause.message : "Не удалось открыть кабинет"); }
-    finally { setBusy(false); }
+    setBusyAction("demo");
+    setFeedback(null);
+    try {
+      await openWorkspace(
+        await authRequest<AuthSession>("/auth/demo", { capability }),
+        capability,
+      );
+    } catch (cause) {
+      setFeedback(feedbackFromError(cause, "Не удалось открыть кабинет"));
+    } finally {
+      setBusyAction(null);
+    }
   };
 
   const emailLogin = async (event: FormEvent) => {
-    event.preventDefault(); setBusy(true); setError("");
-    try { await routeSession(await request<Session>("/auth/login", { email, password })); }
-    catch (cause) { setError(cause instanceof Error ? cause.message : "Вход не выполнен"); }
-    finally { setBusy(false); }
+    event.preventDefault();
+    setBusyAction("email");
+    setFeedback(null);
+    try {
+      await openWorkspace(
+        await authRequest<AuthSession>("/auth/login", { email, password }),
+        capability,
+      );
+    } catch (cause) {
+      setFeedback(feedbackFromError(cause, "Вход не выполнен"));
+    } finally {
+      setBusyAction(null);
+    }
   };
 
   const forgotPassword = async () => {
-    if (!email) return setError("Укажите email для восстановления пароля");
-    try { await request("/auth/password/forgot", { email }); setError("Если аккаунт существует, письмо для восстановления отправлено"); }
-    catch (cause) { setError(cause instanceof Error ? cause.message : "Не удалось отправить письмо"); }
+    if (!email) {
+      setFeedback({
+        kind: "error",
+        message: "Сначала укажите рабочий email в поле выше.",
+      });
+      return;
+    }
+    setBusyAction("forgot");
+    setFeedback(null);
+    try {
+      await authRequest("/auth/password/forgot", { email });
+      setFeedback({
+        kind: "success",
+        message:
+          "Если аккаунт существует, мы отправили ссылку для восстановления пароля.",
+      });
+    } catch (cause) {
+      setFeedback(feedbackFromError(cause, "Не удалось отправить письмо"));
+    } finally {
+      setBusyAction(null);
+    }
   };
 
   const renderGoogle = () => {
-    if (!googleClientId || !window.google || !googleButton.current) return;
+    if (!hasGoogle || !window.google || !googleButton.current) return;
     googleButton.current.replaceChildren();
-    window.google.accounts.id.initialize({ client_id: googleClientId, callback: ({ credential }) => void exchange("GOOGLE", credential) });
-    window.google.accounts.id.renderButton(googleButton.current, { theme: "outline", size: "large", width: 360, locale: "ru" });
+    window.google.accounts.id.initialize({
+      client_id: googleClientId,
+      callback: ({ credential }) => void exchange("GOOGLE", credential),
+    });
+    window.google.accounts.id.renderButton(googleButton.current, {
+      theme: "outline",
+      size: "large",
+      width: 360,
+      locale: "ru",
+    });
   };
-  useEffect(() => { renderGoogle(); }, []);
+
+  useEffect(() => {
+    renderGoogle();
+  }, []);
 
   const apple = async () => {
-    if (!window.AppleID || !appleClientId || !appleRedirectUri) return setError("Apple Sign In ещё не настроен для этого домена");
-    try { window.AppleID.auth.init({ clientId: appleClientId, scope: "name email", redirectURI: appleRedirectUri, usePopup: true }); const result = await window.AppleID.auth.signIn(); await exchange("APPLE", result.authorization.id_token); }
-    catch (cause) { setError(cause instanceof Error ? cause.message : "Apple Sign In не выполнен"); }
+    if (!window.AppleID || !hasApple) return;
+    try {
+      window.AppleID.auth.init({
+        clientId: appleClientId,
+        scope: "name email",
+        redirectURI: appleRedirectUri,
+        usePopup: true,
+      });
+      const result = await window.AppleID.auth.signIn();
+      await exchange("APPLE", result.authorization.id_token);
+    } catch (cause) {
+      setFeedback(feedbackFromError(cause, "Apple Sign In не выполнен"));
+    }
   };
 
-  return <main className="loginPage">
-    <Script src="https://accounts.google.com/gsi/client?hl=ru" strategy="afterInteractive" onLoad={renderGoogle} />
-    <Script src="https://appleid.cdn-apple.com/appleauth/static/jsapi/appleid/1/ru_RU/appleid.auth.js" strategy="afterInteractive" />
-    <section className="loginIntro"><a className="brand" href={buyerAppUrl}><span>DM</span><strong>DentMarket <small>KZ</small></strong></a><div><p className="eyebrow">Вход в DentMarket</p><h1>Продолжите работу в своём кабинете</h1><p>Закупайте для клиники или управляйте продажами и заказами.</p></div><a className="backLink" href={buyerAppUrl}>← Вернуться в магазин</a></section>
-    <section className="loginPanel"><div className="loginCard"><p className="eyebrow">Вход</p><h2>Выберите кабинет</h2><div className="rolePicker"><button type="button" data-selected={capability === "BUYER"} onClick={() => setCapability("BUYER")}><b>Клиника</b><span>Магазин и закупки</span></button><button type="button" data-selected={capability === "SUPPLIER"} onClick={() => setCapability("SUPPLIER")}><b>Поставщик</b><span>Продажи и товары</span></button></div><form className="emailLoginForm" onSubmit={emailLogin}><DmField label="Рабочий email" required><DmInput type="email" autoComplete="email" value={email} onChange={(_, data) => setEmail(data.value)} required /></DmField><DmField label="Пароль" required><DmInput type="password" autoComplete="current-password" value={password} onChange={(_, data) => setPassword(data.value)} required /></DmField><DmButton type="submit" appearance="primary" disabled={busy}>{busy ? "Входим…" : "Войти по email"}</DmButton><DmButton type="button" appearance="subtle" className="linkButton" onClick={() => void forgotPassword()}>Забыли пароль?</DmButton></form><div className="divider"><span>или</span></div><div className="identityButtons"><div ref={googleButton} className="googleButton" />{!googleClientId ? <div className="identityDisabled">Вход через Google пока недоступен</div> : null}<DmButton type="button" appearance="secondary" className="appleButton" onClick={() => void apple()} disabled={!appleClientId || !appleRedirectUri || busy}> Продолжить с Apple</DmButton><div className="divider"><span>посмотреть без регистрации</span></div><DmButton type="button" appearance="primary" className="demoLogin" onClick={() => void demo()} disabled={busy}>{busy ? "Открываем кабинет…" : capability === "BUYER" ? "Посмотреть магазин" : "Посмотреть кабинет поставщика"}</DmButton></div>{error ? <p className="formError" role="alert">{error}</p> : null}<p className="loginSignup">Нет аккаунта? <a href={`/register?role=${capability === "BUYER" ? "buyer" : "supplier"}`}>Зарегистрироваться</a></p></div></section>
-  </main>;
+  return (
+    <main className="loginPage">
+      {hasGoogle ? (
+        <Script
+          src="https://accounts.google.com/gsi/client?hl=ru"
+          strategy="afterInteractive"
+          onLoad={renderGoogle}
+        />
+      ) : null}
+      {hasApple ? (
+        <Script
+          src="https://appleid.cdn-apple.com/appleauth/static/jsapi/appleid/1/ru_RU/appleid.auth.js"
+          strategy="afterInteractive"
+        />
+      ) : null}
+      <section className="loginIntro">
+        <AuthBrand href={buyerAppUrl} />
+        <div>
+          <p className="eyebrow">Вход в DentMarket</p>
+          <h1>Продолжите работу в своём кабинете</h1>
+          <p>Закупайте для клиники или управляйте продажами и заказами.</p>
+        </div>
+        <a className="backLink" href={buyerAppUrl}>
+          ← Вернуться в магазин
+        </a>
+      </section>
+      <section className="loginPanel" aria-labelledby="login-title">
+        <div className="loginCard">
+          <p className="eyebrow">Вход</p>
+          <h2 id="login-title">Выберите кабинет</h2>
+          <AuthRolePicker
+            value={capability}
+            onChange={setCapability}
+            disabled={busy}
+          />
+          <form className="emailLoginForm" onSubmit={emailLogin}>
+            <DmField label="Рабочий email" required>
+              <DmInput
+                type="email"
+                autoComplete="email"
+                value={email}
+                onChange={(_, data) => setEmail(data.value)}
+                disabled={busy}
+                required
+              />
+            </DmField>
+            <DmField label="Пароль" required>
+              <DmInput
+                type="password"
+                autoComplete="current-password"
+                value={password}
+                onChange={(_, data) => setPassword(data.value)}
+                disabled={busy}
+                required
+              />
+            </DmField>
+            <DmButton type="submit" appearance="primary" disabled={busy}>
+              {busyAction === "email" ? "Входим…" : "Войти по email"}
+            </DmButton>
+            <DmButton
+              type="button"
+              appearance="subtle"
+              className="linkButton"
+              onClick={() => void forgotPassword()}
+              disabled={busy}
+            >
+              {busyAction === "forgot" ? "Отправляем…" : "Забыли пароль?"}
+            </DmButton>
+          </form>
+          {hasSocialLogin ? (
+            <>
+              <div className="divider">
+                <span>или</span>
+              </div>
+              <div className="identityButtons">
+                {hasGoogle ? (
+                  <div ref={googleButton} className="googleButton" />
+                ) : null}
+                {hasApple ? (
+                  <DmButton
+                    type="button"
+                    appearance="secondary"
+                    className="appleButton"
+                    onClick={() => void apple()}
+                    disabled={busy}
+                  >
+                     Продолжить с Apple
+                  </DmButton>
+                ) : null}
+              </div>
+            </>
+          ) : null}
+          <div className="divider">
+            <span>посмотреть без регистрации</span>
+          </div>
+          <DmButton
+            type="button"
+            appearance="primary"
+            className="demoLogin"
+            onClick={() => void demo()}
+            disabled={busy}
+          >
+            {busyAction === "demo"
+              ? "Открываем кабинет…"
+              : capability === "BUYER"
+                ? "Посмотреть магазин"
+                : "Посмотреть кабинет поставщика"}
+          </DmButton>
+          {feedback ? <AuthNotice feedback={feedback} /> : null}
+          <p className="loginSignup">
+            Нет аккаунта?{" "}
+            <a
+              href={`/register?role=${capability === "BUYER" ? "buyer" : "supplier"}`}
+            >
+              Зарегистрироваться
+            </a>
+          </p>
+        </div>
+      </section>
+    </main>
+  );
 }
