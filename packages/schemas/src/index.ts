@@ -1243,3 +1243,25 @@ export type FailIntegrationJobInput = z.infer<typeof failIntegrationJobSchema>;
 export type ReconciliationQueryInput = z.infer<typeof reconciliationQuerySchema>;
 export type ResolveReconciliationInput = z.infer<typeof resolveReconciliationSchema>;
 export type UpdateConnectorReadinessInput = z.infer<typeof updateConnectorReadinessSchema>;
+
+export {
+  connectorAgentJobResultSchema,
+  connectorCatalogItemSchema,
+  connectorCatalogResultSchema,
+  connectorDiagnosticResultSchema,
+  connectorInventoryItemSchema,
+  connectorInventoryResultSchema,
+  connectorOrderResultSchema,
+  connectorPriceItemSchema,
+  connectorPriceResultSchema,
+  connectorReservationResultSchema,
+  parseConnectorAgentJobResult,
+} from "./integration-contracts.js";
+export type {
+  ConnectorAgentJobType,
+  ConnectorCatalogResult,
+  ConnectorInventoryResult,
+  ConnectorOrderResult,
+  ConnectorPriceResult,
+  ConnectorReservationResult,
+} from "./integration-contracts.js";

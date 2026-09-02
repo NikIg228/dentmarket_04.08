@@ -1,14 +1,15 @@
-import { ConflictException, Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
-import type { CompleteIntegrationJobInput, ConnectorAgentHeartbeatInput, EnrollConnectorAgentInput, FailIntegrationJobInput } from "@marketplace/schemas";
+import { BadRequestException, ConflictException, Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
+import { parseConnectorAgentJobResult, type CompleteIntegrationJobInput, type ConnectorAgentHeartbeatInput, type EnrollConnectorAgentInput, type FailIntegrationJobInput } from "@marketplace/schemas";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../platform/prisma/prisma.service";
 import { IntegrationCryptoService } from "./integration-crypto.service";
 import { IntegrationJobsService } from "./integration-jobs.service";
 import { ExternalReservationsService } from "./external-reservations.service";
+import { IntegrationExecutionService } from "./integration-execution.service";
 
 @Injectable()
 export class ConnectorAgentService {
-  constructor(private readonly prisma: PrismaService, private readonly crypto: IntegrationCryptoService, private readonly jobs: IntegrationJobsService, private readonly externalReservations: ExternalReservationsService) {}
+  constructor(private readonly prisma: PrismaService, private readonly crypto: IntegrationCryptoService, private readonly jobs: IntegrationJobsService, private readonly externalReservations: ExternalReservationsService, private readonly execution: IntegrationExecutionService) {}
 
   async enroll(agentId: string, input: EnrollConnectorAgentInput, ipAddress?: string) {
     const agent = await this.prisma.connectorAgent.findUnique({ where: { agentId }, include: { connection: true } });
@@ -36,17 +37,47 @@ export class ConnectorAgentService {
 
   async claim(agentId: string, authorization: string | undefined) {
     const agent = await this.authenticate(agentId, authorization);
-    const job = await this.jobs.claimForAgent(agent.connectionId, this.workerId(agent.id));
-    if (!job) return { job: null };
-    return { job: { id: job.id, type: job.type, trigger: job.trigger, payload: job.payload, cursor: job.cursor, attempt: job.attempt, maxAttempts: job.maxAttempts, correlationId: job.correlationId } };
+    const workerId = this.workerId(agent.id);
+    for (let index = 0; index < 5; index += 1) {
+      const job = await this.jobs.claimForAgent(agent.connectionId, workerId);
+      if (!job) return { job: null };
+      if (["FULL_SYNC", "INCREMENTAL_SYNC"].includes(job.type)) {
+        const expanded = await this.execution.enqueueCompositeSync(job);
+        await this.jobs.complete(job.id, workerId, expanded);
+        continue;
+      }
+      return { job: { id: job.id, type: job.type, trigger: job.trigger, payload: job.payload, cursor: job.cursor, attempt: job.attempt, maxAttempts: job.maxAttempts, correlationId: job.correlationId } };
+    }
+    return { job: null };
   }
 
   async complete(agentId: string, authorization: string | undefined, jobId: string, input: CompleteIntegrationJobInput) {
     const agent = await this.authenticate(agentId, authorization);
     const job = await this.prisma.integrationSyncJob.findFirst({ where: { id: jobId, connectionId: agent.connectionId } });
     if (!job) throw new NotFoundException("Integration job not found for this agent");
-    await this.externalReservations.finalizeAgentJob(jobId, input.result);
-    return this.jobs.complete(jobId, this.workerId(agent.id), input.result, input.cursor);
+    const parsedResult = parseConnectorAgentJobResult(job.type, input.result);
+    if (!parsedResult.success) {
+      throw new BadRequestException({
+        code: "INVALID_CONNECTOR_JOB_RESULT",
+        message: "Connector job result does not match the job contract",
+        details: parsedResult.error.flatten(),
+      });
+    }
+    const result = parsedResult.data as Record<string, unknown>;
+    const workerId = this.workerId(agent.id);
+    const completion = await this.jobs.acquireCompletion(jobId, agent.connectionId, workerId);
+    try {
+      const application = await this.execution.applyAgentResult(completion.job, result);
+      await this.externalReservations.finalizeAgentJob(jobId, result);
+      const nextCursor = result.nextCursor && typeof result.nextCursor === "object" && !Array.isArray(result.nextCursor)
+        ? result.nextCursor as Record<string, unknown>
+        : null;
+      const completed = await this.jobs.complete(jobId, completion.workerId, result, nextCursor);
+      return { ...completed, application };
+    } catch (error) {
+      await this.jobs.releaseCompletion(jobId, completion.workerId, workerId);
+      throw error;
+    }
   }
 
   async fail(agentId: string, authorization: string | undefined, jobId: string, input: FailIntegrationJobInput) {

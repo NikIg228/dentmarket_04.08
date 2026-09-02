@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import type { CompleteDocumentSignatureInput, CreateDocumentTemplateInput, CreateDocumentVersionInput, CreateGeneratedDocumentInput, CreateSignatureSessionInput, DocumentQueryInput, GenerateOrderDocumentPackRequest, UploadDocumentInput } from "@marketplace/schemas";
 import { Prisma } from "@prisma/client";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { PrismaService } from "../../platform/prisma/prisma.service";
 import { ObjectStorageService } from "../../platform/storage/object-storage.service";
 import type { SupplierActorContext } from "../suppliers/supplier-access.service";
@@ -374,6 +374,31 @@ export class DocumentsService {
     const updatedDocument = result.status === "SIGNED" ? await this.refreshDocumentSignatureStatus(documentId) : await this.prisma.document.update({ where: { id: documentId }, data: { status: "AWAITING_SIGNATURE" } });
     await this.prisma.auditLog.create({ data: { ...context, action: "document.signature_session.created", entityType: "DocumentSignature", entityId: signature.id, after: { documentId, method: input.method, status: signature.status, signerOrganizationId: signature.signerOrganizationId } } });
     return { signature, signingUrl: result.signingUrl, document: updatedDocument };
+  }
+
+  async createLocalEdsSignatureSession(documentId: string, input: Omit<CreateSignatureSessionInput, "method"> & { method: "EDS" }, context: SupplierActorContext) {
+    const document = await this.get(documentId, context);
+    const operator = await this.isOperator(context.organizationId);
+    if (input.signerOrganizationId && input.signerOrganizationId !== context.organizationId && !operator) throw new ForbiddenException("Signer organization must be the active organization");
+    if (input.signerUserId && input.signerUserId !== context.actorId && !operator) throw new ForbiddenException("Signer user must be the authenticated user");
+    if (!document.checksumSha256 || !document.storageKey) throw new ConflictException("Document content is not ready for signature");
+    if (!["GENERATED", "AWAITING_SIGNATURE", "PARTIALLY_SIGNED"].includes(document.status)) throw new ConflictException("Document cannot be signed in its current state");
+    const externalSessionId = `ncalayer-${randomUUID()}`;
+    const expiresAt = new Date(Date.now() + input.expiresInMinutes * 60_000);
+    const signature = await this.prisma.documentSignature.create({ data: {
+      documentId,
+      signerOrganizationId: input.signerOrganizationId,
+      signerUserId: input.signerUserId,
+      signerName: input.signerName,
+      method: "EDS",
+      status: "SESSION_CREATED",
+      externalSessionId,
+      expiresAt,
+      evidence: { provider: "ncalayer-local", format: "CMS", checksumSha256: document.checksumSha256 },
+    } });
+    const updatedDocument = await this.prisma.document.update({ where: { id: documentId }, data: { status: "AWAITING_SIGNATURE" } });
+    await this.prisma.auditLog.create({ data: { ...context, action: "document.signature_session.created", entityType: "DocumentSignature", entityId: signature.id, after: { documentId, method: "EDS", status: signature.status, provider: "ncalayer-local", signerOrganizationId: signature.signerOrganizationId } } });
+    return { signature, signingUrl: null, document: updatedDocument };
   }
 
   async completeSignature(signatureId: string, input: CompleteDocumentSignatureInput, context: SupplierActorContext, trustedExternalCallback = false) {

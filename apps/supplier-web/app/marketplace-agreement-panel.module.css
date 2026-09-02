@@ -1,6 +1,7 @@
 .stack { display: grid; gap: 18px; }
 .loading { min-height: 320px; display: grid; place-items: center; }
 .error { padding: 12px 16px; border: 1px solid var(--colorPaletteRedBorder2); border-radius: 10px; background: var(--colorPaletteRedBackground1); color: var(--colorPaletteRedForeground1); }
+.success { padding: 12px 16px; border: 1px solid var(--colorPaletteGreenBorder2); border-radius: 10px; background: var(--colorPaletteGreenBackground1); color: var(--colorPaletteGreenForeground1); }
 .callout { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 18px; align-items: center; padding: 22px; }
 .callout h2, .callout p { margin: 0; }
 .callout p { margin-top: 6px; max-width: 720px; color: var(--colorNeutralForeground3); line-height: 1.55; }

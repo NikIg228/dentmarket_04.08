@@ -151,8 +151,18 @@ export class MarketplaceApiClient {
     }
     const disposition = response.headers.get("content-disposition");
     const encodedName = disposition?.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
+    let blob: Blob;
+    if ((response.headers.get("content-type") ?? "").toLowerCase().includes("application/json")) {
+      const payload = (await response.json()) as { url?: unknown };
+      if (typeof payload.url !== "string" || !payload.url) throw new MarketplaceApiError(502, { message: "Document download did not return a file or signed URL" });
+      const signedResponse = await fetch(payload.url, { cache: "no-store" });
+      if (!signedResponse.ok) throw new MarketplaceApiError(signedResponse.status, { message: "Signed document download failed" });
+      blob = await signedResponse.blob();
+    } else {
+      blob = await response.blob();
+    }
     return {
-      blob: await response.blob(),
+      blob,
       fileName: encodedName ? decodeURIComponent(encodedName) : null,
     };
   }

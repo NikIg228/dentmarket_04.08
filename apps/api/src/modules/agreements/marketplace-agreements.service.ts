@@ -1,6 +1,7 @@
 import { ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { Cron } from "@nestjs/schedule";
 import { Prisma } from "@prisma/client";
+import type { SignMarketplaceAgreementInput } from "@marketplace/schemas";
 import { PrismaService } from "../../platform/prisma/prisma.service";
 import { DocumentsService } from "../documents/documents.service";
 import type { SupplierActorContext } from "../suppliers/supplier-access.service";
@@ -74,7 +75,7 @@ export class MarketplaceAgreementsService {
     return agreement;
   }
 
-  async sign(agreementId: string, input: { signerName: string; expiresInMinutes: number }, context: SupplierActorContext) {
+  async sign(agreementId: string, input: SignMarketplaceAgreementInput, context: SupplierActorContext) {
     const agreement = await this.requireParty(agreementId, context);
     if (agreement.status === "ACTIVE" || agreement.status === "NON_RENEWING") throw new ConflictException("Agreement is already valid; signing window is unavailable");
     if (agreement.status !== "AWAITING_SIGNATURE") throw new ConflictException("Agreement cannot be signed in its current state");
@@ -84,7 +85,10 @@ export class MarketplaceAgreementsService {
     if (stale.length) await this.prisma.documentSignature.updateMany({ where: { id: { in: stale.map(({ id }) => id) } }, data: { status: "EXPIRED", rejectionReason: "Signing session expired before completion" } });
     const existing = agreement.document.signatures.find(({ signerOrganizationId, method, status, expiresAt }) => signerOrganizationId === context.organizationId && method === "EDS" && ["PENDING", "SESSION_CREATED", "SIGNED"].includes(status) && (status === "SIGNED" || !expiresAt || expiresAt > now));
     if (existing) return { agreement: await this.presentation(agreement.id, context), signature: existing, signingUnavailableReason: existing.status === "SIGNED" ? "party_already_signed" : "signature_session_exists" };
-    const result = await this.documents.createSignatureSession(agreement.documentId, { method: "EDS", signerOrganizationId: context.organizationId, signerUserId: context.actorId, signerName: input.signerName, expiresInMinutes: input.expiresInMinutes }, context);
+    const sessionInput = { method: "EDS" as const, signerOrganizationId: context.organizationId, signerUserId: context.actorId, signerName: input.signerName, expiresInMinutes: input.expiresInMinutes };
+    const result = input.signingMode === "LOCAL_NCALAYER"
+      ? await this.documents.createLocalEdsSignatureSession(agreement.documentId, sessionInput, context)
+      : await this.documents.createSignatureSession(agreement.documentId, sessionInput, context);
     await this.reconcile(agreement.id);
     return { agreement: await this.presentation(agreement.id, context), signature: result.signature, signingUrl: result.signingUrl };
   }

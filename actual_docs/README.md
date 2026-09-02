@@ -58,6 +58,7 @@
 ### `integrations/` — подключения поставщиков и runbooks
 
 - [Connector readiness](integrations/connector-readiness.md)
+- [ЭЦП НУЦ РК и 1С — техническая спецификация](integrations/eds-and-1c-integration-technical-spec.md)
 - [Supabase](integrations/supabase.md)
 - [Manual supplier](integrations/runbooks/manual-supplier.md)
 - [File import](integrations/runbooks/file-import.md)

@@ -213,10 +213,40 @@ export const initiateMarketplaceAgreementSchema = z.object({
 export const signMarketplaceAgreementSchema = z.object({
   signerName: z.string().trim().min(2).max(240),
   expiresInMinutes: z.number().int().min(5).max(1_440).default(60),
+  signingMode: z.enum(["LOCAL_NCALAYER", "REMOTE_GATEWAY"]).default("REMOTE_GATEWAY"),
 });
 
 export const marketplaceAgreementDecisionSchema = z.object({
   reason: z.string().trim().min(10).max(1_000),
+});
+
+const sha256HexSchema = z.string().trim().regex(/^[a-f0-9]{64}$/i);
+
+export const signatureGatewayCertificateSchema = z.object({
+  subjectBin: z.string().regex(/^\d{12}$/),
+  issuer: z.string().trim().min(2).max(500),
+  serialNumber: z.string().trim().min(2).max(240),
+  validFrom: z.iso.datetime(),
+  validTo: z.iso.datetime(),
+});
+
+export const signatureGatewayVerificationSchema = z.object({
+  verified: z.literal(true),
+  signatureVerified: z.literal(true),
+  certificateChainVerified: z.literal(true),
+  revocationStatus: z.literal("GOOD"),
+  signedDocumentChecksum: sha256HexSchema,
+  signatureHash: sha256HexSchema,
+  externalSignatureId: z.string().trim().min(6).max(240),
+  certificate: signatureGatewayCertificateSchema,
+  provider: z.string().trim().min(2).max(160),
+  evidence: z.record(z.string(), z.unknown()).default({}),
+});
+
+export const browserEdsSignatureSchema = z.object({
+  signatureId: z.uuid(),
+  signedContainerBase64: z.string().regex(/^[A-Za-z0-9+/]+={0,2}$/).min(16).max(16_000_000),
+  dataChecksumSha256: sha256HexSchema,
 });
 
 export const signatureGatewayCallbackSchema = z.object({
@@ -227,20 +257,31 @@ export const signatureGatewayCallbackSchema = z.object({
   signatureHash: z.string().trim().min(32).max(512).nullable().optional(),
   rejectionReason: z.string().trim().max(1_000).nullable().optional(),
   signedDocumentChecksum: z.string().trim().regex(/^[a-f0-9]{64}$/i),
-  certificate: z.object({
-    subjectBin: z.string().regex(/^\d{12}$/),
-    issuer: z.string().trim().min(2).max(500),
-    serialNumber: z.string().trim().min(2).max(240),
-    validFrom: z.iso.datetime(),
-    validTo: z.iso.datetime(),
-  }),
+  certificate: signatureGatewayCertificateSchema,
+  verification: signatureGatewayVerificationSchema.optional(),
   evidence: z.record(z.string(), z.unknown()).default({}),
+}).superRefine((value, context) => {
+  if (value.status !== "SIGNED") return;
+  if (!value.verification) {
+    context.addIssue({ code: "custom", path: ["verification"], message: "Signed callback requires gateway verification evidence" });
+    return;
+  }
+  if (value.verification.signedDocumentChecksum.toLowerCase() !== value.signedDocumentChecksum.toLowerCase()) {
+    context.addIssue({ code: "custom", path: ["verification", "signedDocumentChecksum"], message: "Verification checksum does not match the callback checksum" });
+  }
+  if (value.verification.certificate.subjectBin !== value.certificate.subjectBin) {
+    context.addIssue({ code: "custom", path: ["verification", "certificate", "subjectBin"], message: "Verification certificate BIN does not match the callback certificate" });
+  }
+  if (value.externalSignatureId && value.verification.externalSignatureId !== value.externalSignatureId) {
+    context.addIssue({ code: "custom", path: ["verification", "externalSignatureId"], message: "Verification signature ID does not match the callback signature ID" });
+  }
 });
 
 export type SocialExchangeInput = z.infer<typeof socialExchangeSchema>;
 export type CreateRegistrationIntentInput = z.infer<typeof createRegistrationIntentSchema>;
 export type CreateBuyerSupplierAgreementInput = z.infer<typeof createBuyerSupplierAgreementSchema>;
 export type SignBuyerSupplierAgreementInput = z.infer<typeof signBuyerSupplierAgreementSchema>;
+export type SignMarketplaceAgreementInput = z.infer<typeof signMarketplaceAgreementSchema>;
 export type CreatePromotionInput = z.infer<typeof createPromotionSchema>;
 export type EvaluatePromotionInput = z.infer<typeof evaluatePromotionSchema>;
 export type RedeemPromotionInput = z.infer<typeof redeemPromotionSchema>;
@@ -250,3 +291,5 @@ export type UpdateSupportTicketInput = z.infer<typeof updateSupportTicketSchema>
 export type CreateBillingPlanInput = z.infer<typeof createBillingPlanSchema>;
 export type SendAiMessageInput = z.infer<typeof sendAiMessageSchema>;
 export type SubmitProductCandidateInput = z.infer<typeof submitProductCandidateSchema>;
+export type BrowserEdsSignatureInput = z.infer<typeof browserEdsSignatureSchema>;
+export type SignatureGatewayVerification = z.infer<typeof signatureGatewayVerificationSchema>;

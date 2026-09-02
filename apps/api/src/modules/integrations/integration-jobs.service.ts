@@ -1,6 +1,7 @@
 import { ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import type { EnqueueIntegrationJobInput } from "@marketplace/schemas";
 import { Prisma, type IntegrationSyncJob } from "@prisma/client";
+import { randomUUID } from "node:crypto";
 import { PrismaService } from "../../platform/prisma/prisma.service";
 
 @Injectable()
@@ -105,6 +106,30 @@ export class IntegrationJobsService {
       });
       await tx.integrationConnection.update({ where: { id: job.connectionId }, data: { status: "ACTIVE", lastSuccessAt: new Date(), lastError: null, consecutiveFailures: 0 } });
       return completed;
+    });
+  }
+
+  async acquireCompletion(jobId: string, connectionId: string, workerId: string) {
+    const completionWorkerId = `${workerId}:complete:${randomUUID()}`;
+    const acquired = await this.prisma.integrationSyncJob.updateMany({
+      where: { id: jobId, connectionId, status: "RUNNING", lockedBy: workerId },
+      data: { lockedBy: completionWorkerId, lockedAt: new Date() },
+    });
+    if (acquired.count !== 1) {
+      const existing = await this.prisma.integrationSyncJob.findFirst({ where: { id: jobId, connectionId }, select: { id: true } });
+      if (!existing) throw new NotFoundException("Integration job not found");
+      throw new ConflictException("Integration job completion is already claimed or no longer running");
+    }
+    return {
+      job: await this.prisma.integrationSyncJob.findUniqueOrThrow({ where: { id: jobId } }),
+      workerId: completionWorkerId,
+    };
+  }
+
+  async releaseCompletion(jobId: string, completionWorkerId: string, workerId: string) {
+    await this.prisma.integrationSyncJob.updateMany({
+      where: { id: jobId, status: "RUNNING", lockedBy: completionWorkerId },
+      data: { lockedBy: workerId, lockedAt: new Date() },
     });
   }
 

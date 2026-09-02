@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
+import type { ConnectorCatalogResult, ConnectorInventoryResult, ConnectorPriceResult } from "@marketplace/schemas";
 import { createHash } from "node:crypto";
 import {
   Prisma,
@@ -13,10 +14,13 @@ import { DataFreshnessService } from "../inventory/data-freshness.service";
 import { IntegrationAdapterRegistry } from "./adapters/adapter-registry.service";
 import {
   asRecord,
+  type CatalogPage,
   type ExternalInventoryItem,
   type ExternalPriceItem,
   type IntegrationAdapter,
   type IntegrationAdapterContext,
+  type InventoryPage,
+  type PricePage,
   PermanentIntegrationError,
 } from "./adapters/integration-adapter";
 import { IntegrationJobsService } from "./integration-jobs.service";
@@ -127,7 +131,7 @@ export class IntegrationExecutionService {
     }
   }
 
-  private async enqueueCompositeSync(job: IntegrationSyncJob) {
+  async enqueueCompositeSync(job: IntegrationSyncJob) {
     const jobs = await Promise.all(
       (["CATALOG_SYNC", "PRICE_SYNC", "INVENTORY_SYNC"] as const).map((type) =>
         this.jobs.enqueue(
@@ -147,15 +151,96 @@ export class IntegrationExecutionService {
     };
   }
 
+  async applyAgentResult(job: IntegrationSyncJob, result: Record<string, unknown>) {
+    const connection = await this.prisma.integrationConnection.findUnique({ where: { id: job.connectionId } });
+    if (!connection) throw new NotFoundException("Integration connection not found");
+    if (connection.provider !== "ONE_C") throw new PermanentIntegrationError("Agent result requires a ONE_C integration connection");
+    if (!connection.sourceId) throw new PermanentIntegrationError("ONE_C integration connection has no supplier data source");
+    const cursor = asRecord(job.cursor);
+    const context = {} as IntegrationAdapterContext;
+    switch (job.type) {
+      case "CATALOG_SYNC":
+        return this.pullCatalog(job, connection.sourceId, connection.supplierOrganizationId, context, null, cursor, this.agentCatalogPage(result));
+      case "PRICE_SYNC":
+        return this.pullPrices(job, connection.sourceId, connection.supplierOrganizationId, context, null, cursor, this.agentPricePage(result));
+      case "INVENTORY_SYNC":
+        return this.pullInventory(job, connection.sourceId, connection.supplierOrganizationId, context, null, cursor, this.agentInventoryPage(result));
+      default:
+        return { applied: false, reason: "Job result does not mutate catalog, prices or inventory" };
+    }
+  }
+
+  private agentCatalogPage(result: Record<string, unknown>): CatalogPage {
+    const page = result as unknown as ConnectorCatalogResult;
+    return {
+      items: page.items.map((item) => ({
+        externalId: item.externalId,
+        name: item.name,
+        supplierSku: item.supplierSku ?? undefined,
+        gtin: item.gtin ?? undefined,
+        brand: item.brand ?? undefined,
+        manufacturer: item.manufacturer ?? undefined,
+        unit: item.unit ?? undefined,
+        raw: { ...item.raw, packageQuantity: item.packageQuantity ?? null },
+      })),
+      nextCursor: page.nextCursor ?? undefined,
+    };
+  }
+
+  private agentPricePage(result: Record<string, unknown>): PricePage {
+    const page = result as unknown as ConnectorPriceResult;
+    return {
+      items: page.items.map((item) => ({
+        externalId: item.externalId,
+        priceTypeId: item.priceTypeId ?? undefined,
+        priceTypeName: item.priceTypeName ?? undefined,
+        valueMinor: this.safeInteger(item.valueMinor, "price value"),
+        currency: item.currency,
+        raw: item.raw,
+      })),
+      nextCursor: page.nextCursor ?? undefined,
+    };
+  }
+
+  private agentInventoryPage(result: Record<string, unknown>): InventoryPage {
+    const page = result as unknown as ConnectorInventoryResult;
+    return {
+      items: page.items.map((item) => ({
+        externalId: item.externalId,
+        externalWarehouseId: item.externalWarehouseId ?? undefined,
+        stock: this.safeDecimal(item.stock, "stock"),
+        reserved: this.safeDecimal(item.reserved, "reserved stock"),
+        available: this.safeDecimal(item.available, "available stock"),
+        raw: item.raw,
+      })),
+      nextCursor: page.nextCursor ?? undefined,
+    };
+  }
+
+  private safeInteger(value: string, label: string) {
+    const parsed = Number(value);
+    if (!Number.isSafeInteger(parsed)) throw new PermanentIntegrationError(`Agent ${label} exceeds the safe numeric range supported by the integration pipeline`);
+    return parsed;
+  }
+
+  private safeDecimal(value: string, label: string) {
+    const decimal = new Prisma.Decimal(value);
+    const parsed = decimal.toNumber();
+    if (!Number.isFinite(parsed) || !new Prisma.Decimal(parsed).equals(decimal)) throw new PermanentIntegrationError(`Agent ${label} is outside the exact numeric range supported by the integration pipeline`);
+    return parsed;
+  }
+
   private async pullCatalog(
     job: IntegrationSyncJob,
     sourceId: string,
     supplierOrganizationId: string,
     context: IntegrationAdapterContext,
-    adapter: IntegrationAdapter,
+    adapter: IntegrationAdapter | null,
     cursor: Record<string, unknown>,
+    suppliedPage?: CatalogPage,
   ) {
-    const page = await adapter.pullCatalog(context, cursor);
+    const page = suppliedPage ?? (adapter ? await adapter.pullCatalog(context, cursor) : null);
+    if (!page) throw new PermanentIntegrationError("Catalog page is missing from the connector result");
     await this.prisma.$transaction(async (tx) => {
       for (const item of page.items) {
         await tx.supplierExternalItem.upsert({
@@ -227,8 +312,9 @@ export class IntegrationExecutionService {
     sourceId: string,
     supplierOrganizationId: string,
     context: IntegrationAdapterContext,
-    adapter: IntegrationAdapter,
+    adapter: IntegrationAdapter | null,
     cursor: Record<string, unknown>,
+    suppliedPage?: PricePage,
   ) {
     const bindings = await this.prisma.integrationDataBinding.findMany({
       where: {
@@ -240,7 +326,8 @@ export class IntegrationExecutionService {
     });
     if (bindings.length === 0)
       return { skipped: true, reason: "No active PRICE binding" };
-    const page = await adapter.pullPrices(context, cursor);
+    const page = suppliedPage ?? (adapter ? await adapter.pullPrices(context, cursor) : null);
+    if (!page) throw new PermanentIntegrationError("Price page is missing from the connector result");
     const productIds = new Set<string>();
     const result = {
       received: page.items.length,
@@ -446,8 +533,9 @@ export class IntegrationExecutionService {
     sourceId: string,
     supplierOrganizationId: string,
     context: IntegrationAdapterContext,
-    adapter: IntegrationAdapter,
+    adapter: IntegrationAdapter | null,
     cursor: Record<string, unknown>,
+    suppliedPage?: InventoryPage,
   ) {
     const [bindings, warehouses] = await Promise.all([
       this.prisma.integrationDataBinding.findMany({
@@ -465,7 +553,8 @@ export class IntegrationExecutionService {
     ]);
     if (bindings.length === 0)
       return { skipped: true, reason: "No active INVENTORY binding" };
-    const page = await adapter.pullInventory(context, cursor);
+    const page = suppliedPage ?? (adapter ? await adapter.pullInventory(context, cursor) : null);
+    if (!page) throw new PermanentIntegrationError("Inventory page is missing from the connector result");
     const result = {
       received: page.items.length,
       updated: 0,

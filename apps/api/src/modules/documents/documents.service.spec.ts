@@ -18,4 +18,42 @@ describe("DocumentsService signature status", () => {
     expect(prisma.document.updateMany).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "document", status: { not: "SIGNED" } } }));
     expect(result.status).toBe("SIGNED");
   });
+
+  it("rejects a local EDS signer from another organization", async () => {
+    const service = new DocumentsService({} as never, {} as never, {} as never, {} as never, {} as never);
+    vi.spyOn(service, "get").mockResolvedValue({
+      id: "document",
+      checksumSha256: "a".repeat(64),
+      storageKey: "documents/document.pdf",
+      status: "GENERATED",
+    } as never);
+    vi.spyOn(service as any, "isOperator").mockResolvedValue(false);
+
+    await expect(service.createLocalEdsSignatureSession("document", {
+      method: "EDS",
+      signerOrganizationId: "organization-b",
+      signerUserId: "user-a",
+      signerName: "Signer",
+      expiresInMinutes: 60,
+    }, { actorId: "user-a", organizationId: "organization-a" })).rejects.toThrow("Signer organization must be the active organization");
+  });
+
+  it("rejects a local EDS session created for another user", async () => {
+    const service = new DocumentsService({} as never, {} as never, {} as never, {} as never, {} as never);
+    vi.spyOn(service, "get").mockResolvedValue({
+      id: "document",
+      checksumSha256: "a".repeat(64),
+      storageKey: "documents/document.pdf",
+      status: "GENERATED",
+    } as never);
+    vi.spyOn(service as any, "isOperator").mockResolvedValue(false);
+
+    await expect(service.createLocalEdsSignatureSession("document", {
+      method: "EDS",
+      signerOrganizationId: "organization-a",
+      signerUserId: "user-b",
+      signerName: "Signer",
+      expiresInMinutes: 60,
+    }, { actorId: "user-a", organizationId: "organization-a" })).rejects.toThrow("Signer user must be the authenticated user");
+  });
 });

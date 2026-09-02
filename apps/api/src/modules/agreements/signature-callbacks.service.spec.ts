@@ -1,6 +1,6 @@
 import { createHmac } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { verifySignatureCallbackEnvelope } from "./signature-callbacks.service";
+import { requireMatchingSignerOrganization, verifySignatureCallbackEnvelope } from "./signature-callbacks.service";
 
 describe("EDS signature callback envelope", () => {
   const secret = "signature-callback-secret-with-32-chars";
@@ -17,5 +17,16 @@ describe("EDS signature callback envelope", () => {
     expect(() => verifySignatureCallbackEnvelope({ rawBody: Buffer.from('{"signatureId":"changed"}'), eventId: "event-12345", timestamp, signature, secret, toleranceSeconds: 300, now })).toThrow("HMAC is invalid");
     expect(() => verifySignatureCallbackEnvelope({ rawBody, eventId: "event-12345", timestamp: String(Math.floor((now - 301_000) / 1_000)), signature, secret, toleranceSeconds: 300, now })).toThrow("outside the allowed window");
     expect(() => verifySignatureCallbackEnvelope({ rawBody, eventId: "short", timestamp, signature, secret, toleranceSeconds: 300, now })).toThrow("event ID is invalid");
+  });
+});
+
+describe("EDS signer organization binding", () => {
+  it("accepts a certificate BIN only for the signature organization", () => {
+    expect(() => requireMatchingSignerOrganization({ bin: "123456789012" }, "123456789012")).not.toThrow();
+  });
+
+  it("rejects a mismatched or absent signer organization", () => {
+    expect(() => requireMatchingSignerOrganization({ bin: "123456789012" }, "999999999999")).toThrow("certificate BIN does not match");
+    expect(() => requireMatchingSignerOrganization(null, "123456789012")).toThrow("certificate BIN does not match");
   });
 });
