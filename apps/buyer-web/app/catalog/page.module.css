@@ -134,8 +134,7 @@
 
 .filterHeading { display: flex; align-items: center; gap: 9px; font-size: 13px; }
 .filterHeading svg { width: 18px; color: var(--dm-brand-primary); }
-.checkRow { display: flex; align-items: center; gap: 9px; color: var(--dm-text-secondary); font-size: 13px; font-weight: 650; cursor: pointer; }
-.checkRow input { width: 17px; height: 17px; accent-color: var(--dm-brand-primary); }
+.checkRow { color: var(--dm-text-secondary); font-size: 13px; font-weight: 650; }
 .filterGroup { display: grid; gap: 5px; }
 .filterLabel { margin-bottom: 5px; color: var(--dm-text-muted); font-size: 10px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
 .filterOption,

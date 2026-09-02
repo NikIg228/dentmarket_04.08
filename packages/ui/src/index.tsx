@@ -5,6 +5,12 @@ import {
   Button,
   Checkbox,
   createLightTheme,
+  Dialog,
+  DialogActions,
+  DialogBody,
+  DialogContent,
+  DialogSurface,
+  DialogTitle,
   Field,
   FluentProvider,
   Input,
@@ -105,6 +111,146 @@ export function DmButton({ className, ...props }: ButtonProps) {
 /** Shared checkbox control for filters and capability selections. */
 export function DmCheckbox({ className, ...props }: CheckboxProps) {
   return <Checkbox {...props} className={joinClasses("dm-checkbox", className)} />;
+}
+
+/** Shared modal contract with Fluent focus trap, Escape handling and labelled title. */
+export function DmDialog({
+  open,
+  onOpenChange,
+  title,
+  description,
+  children,
+  actions,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  title: string;
+  description?: string;
+  children: ReactNode;
+  actions?: ReactNode;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={(_, data) => onOpenChange(data.open)}>
+      <DialogSurface className="dm-dialog-surface">
+        <DialogBody>
+          <DialogTitle
+            action={
+              <DmButton
+                appearance="subtle"
+                icon={<Dismiss24Regular />}
+                aria-label="Закрыть окно"
+                onClick={() => onOpenChange(false)}
+              />
+            }
+          >
+            {title}
+          </DialogTitle>
+          <DialogContent className="dm-dialog-content">
+            {description ? (
+              <p className="dm-dialog-description">{description}</p>
+            ) : null}
+            {children}
+          </DialogContent>
+          {actions ? <DialogActions>{actions}</DialogActions> : null}
+        </DialogBody>
+      </DialogSurface>
+    </Dialog>
+  );
+}
+
+export type DmTableColumn = {
+  key: string;
+  label: ReactNode;
+};
+
+/** Shared responsive table shell for dense operational data. */
+export function DmTable({
+  caption,
+  columns,
+  children,
+  className,
+}: {
+  caption: string;
+  columns: DmTableColumn[];
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className="mp-table-wrap">
+      <table className={joinClasses("mp-table", "dm-table", className)}>
+        <caption className="dm-sr-only">{caption}</caption>
+        <thead>
+          <tr>
+            {columns.map((column) => (
+              <th scope="col" key={column.key}>
+                {column.label}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>{children}</tbody>
+      </table>
+    </div>
+  );
+}
+
+export function DmFeedback({
+  tone = "info",
+  title,
+  description,
+  icon,
+  action,
+  alert = false,
+}: {
+  tone?: "success" | "warning" | "danger" | "info" | "neutral";
+  title: string;
+  description: string;
+  icon?: ReactNode;
+  action?: ReactNode;
+  alert?: boolean;
+}) {
+  return (
+    <div
+      className={`dm-feedback dm-feedback-${tone}`}
+      role={alert ? "alert" : "status"}
+      aria-live={alert ? "assertive" : "polite"}
+    >
+      {icon ? <span className="dm-feedback-icon" aria-hidden="true">{icon}</span> : null}
+      <div className="dm-feedback-copy">
+        <strong>{title}</strong>
+        <span>{description}</span>
+      </div>
+      {action ? <div className="dm-feedback-action">{action}</div> : null}
+    </div>
+  );
+}
+
+/** Explicit reprice/stock/conflict state. Never hide a blocking change in a toast. */
+export function DmConflictState({
+  tone = "warning",
+  title,
+  description,
+  icon,
+  action,
+  blocking = true,
+}: {
+  tone?: "warning" | "danger" | "neutral" | "success";
+  title: string;
+  description: string;
+  icon?: ReactNode;
+  action?: ReactNode;
+  blocking?: boolean;
+}) {
+  return (
+    <DmFeedback
+      tone={tone}
+      title={title}
+      description={description}
+      icon={icon}
+      action={action}
+      alert={blocking}
+    />
+  );
 }
 
 export function MarketplaceProvider({ children }: { children: ReactNode }) {

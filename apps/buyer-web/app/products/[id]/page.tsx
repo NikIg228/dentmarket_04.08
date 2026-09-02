@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { cache } from "react";
 import catalog from "../../data/public-catalog-fallback.json";
 import mediaCatalog from "../../data/public-catalog-media.json";
+import { PublicHeader } from "../../public-header";
 import styles from "./page.module.css";
 import ProductOfferActions from "./product-offer-actions";
 
@@ -23,6 +24,7 @@ type DetailProduct = {
   attributes: Array<readonly [string, string]>;
   isAvailable: boolean;
   offers: Array<{
+    id: string;
     supplier: { id: string; name: string };
     supplierSku: string | null;
     priceMinor: string | null;
@@ -58,6 +60,7 @@ function fromFallback(product: CatalogProduct): DetailProduct {
     attributes: product.attributes.map(([name, value]) => [name, value]),
     isAvailable: product.isAvailable,
     offers: product.offers.map((offer) => ({
+      id: offer.id,
       supplier: offer.supplier,
       supplierSku: offer.supplierSku,
       priceMinor: offer.priceMinor,
@@ -90,6 +93,7 @@ function fromComparison(comparison: PublicComparison): DetailProduct {
       ),
     ),
     offers: comparison.offers.map((offer) => ({
+      id: offer.offerId,
       supplier: {
         id: offer.supplier.organizationId,
         name: offer.supplier.name,
@@ -117,18 +121,6 @@ const getProduct = cache(async (id: string): Promise<DetailProduct | null> => {
     return fallback ? fromFallback(fallback) : null;
   }
 });
-
-function formatPrice(
-  minor: number | string | null | undefined,
-  currency = "KZT",
-) {
-  if (minor == null) return "Цена по запросу";
-  return new Intl.NumberFormat("ru-KZ", {
-    style: "currency",
-    currency,
-    maximumFractionDigits: 0,
-  }).format(Number(minor) / 100);
-}
 
 export async function generateMetadata({
   params,
@@ -162,9 +154,10 @@ export default async function ProductPage({
   const attributes = product.attributes ?? [];
 
   return (
-    <main className={styles.page}>
-      <div className={styles.shell}>
-        <Link className={styles.back} href="/">
+    <div className={styles.page}>
+      <PublicHeader active="catalog" baseHref="/catalog" />
+      <main className={styles.shell}>
+        <Link className={styles.back} href="/catalog">
           ← Вернуться в каталог
         </Link>
         <div className={styles.breadcrumbs}>
@@ -280,7 +273,13 @@ export default async function ProductPage({
                     </div>
                     <div className={styles.offerRight}>
                       <strong>
-                        {formatPrice(offer.priceMinor, offer.currency)}
+                        {offer.priceMinor == null
+                          ? "Цена по запросу"
+                          : new Intl.NumberFormat("ru-KZ", {
+                              style: "currency",
+                              currency: offer.currency,
+                              maximumFractionDigits: 0,
+                            }).format(Number(offer.priceMinor) / 100)}
                       </strong>
                       <span
                         className={
@@ -300,7 +299,7 @@ export default async function ProductPage({
             </div>
           </div>
         </section>
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }

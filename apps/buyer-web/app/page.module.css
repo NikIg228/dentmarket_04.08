@@ -757,71 +757,6 @@
   flex-wrap: wrap;
   gap: 5px;
 }
-.cartSummary {
-  padding: 18px;
-}
-.cartValidationSummary {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0 18px 14px;
-  padding: 12px 14px;
-  border: 1px solid var(--colorNeutralStroke2);
-  border-radius: 10px;
-  background: var(--colorNeutralBackground2);
-  color: var(--colorNeutralForeground2);
-  font-size: 13px;
-}
-.cartRowChanged {
-  background: color-mix(
-    in srgb,
-    var(--colorPaletteYellowBackground2) 72%,
-    transparent
-  );
-}
-.cartRowUnavailable {
-  background: color-mix(
-    in srgb,
-    var(--colorPaletteRedBackground2) 72%,
-    transparent
-  );
-}
-.cartValueChange {
-  display: grid;
-  gap: 3px;
-}
-.cartValueChange del {
-  color: var(--colorNeutralForeground3);
-  font-size: 12px;
-}
-.cartChangeMessage,
-.cartIssue {
-  display: block;
-  margin-top: 4px;
-  color: var(--colorPaletteDarkOrangeForeground1);
-  font-size: 11px;
-}
-.cartIssue {
-  color: var(--colorPaletteRedForeground1);
-}
-.cartTotal {
-  display: flex;
-  justify-content: space-between;
-  align-items: end;
-  gap: 18px;
-  padding: 18px;
-  border-top: 1px solid var(--colorNeutralStroke2);
-}
-.cartTotal span {
-  display: grid;
-  gap: 3px;
-  color: var(--colorNeutralForeground3);
-  font-size: 11px;
-}
-.cartTotal strong {
-  color: var(--colorNeutralForeground1);
-  font-size: 24px;
-}
 .notificationList,
 .documentList {
   display: grid;
@@ -844,21 +779,6 @@
   display: block;
   margin-bottom: 4px;
   font-size: 13px;
-}
-.reviewForm {
-  display: grid;
-  grid-template-columns: auto minmax(180px, 1fr) auto;
-  gap: 8px;
-  align-items: center;
-  padding: 10px;
-  background: var(--colorNeutralBackground2);
-}
-.reviewForm strong,
-.reviewForm span {
-  font-size: 11px;
-}
-.reviewForm span {
-  color: var(--colorNeutralForeground3);
 }
 .notification p,
 .document p {

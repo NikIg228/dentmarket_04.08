@@ -18,7 +18,6 @@ import {
   ArrowSync24Regular,
   Box24Regular,
   Cart24Regular,
-  CheckmarkCircle24Regular,
   ClipboardTaskListLtr24Regular,
   Document24Regular,
   Dismiss24Regular,
@@ -56,7 +55,6 @@ import {
   type NavigationItem,
 } from "@marketplace/ui";
 import {
-  Fragment,
   useCallback,
   useEffect,
   useMemo,
@@ -65,10 +63,14 @@ import {
 } from "react";
 import styles from "./page.module.css";
 import { BuyerServicesPanel } from "./buyer-services-panel";
-import { OrderDecisionDetails } from "./order-decision-details";
-import { OrderShipments, type BuyerShipment } from "./order-shipments";
-import { OrderDocuments } from "./order-documents";
-import type { OrderDocumentResponse } from "@marketplace/api-client";
+import { BuyerCart } from "./features/purchasing/buyer-cart";
+import { BuyerOrders } from "./features/purchasing/buyer-orders";
+import type {
+  Cart,
+  CartValidation,
+  ReviewDraft,
+  SupplierOrder,
+} from "./features/purchasing/types";
 import { SmartCommercePanel } from "./smart-commerce-panel";
 import publicCatalogData from "./data/public-catalog-fallback.json";
 import publicCatalogMedia from "./data/public-catalog-media.json";
@@ -533,80 +535,6 @@ type Comparison = {
   reviewSummary?: { count: number; averageRating: number | null };
   comparisonAttributes: Array<{ code: string; name: string; value: unknown }>;
 };
-type CartItem = {
-  id: string;
-  offerId: string;
-  quantity: string;
-  unitPriceMinor: string;
-  totalPriceMinor: string;
-  currency: string;
-  offer?: {
-    supplier?: { organization?: { displayName?: string } };
-    productVariant?: { product?: { canonicalName?: string } };
-  };
-};
-type Cart = {
-  id: string;
-  status: string;
-  currency: string;
-  items: CartItem[];
-  checkout?: { id: string } | null;
-  createdAt: string;
-};
-type CartLineSnapshot = {
-  resolvedAt: string;
-  offerVersion: number;
-  source: string;
-  ruleId: string | null;
-  unitPriceMinor: string;
-  quantity: string;
-  totalPriceMinor: string;
-  currency: string;
-  minimumOrderQuantity: string;
-  orderIncrement: string;
-  availableQuantity: string | null;
-  fulfillmentStatus: "AVAILABLE" | "INSUFFICIENT_STOCK" | "OUT_OF_STOCK";
-};
-type CartValidationItem = {
-  cartItemId: string;
-  offerId: string;
-  status: "UNCHANGED" | "CHANGED" | "UNAVAILABLE";
-  changes: Array<"PRICE" | "STOCK" | "AVAILABILITY" | "OFFER_RULES">;
-  previous: CartLineSnapshot;
-  current: CartLineSnapshot | null;
-  canCheckout: boolean;
-  requiresAcceptance: boolean;
-  message: string | null;
-};
-type CartValidation = {
-  cartId: string;
-  cartVersion: number;
-  validatedAt: string;
-  hasChanges: boolean;
-  requiresAcceptance: boolean;
-  canCheckout: boolean;
-  items: CartValidationItem[];
-};
-type SupplierOrder = {
-  id: string;
-  buyerOrganizationId: string;
-  orderNumber: string;
-  status: string;
-  subtotalAmountMinor: string;
-  currency: string;
-  createdAt: string;
-  supplier: { displayName: string };
-  shipments?: BuyerShipment[];
-  documents?: OrderDocumentResponse[];
-  items: Array<{
-    id: string;
-    quantity: string;
-    acceptedQuantity: string | null;
-    decisionReason: string | null;
-    status: string;
-    offer: { productVariant: { product: { canonicalName: string } } };
-  }>;
-};
 type SupplierTrust = {
   status: string;
   score: string | null;
@@ -796,9 +724,9 @@ export default function BuyerWorkspace({
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
-  const [reviewDrafts, setReviewDrafts] = useState<
-    Record<string, { rating: number; comment: string }>
-  >({});
+  const [reviewDrafts, setReviewDrafts] = useState<Record<string, ReviewDraft>>(
+    {},
+  );
   const [submittedReviews, setSubmittedReviews] = useState<string[]>([]);
 
   useEffect(() => {
@@ -839,13 +767,6 @@ export default function BuyerWorkspace({
   ]);
 
   const activeCart = carts.find((cart) => cart.status === "ACTIVE") ?? null;
-  const cartValidationByItem = useMemo(
-    () =>
-      new Map(
-        (cartValidation?.items ?? []).map((item) => [item.cartItemId, item]),
-      ),
-    [cartValidation],
-  );
   const buyerOrders = orders.filter(
     (order) => order.buyerOrganizationId === buyerId,
   );
@@ -2838,414 +2759,32 @@ export default function BuyerWorkspace({
   );
 
   const renderCart = () => (
-    <div className="mp-stack">
-      <PageHeader
-        eyebrow="Заказ"
-        title="Корзина клиники"
-        description="Цены и остатки будут повторно проверены перед резервированием."
-        actions={
-          <Button icon={<ArrowSync24Regular />} onClick={() => void refresh()}>
-            Обновить
-          </Button>
-        }
-      />
-      {!activeCart || !activeCart.items.length ? (
-        <Section>
-          <EmptyState
-            icon={<Cart24Regular />}
-            title="Корзина пока пуста"
-            description="Добавьте товары из каталога, чтобы собрать заказ нескольким поставщикам."
-            action={
-              <Button appearance="primary" onClick={() => setActive("catalog")}>
-                Перейти в каталог
-              </Button>
-            }
-          />
-        </Section>
-      ) : (
-        <Section
-          title={`${activeCart.items.length} позиций`}
-          description="Активная корзина"
-        >
-          <div className={styles.cartValidationSummary}>
-            {cartValidationLoading ? (
-              <>
-                <Spinner size="tiny" /> Проверяем актуальные цены и остатки…
-              </>
-            ) : cartValidation?.requiresAcceptance ? (
-              <>
-                <Alert24Regular /> В корзине изменились цены. Проверьте позиции
-                и примите изменения перед оформлением.
-              </>
-            ) : cartValidation && !cartValidation.canCheckout ? (
-              <>
-                <Alert24Regular /> Некоторые позиции сейчас нельзя заказать в
-                выбранном количестве.
-              </>
-            ) : cartValidation?.hasChanges ? (
-              <>
-                <ArrowSync24Regular /> Остатки обновились. Новые значения
-                показаны рядом со старыми.
-              </>
-            ) : (
-              <>
-                <CheckmarkCircle24Regular /> Цены и остатки актуальны.
-              </>
-            )}
-          </div>
-          <div className="mp-table-wrap">
-            <table className="mp-table">
-              <thead>
-                <tr>
-                  <th>Товар</th>
-                  <th>Поставщик</th>
-                  <th>Количество</th>
-                  <th>Цена</th>
-                  <th>Сумма</th>
-                </tr>
-              </thead>
-              <tbody>
-                {activeCart.items.map((item) => {
-                  const validation = cartValidationByItem.get(item.id);
-                  const current = validation?.current;
-                  const priceChanged =
-                    validation?.changes.includes("PRICE") ?? false;
-                  const stockChanged =
-                    validation?.changes.includes("STOCK") ?? false;
-                  const unavailable =
-                    validation?.status === "UNAVAILABLE" ||
-                    current?.fulfillmentStatus !== "AVAILABLE";
-                  return (
-                    <tr
-                      key={item.id}
-                      className={
-                        unavailable
-                          ? styles.cartRowUnavailable
-                          : validation?.status === "CHANGED"
-                            ? styles.cartRowChanged
-                            : undefined
-                      }
-                    >
-                      <td>
-                        <strong>
-                          {item.offer?.productVariant?.product?.canonicalName ??
-                            `Позиция ${item.offerId.slice(0, 8)}`}
-                        </strong>
-                        <small className="mp-mono">
-                          {item.offerId.slice(0, 12)}
-                        </small>
-                        {validation?.message ? (
-                          <small
-                            className={
-                              unavailable
-                                ? styles.cartIssue
-                                : styles.cartChangeMessage
-                            }
-                          >
-                            {validation.message}
-                          </small>
-                        ) : null}
-                      </td>
-                      <td>
-                        {item.offer?.supplier?.organization?.displayName ??
-                          "Поставщик"}
-                      </td>
-                      <td>
-                        <strong>{item.quantity}</strong>
-                        <small
-                          className={
-                            stockChanged ? styles.cartChangeMessage : undefined
-                          }
-                        >
-                          Остаток:{" "}
-                          {validation?.previous.availableQuantity ?? "—"}
-                          {stockChanged || unavailable
-                            ? ` → ${current?.availableQuantity ?? "0"}`
-                            : ""}
-                        </small>
-                      </td>
-                      <td>
-                        <div className={styles.cartValueChange}>
-                          {priceChanged ? (
-                            <del>
-                              {formatMoney(
-                                validation?.previous.unitPriceMinor ??
-                                  item.unitPriceMinor,
-                                validation?.previous.currency ?? item.currency,
-                              )}
-                            </del>
-                          ) : null}
-                          <strong>
-                            {formatMoney(
-                              current?.unitPriceMinor ?? item.unitPriceMinor,
-                              current?.currency ?? item.currency,
-                            )}
-                          </strong>
-                        </div>
-                      </td>
-                      <td>
-                        <div className={styles.cartValueChange}>
-                          {priceChanged ? (
-                            <del>
-                              {formatMoney(
-                                validation?.previous.totalPriceMinor ??
-                                  item.totalPriceMinor,
-                                validation?.previous.currency ?? item.currency,
-                              )}
-                            </del>
-                          ) : null}
-                          <strong>
-                            {formatMoney(
-                              current?.totalPriceMinor ?? item.totalPriceMinor,
-                              current?.currency ?? item.currency,
-                            )}
-                          </strong>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-          <div className={styles.cartTotal}>
-            <span>
-              Итого по корзине
-              <strong>
-                {formatMoney(
-                  activeCart.items.reduce(
-                    (sum, item) =>
-                      sum +
-                      Number(
-                        cartValidationByItem.get(item.id)?.current
-                          ?.totalPriceMinor ?? item.totalPriceMinor,
-                      ),
-                    0,
-                  ),
-                  activeCart.currency,
-                )}
-              </strong>
-            </span>
-            {cartValidation?.hasChanges ? (
-              <Button
-                appearance={
-                  cartValidation.requiresAcceptance ? "primary" : "secondary"
-                }
-                icon={<ArrowSync24Regular />}
-                onClick={() => void acceptCartChanges()}
-                disabled={busy === "reprice" || cartValidationLoading}
-              >
-                {busy === "reprice"
-                  ? "Применяем изменения"
-                  : "Принять новые цены и остатки"}
-              </Button>
-            ) : null}
-            <Button
-              appearance="primary"
-              size="large"
-              icon={<ShoppingBag24Regular />}
-              onClick={() => void checkout()}
-              disabled={
-                busy === "checkout" ||
-                cartValidationLoading ||
-                !cartValidation?.canCheckout
-              }
-            >
-              {busy === "checkout" ? "Резервируем" : "Оформить заказ"}
-            </Button>
-          </div>
-        </Section>
-      )}
-    </div>
+    <BuyerCart
+      cart={activeCart}
+      validation={cartValidation}
+      validationLoading={cartValidationLoading}
+      busy={busy}
+      onRefresh={() => void refresh()}
+      onBrowseCatalog={() => setActive("catalog")}
+      onAcceptChanges={() => void acceptCartChanges()}
+      onCheckout={() => void checkout()}
+    />
   );
 
   const renderOrders = () => (
-    <div className="mp-stack">
-      <PageHeader
-        eyebrow="Исполнение"
-        title="Заказы"
-        description="После оформления корзина автоматически разделится на заказы поставщикам."
-      />
-      <div className="mp-metrics">
-        <Metric
-          label="Всего заказов"
-          value={buyerOrders.length}
-          detail="По всем поставщикам"
-          icon={<ClipboardTaskListLtr24Regular />}
-        />
-        <Metric
-          label="Ждут подтверждения"
-          value={
-            buyerOrders.filter(
-              (order) => order.status === "AWAITING_CONFIRMATION",
-            ).length
-          }
-          detail="Резерв уже создан"
-          icon={<Box24Regular />}
-        />
-        <Metric
-          label="Подтверждены"
-          value={
-            buyerOrders.filter((order) => order.status === "CONFIRMED").length
-          }
-          detail="Готовы к отгрузке"
-          icon={<CheckmarkCircle24Regular />}
-        />
-        <Metric
-          label="Объём закупок"
-          value={formatMoney(
-            buyerOrders.reduce(
-              (sum, order) => sum + Number(order.subtotalAmountMinor),
-              0,
-            ),
-          )}
-          detail="Включая текущие заказы"
-          icon={<ShoppingBag24Regular />}
-        />
-      </div>
-      <Section>
-        {!buyerOrders.length ? (
-          <EmptyState
-            icon={<ClipboardTaskListLtr24Regular />}
-            title="Заказов ещё нет"
-            description="Оформленные корзины появятся здесь."
-          />
-        ) : (
-          <div className="mp-table-wrap">
-            <table className="mp-table">
-              <thead>
-                <tr>
-                  <th>Заказ</th>
-                  <th>Поставщик</th>
-                  <th>Позиции</th>
-                  <th>Сумма</th>
-                  <th>Статус</th>
-                  <th>Создан</th>
-                </tr>
-              </thead>
-              <tbody>
-                {buyerOrders.map((order) => (
-                  <Fragment key={order.id}>
-                    <tr>
-                      <td>
-                        <strong>{order.orderNumber}</strong>
-                        <small className="mp-mono">
-                          {order.id.slice(0, 8)}
-                        </small>
-                      </td>
-                      <td>{order.supplier.displayName}</td>
-                      <td>{order.items.length}</td>
-                      <td>
-                        {formatMoney(order.subtotalAmountMinor, order.currency)}
-                      </td>
-                      <td>
-                        <StatusTag tone={statusTone(order.status)}>
-                          {formatStatus(order.status)}
-                        </StatusTag>
-                      </td>
-                      <td>{formatDate(order.createdAt, true)}</td>
-                    </tr>
-                    {order.items.some(
-                      (item) =>
-                        item.acceptedQuantity !== null &&
-                        Number(item.acceptedQuantity) < Number(item.quantity),
-                    ) ? (
-                      <tr>
-                        <td colSpan={6}>
-                          <OrderDecisionDetails order={order} />
-                        </td>
-                      </tr>
-                    ) : null}
-                    {order.shipments?.length ? (
-                      <tr>
-                        <td colSpan={6}>
-                          <OrderShipments shipments={order.shipments} />
-                        </td>
-                      </tr>
-                    ) : null}
-                    {order.documents?.length ? (
-                      <tr>
-                        <td colSpan={6}>
-                          <OrderDocuments orderNumber={order.orderNumber} documents={order.documents} api={api} />
-                        </td>
-                      </tr>
-                    ) : null}
-                    {[
-                      "DELIVERED",
-                      "PARTIALLY_FULFILLED",
-                      "RETURN_DISPUTE",
-                      "REJECTED",
-                      "CANCELLED",
-                    ].includes(order.status) ? (
-                      <tr>
-                        <td colSpan={6}>
-                          <div className={styles.reviewForm}>
-                            <strong>
-                              {submittedReviews.includes(order.id)
-                                ? "Отзыв отправлен"
-                                : "Оцените исполнение заказа"}
-                            </strong>
-                            {submittedReviews.includes(order.id) ? (
-                              <span>
-                                Оценка будет учтена в рейтинге поставщика.
-                              </span>
-                            ) : (
-                              <>
-                                <Select
-                                  value={String(reviewDraft(order.id).rating)}
-                                  onChange={(_, data) =>
-                                    setReviewDrafts((items) => ({
-                                      ...items,
-                                      [order.id]: {
-                                        ...reviewDraft(order.id),
-                                        rating: Number(data.value),
-                                      },
-                                    }))
-                                  }
-                                >
-                                  <option value="5">5, отлично</option>
-                                  <option value="4">4, хорошо</option>
-                                  <option value="3">3, нормально</option>
-                                  <option value="2">2, плохо</option>
-                                  <option value="1">1, очень плохо</option>
-                                </Select>
-                                <Input
-                                  value={reviewDraft(order.id).comment}
-                                  onChange={(_, data) =>
-                                    setReviewDrafts((items) => ({
-                                      ...items,
-                                      [order.id]: {
-                                        ...reviewDraft(order.id),
-                                        comment: data.value,
-                                      },
-                                    }))
-                                  }
-                                  placeholder="Комментарий о поставке, цене или наличии"
-                                />
-                                <Button
-                                  appearance="secondary"
-                                  onClick={() => void submitReview(order.id)}
-                                  disabled={busy === `review:${order.id}`}
-                                >
-                                  {busy === `review:${order.id}`
-                                    ? "Отправляем"
-                                    : "Оставить отзыв"}
-                                </Button>
-                              </>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ) : null}
-                  </Fragment>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Section>
-    </div>
+    <BuyerOrders
+      orders={buyerOrders}
+      api={api}
+      busy={busy}
+      submittedReviews={submittedReviews}
+      reviewDraft={reviewDraft}
+      onReviewDraftChange={(orderId, draft) =>
+        setReviewDrafts((items) => ({ ...items, [orderId]: draft }))
+      }
+      onSubmitReview={(orderId) => void submitReview(orderId)}
+    />
   );
+
 
   const renderDocuments = () => (
     <div className="mp-stack">

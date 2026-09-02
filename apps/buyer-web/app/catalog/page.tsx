@@ -12,6 +12,7 @@ import {
 } from "@fluentui/react-icons";
 import {
   DmButton,
+  DmCheckbox,
   DmSelect,
   EmptyState,
   ErrorState,
@@ -212,10 +213,12 @@ export default function CatalogPage() {
         <section className={styles.content} aria-label="Каталог товаров">
           <aside className={styles.filters} aria-label="Фильтры каталога">
             <div className={styles.filterHeading}><Filter24Regular aria-hidden="true" /><strong>Фильтры</strong></div>
-            <label className={styles.checkRow}>
-              <input type="checkbox" checked={inStockOnly} onChange={(event) => changeStockFilter(event.currentTarget.checked)} />
-              <span>Только в наличии</span>
-            </label>
+            <DmCheckbox
+              className={styles.checkRow}
+              checked={inStockOnly}
+              onChange={(_, data) => changeStockFilter(data.checked === true)}
+              label="Только в наличии"
+            />
             <div className={styles.filterGroup}>
               <span className={styles.filterLabel}>Категории</span>
               <button type="button" className={!categoryId ? styles.filterOptionActive : styles.filterOption} onClick={() => selectCategory(undefined)}>Все категории</button>

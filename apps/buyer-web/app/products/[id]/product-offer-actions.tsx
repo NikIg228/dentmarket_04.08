@@ -1,9 +1,25 @@
 "use client";
 
-import { useState } from "react";
+import { Cart24Regular } from "@fluentui/react-icons";
+import {
+  MarketplaceApiClient,
+  parseSessionHandoff,
+  type ApiContext,
+} from "@marketplace/api-client";
+import {
+  DmButton,
+  DmDialog,
+  StatusTag,
+  errorMessage,
+  formatMoney,
+} from "@marketplace/ui";
+import { useMemo, useRef, useState } from "react";
+import type { Cart } from "../../features/purchasing/types";
+import { loginUrl } from "../../public-links";
 import styles from "./page.module.css";
 
 type Offer = {
+  id: string;
   supplier: { name: string };
   priceMinor: number | string | null;
   currency: string;
@@ -14,11 +30,6 @@ type Offer = {
   officialDistributor?: boolean;
 };
 
-function formatPrice(minor: number | string | null, currency: string) {
-  if (minor == null) return "Цена по запросу";
-  return new Intl.NumberFormat("ru-KZ", { style: "currency", currency, maximumFractionDigits: 0 }).format(Number(minor) / 100);
-}
-
 function deliveryLabel(methods: string[] = []) {
   if (methods.includes("CARRIER")) return "Курьерская доставка";
   if (methods.includes("NATIONWIDE")) return "Доставка по Казахстану";
@@ -28,38 +39,132 @@ function deliveryLabel(methods: string[] = []) {
 
 export default function ProductOfferActions({ offers }: { offers: Offer[] }) {
   const [compareOpen, setCompareOpen] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<
+    { tone: "success" | "danger"; message: string } | null
+  >(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const apiUrl =
+    process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:4012/api";
+  const availableOffers = useMemo(
+    () => offers.filter((offer) => offer.available && offer.priceMinor != null),
+    [offers],
+  );
+
+  const addToCart = async (offer: Offer) => {
+    const session = parseSessionHandoff(
+      window.sessionStorage.getItem("dentmarket:buyer-session"),
+      "BUYER",
+    );
+    if (!session) {
+      window.location.assign(loginUrl);
+      return;
+    }
+    const context: ApiContext = session.accessToken
+      ? { accessToken: session.accessToken }
+      : session.actorId && session.organizationId
+        ? {
+            actorId: session.actorId,
+            organizationId: session.organizationId,
+          }
+        : {};
+    const api = new MarketplaceApiClient(apiUrl, context);
+    setBusy(offer.id);
+    setFeedback(null);
+    try {
+      const carts = await api.get<Cart[]>(
+        `/buyers/${session.organizationId}/carts`,
+      );
+      const cart =
+        carts.find((item) => item.status === "ACTIVE") ??
+        (await api.post<Cart>(`/buyers/${session.organizationId}/carts`, {
+          currency: offer.currency,
+        }));
+      await api.post(`/carts/${cart.id}/items`, {
+        offerId: offer.id,
+        quantity: 1,
+      });
+      setFeedback({
+        tone: "success",
+        message: `${offer.supplier.name}: позиция добавлена в корзину.`,
+      });
+    } catch (cause) {
+      setFeedback({ tone: "danger", message: errorMessage(cause) });
+    } finally {
+      setBusy(null);
+    }
+  };
 
   return (
     <>
-      <button className={styles.compareButton} type="button" onClick={() => setCompareOpen(true)}>
-        Сравнить предложения
-      </button>
-      {compareOpen ? (
-        <div className={styles.compareBackdrop} role="presentation" onClick={() => setCompareOpen(false)}>
-          <section className={styles.compareDrawer} role="dialog" aria-modal="true" aria-labelledby="compare-title" onClick={(event) => event.stopPropagation()}>
-            <header className={styles.compareHeader}>
-              <div><span className={styles.eyebrow}>Быстрое сравнение</span><h2 id="compare-title">Предложения поставщиков</h2></div>
-              <button className={styles.closeButton} type="button" aria-label="Закрыть сравнение" onClick={() => setCompareOpen(false)}>×</button>
-            </header>
-            <div className={styles.compareList}>
-              {offers.length ? offers.map((offer, index) => (
-                <article className={styles.compareOffer} key={`${offer.supplier.name}-${index}`}>
+      <DmButton
+        appearance="primary"
+        icon={<Cart24Regular />}
+        onClick={(event) => {
+          triggerRef.current = event.currentTarget;
+          setCompareOpen(true);
+        }}
+        disabled={!offers.length}
+      >
+        Сравнить и заказать
+      </DmButton>
+      <DmDialog
+        open={compareOpen}
+        onOpenChange={(open) => {
+          setCompareOpen(open);
+          if (!open) {
+            window.requestAnimationFrame(() => triggerRef.current?.focus());
+          }
+        }}
+        title="Предложения поставщиков"
+        description="Сравните фасовку, доступность и цену. Перед checkout корзина будет проверена повторно."
+      >
+        {feedback ? (
+          <div
+            className={
+              feedback.tone === "success"
+                ? styles.actionSuccess
+                : styles.actionError
+            }
+            role={feedback.tone === "danger" ? "alert" : "status"}
+          >
+            {feedback.message}
+          </div>
+        ) : null}
+        <div className={styles.compareList}>
+          {offers.length ? (
+            offers.map((offer, index) => (
+              <article
+                className={styles.compareOffer}
+                key={`${offer.id}-${offer.supplier.name}-${index}`}
+              >
                   <div className={styles.compareOfferMain}>
                     <strong>{offer.supplier.name}</strong>
                     <span>{offer.packaging?.name ? `Фасовка: ${offer.packaging.name}` : "Фасовка уточняется"}</span>
                     <span>{deliveryLabel(offer.deliveryMethods)}</span>
                   </div>
                   <div className={styles.compareOfferSide}>
-                    <strong>{formatPrice(offer.priceMinor, offer.currency)}</strong>
-                    <span className={offer.available ? styles.available : styles.onRequest}>{offer.available ? "В наличии" : "Под заказ"}</span>
+                    <strong>{formatMoney(offer.priceMinor, offer.currency)}</strong>
+                    <StatusTag tone={offer.available ? "success" : "warning"}>
+                      {offer.available ? "В наличии" : "Под заказ"}
+                    </StatusTag>
                     {offer.verifiedDocuments ? <small>Документы проверены</small> : null}
+                    <DmButton
+                      appearance="primary"
+                      size="small"
+                      onClick={() => void addToCart(offer)}
+                      disabled={busy !== null || !availableOffers.includes(offer)}
+                    >
+                      {busy === offer.id ? "Добавляем…" : "В корзину"}
+                    </DmButton>
                   </div>
                 </article>
-              )) : <p className={styles.muted}>Предложения ещё не добавлены.</p>}
-            </div>
-          </section>
+            ))
+          ) : (
+            <p className={styles.muted}>Предложения ещё не добавлены.</p>
+          )}
         </div>
-      ) : null}
+      </DmDialog>
     </>
   );
 }
