@@ -201,9 +201,9 @@ button, input, select, textarea { font: inherit; }
 
 @media (max-width: 760px) {
   .mp-shell { display: block; }
-  .mp-sidebar { position: fixed; left: 0; height: 100dvh; transform: translateX(-105%); width: min(290px, 88vw); box-shadow: var(--shadow16); transition: transform 160ms ease; }
-  .mp-sidebar.is-open { transform: translateX(0); }
-  .mp-backdrop { position: fixed; inset: 0; z-index: 15; display: block; border: 0; background: rgba(0, 0, 0, .44); }
+  .mp-sidebar { position: fixed; left: 0; height: 100dvh; visibility: hidden; transform: translateX(-105%); width: min(290px, 88vw); box-shadow: var(--shadow16); transition: transform 160ms ease, visibility 0s linear 160ms; }
+  .mp-sidebar.is-open { visibility: visible; transform: translateX(0); transition-delay: 0s; }
+  .mp-backdrop { position: fixed; inset: 0; z-index: 15; display: block; border: 0; background: color-mix(in srgb, var(--dm-text-primary) 44%, transparent); }
   .mp-menu-button, .mp-mobile-close { display: inline-flex !important; }
   .mp-topbar { height: 58px; padding: 0 12px; }
   .mp-topbar-context { display: none; }

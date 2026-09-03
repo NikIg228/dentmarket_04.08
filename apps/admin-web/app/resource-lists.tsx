@@ -1,25 +1,22 @@
 "use client";
 
+import { ArrowClockwise20Regular } from "@fluentui/react-icons";
+import {
+  DmButton,
+  EmptyState,
+  ErrorState,
+  LoadingState,
+  StatusTag,
+} from "@marketplace/ui";
 import { useCallback, useEffect, useState } from "react";
-import styles from "./resource-lists.module.css";
 import { adminAuthHeaders } from "./admin-auth";
-
-type Organization = {
-  id: string;
-  displayName: string;
-  legalName: string;
-  bin: string;
-  capabilities: Array<{ capability: string }>;
-};
-
-type Product = {
-  id: string;
-  canonicalName: string;
-  status: string;
-  productType: string;
-  variants: Array<{ id: string }>;
-  categories: Array<{ category: { nameRu: string } }>;
-};
+import {
+  getOrganizationSummary,
+  getProductSummary,
+  type ResourceOrganization,
+  type ResourceProduct,
+} from "./resource-lists-view-model";
+import styles from "./resource-lists.module.css";
 
 type LoadState<T> = {
   status: "loading" | "ready" | "error";
@@ -29,21 +26,11 @@ type LoadState<T> = {
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:4012/api";
 
-const capabilityLabels: Record<string, string> = {
-  BUYER: "Покупатель",
-  SUPPLIER: "Поставщик",
-  IMPORTER: "Импортёр",
-  LOGISTICS_PROVIDER: "Логистика",
-  SERVICE_PROVIDER: "Сервис",
-  MARKETPLACE_OPERATOR: "Оператор",
-  PAYMENT_PARTNER: "Платёжный партнёр",
-};
-
 export function ResourceLists() {
-  const [organizations, setOrganizations] = useState<LoadState<Organization[]>>(
-    { status: "loading", data: [] },
-  );
-  const [products, setProducts] = useState<LoadState<Product[]>>({
+  const [organizations, setOrganizations] = useState<
+    LoadState<ResourceOrganization[]>
+  >({ status: "loading", data: [] });
+  const [products, setProducts] = useState<LoadState<ResourceProduct[]>>({
     status: "loading",
     data: [],
   });
@@ -60,8 +47,8 @@ export function ResourceLists() {
       return response.json() as Promise<T>;
     };
     const [organizationResult, productResult] = await Promise.allSettled([
-      loadResource<Organization[]>("/organizations"),
-      loadResource<Product[]>("/catalog/products"),
+      loadResource<ResourceOrganization[]>("/organizations"),
+      loadResource<ResourceProduct[]>("/catalog/products"),
     ]);
     setOrganizations(
       organizationResult.status === "fulfilled"
@@ -89,6 +76,9 @@ export function ResourceLists() {
     void load();
   }, [load]);
 
+  const loading =
+    organizations.status === "loading" || products.status === "loading";
+
   return (
     <section className={styles.section} aria-label="Операционные данные">
       <div className={styles.sectionHeader}>
@@ -96,9 +86,14 @@ export function ResourceLists() {
           <h2>Операционные данные</h2>
           <p>Последние организации и мастер-карточки из API.</p>
         </div>
-        <button onClick={() => void load()} className={styles.refreshButton}>
-          Обновить
-        </button>
+        <DmButton
+          appearance="secondary"
+          icon={<ArrowClockwise20Regular />}
+          onClick={() => void load()}
+          disabled={loading}
+        >
+          {loading ? "Обновляем…" : "Обновить"}
+        </DmButton>
       </div>
       <div className={styles.columns}>
         <ResourcePanel
@@ -106,47 +101,45 @@ export function ResourceLists() {
           state={organizations}
           empty="Организации пока не созданы."
         >
-          {organizations.data.slice(0, 6).map((organization) => (
-            <article className={styles.row} key={organization.id}>
-              <div>
-                <strong>{organization.displayName}</strong>
-                <span>{organization.legalName}</span>
-              </div>
-              <div className={styles.rowMeta}>
-                <span>БИН {organization.bin}</span>
-                <span>
-                  {organization.capabilities
-                    .map(
-                      ({ capability }) =>
-                        capabilityLabels[capability] ?? capability,
-                    )
-                    .join(", ")}
-                </span>
-              </div>
-            </article>
-          ))}
+          {organizations.data.slice(0, 6).map((organization) => {
+            const summary = getOrganizationSummary(organization);
+            return (
+              <article className={styles.row} key={organization.id}>
+                <div>
+                  <strong>{summary.displayName}</strong>
+                  <span>{summary.legalName}</span>
+                </div>
+                <div className={styles.rowMeta}>
+                  <span>{summary.bin}</span>
+                  <span>{summary.capabilities}</span>
+                </div>
+              </article>
+            );
+          })}
         </ResourcePanel>
         <ResourcePanel
           title="Центральный каталог"
           state={products}
           empty="Мастер-карточки пока не созданы."
         >
-          {products.data.slice(0, 6).map((product) => (
-            <article className={styles.row} key={product.id}>
-              <div>
-                <strong>{product.canonicalName}</strong>
-                <span>
-                  {product.categories
-                    .map(({ category }) => category.nameRu)
-                    .join(", ") || "Без категории"}
-                </span>
-              </div>
-              <div className={styles.rowMeta}>
-                <span>{product.productType}</span>
-                <span>Вариантов: {product.variants.length}</span>
-              </div>
-            </article>
-          ))}
+          {products.data.slice(0, 6).map((product) => {
+            const summary = getProductSummary(product);
+            return (
+              <article className={styles.row} key={product.id}>
+                <div>
+                  <strong>{summary.canonicalName}</strong>
+                  <span>{summary.categories}</span>
+                </div>
+                <div className={styles.rowMeta}>
+                  <StatusTag tone={summary.statusTone}>
+                    {summary.statusLabel}
+                  </StatusTag>
+                  <span>{summary.productType}</span>
+                  <span>Вариантов: {summary.variants}</span>
+                </div>
+              </article>
+            );
+          })}
         </ResourcePanel>
       </div>
     </section>
@@ -171,23 +164,16 @@ function ResourcePanel<T>({
         <span>{state.status === "ready" ? state.data.length : ""}</span>
       </div>
       {state.status === "loading" && (
-        <div className={styles.skeletons} aria-label="Загрузка">
-          <i />
-          <i />
-          <i />
-        </div>
+        <LoadingState label={`Загружаем: ${title.toLocaleLowerCase("ru-KZ")}`} />
       )}
       {state.status === "error" && (
-        <div className={styles.error} role="alert">
-          <strong>Источник недоступен</strong>
-          <span>{state.message}</span>
-        </div>
+        <ErrorState
+          title="Источник недоступен"
+          description={state.message ?? "Не удалось загрузить данные."}
+        />
       )}
       {state.status === "ready" && state.data.length === 0 && (
-        <div className={styles.empty}>
-          <strong>Нет данных</strong>
-          <span>{empty}</span>
-        </div>
+        <EmptyState title="Нет данных" description={empty} />
       )}
       {state.status === "ready" && state.data.length > 0 && (
         <div className={styles.rows}>{children}</div>

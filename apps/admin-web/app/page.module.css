@@ -162,7 +162,7 @@
   white-space: nowrap;
 }
 .buttonPrimary {
-  color: #fff;
+  color: var(--dm-surface);
   background: var(--dm-brand-primary);
   border: 1px solid var(--dm-brand-primary);
 }

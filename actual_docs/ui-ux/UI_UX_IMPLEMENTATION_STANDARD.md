@@ -69,6 +69,9 @@ DentMarket — рабочий B2B marketplace. Для клиники важны 
 - Контраст текста и controls соответствует WCAG AA; цвет не единственный
   носитель статуса; focus indicator сохраняется.
 - Dialog, menu, drawer и toast работают с клавиатурой и screen reader.
+- Закрытый mobile drawer исключён из последовательности `Tab`; при открытии
+  фокус переходит на доступное действие закрытия, `Escape` закрывает drawer и
+  возвращает фокус на кнопку открытия.
 - Motion не должна блокировать действие; учитывайте `prefers-reduced-motion`.
 
 ## 6. Landing и Taste Skill: ограниченное применение

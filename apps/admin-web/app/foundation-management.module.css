@@ -35,7 +35,7 @@
   border: 1px solid var(--dm-border);
 }
 .primary {
-  color: #fff;
+  color: var(--dm-surface);
   background: var(--dm-brand-primary);
   border: 1px solid var(--dm-brand-primary);
 }
@@ -126,7 +126,7 @@
 .loading i {
   height: 360px;
   border-radius: 10px;
-  background: #eceff3;
+  background: var(--dm-border);
 }
 @media (max-width: 1100px) {
   .grid {

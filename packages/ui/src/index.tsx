@@ -36,7 +36,14 @@ import {
   WeatherSunny24Regular,
 } from "@fluentui/react-icons";
 import type { ReactNode } from "react";
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 type ThemeMode = "light" | "dark";
 
@@ -326,10 +333,30 @@ export function AppShell({
 }: AppShellProps) {
   const { mode, toggle } = useContext(ThemeContext);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+
+  const closeMobileMenu = () => {
+    const shouldRestoreFocus = mobileOpen;
+    setMobileOpen(false);
+    if (shouldRestoreFocus) {
+      window.requestAnimationFrame(() => menuButtonRef.current?.focus());
+    }
+  };
+
+  useEffect(() => {
+    if (!mobileOpen) return;
+    closeButtonRef.current?.focus();
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") closeMobileMenu();
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [mobileOpen]);
 
   const navigate = (id: string) => {
     onNavigate(id);
-    setMobileOpen(false);
+    closeMobileMenu();
   };
 
   return (
@@ -348,11 +375,12 @@ export function AppShell({
             <small>{workspaceLabel}</small>
           </span>
           <Button
+            ref={closeButtonRef}
             className="mp-mobile-close"
             appearance="subtle"
             icon={<Dismiss24Regular />}
             aria-label="Закрыть меню"
-            onClick={() => setMobileOpen(false)}
+            onClick={closeMobileMenu}
           />
         </div>
 
@@ -395,13 +423,14 @@ export function AppShell({
           type="button"
           className="mp-backdrop"
           aria-label="Закрыть меню"
-          onClick={() => setMobileOpen(false)}
+          onClick={closeMobileMenu}
         />
       ) : null}
 
       <div className="mp-workspace">
         <header className="mp-topbar">
           <Button
+            ref={menuButtonRef}
             className="mp-menu-button"
             appearance="subtle"
             icon={<Navigation24Regular />}
