@@ -82,16 +82,21 @@ test("public landing routes both marketplace audiences", async ({ page }) => {
 test("new supplier completes registration and receives a secure cabinet handoff", async ({ page }) => {
   const errors = collectBrowserErrors(page);
   const suffix = String(Date.now()).slice(-10);
+  const email = `e2e-${suffix}@example.kz`;
   await page.goto("http://127.0.0.1:3003/register?role=supplier");
   await page.getByLabel("ФИО владельца").fill("E2E Владелец");
-  await page.getByLabel("Рабочий email").fill(`e2e-${suffix}@example.kz`);
+  await page.getByLabel("Рабочий email").fill(email);
   await page.getByLabel("Пароль").fill("E2E-Supplier-2026!");
   await page.getByLabel("Юридическое наименование").fill(`ТОО E2E ${suffix}`);
   await page.getByLabel("Название в кабинете").fill(`E2E Supply ${suffix}`);
   await page.getByLabel("БИН", { exact: true }).fill(`99${suffix}`.slice(0, 12));
   await page.getByRole("checkbox", { name: "Принимаю условия использования" }).check();
   await page.getByRole("checkbox", { name: "Согласен с политикой конфиденциальности" }).check();
-  await expect(page.getByRole("button", { name: "Продолжить" })).toBeDisabled();
+  const continueButton = page.getByRole("button", { name: "Продолжить" });
+  await expect(continueButton).toBeEnabled();
+  await continueButton.click();
+  await expect(page.getByRole("heading", { name: "Проверьте почту" })).toBeVisible();
+  await expect(page.getByText(email, { exact: false })).toBeVisible();
   await expectHealthyPage(page, errors);
 });
 

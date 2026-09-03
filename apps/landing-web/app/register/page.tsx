@@ -319,6 +319,7 @@ export default function RegisterPage() {
             validationMessage={submitted ? errors.bin : undefined}
           >
             <DmInput
+              aria-label="БИН"
               inputMode="numeric"
               maxLength={12}
               value={form.bin}
