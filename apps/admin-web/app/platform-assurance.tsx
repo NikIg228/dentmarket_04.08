@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, Spinner } from "@fluentui/react-components";
+import { DmButton, DmFeedback } from "@marketplace/ui";
 import {
   ArrowSync20Regular,
   Document20Regular,
@@ -12,22 +12,16 @@ import {
 import { useCallback, useEffect, useState } from "react";
 import styles from "./platform-assurance.module.css";
 import { adminAuthHeaders } from "./admin-auth";
+import {
+  buildAssuranceSummary,
+  type AssuranceSummary,
+} from "./platform-assurance-view-model";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:4012/api";
 const buyerId = "00000000-0000-4000-8000-000000000030";
 const operatorId = "00000000-0000-4000-8000-000000000001";
 
-type Summary = {
-  products: number;
-  documents: number;
-  signedDocuments: number;
-  activeRules: number;
-  blockedChecks: number;
-  notifications: number;
-  paymentProviders: number;
-};
-
-const initial: Summary = {
+const initial: AssuranceSummary = {
   products: 0,
   documents: 0,
   signedDocuments: 0,
@@ -83,19 +77,16 @@ export function PlatformAssurance() {
           ),
           request<Array<unknown>>("/payment-providers"),
         ]);
-      setSummary({
-        products: search.total,
-        documents: documents.length,
-        signedDocuments: documents.filter(({ status }) => status === "SIGNED")
-          .length,
-        activeRules: rules.filter(({ status }) => status === "ACTIVE").length,
-        blockedChecks: checks.filter(
-          ({ decision, status }) =>
-            decision === "BLOCKED" || status === "FAILED",
-        ).length,
-        notifications: notifications.length,
-        paymentProviders: providers.length,
-      });
+      setSummary(
+        buildAssuranceSummary({
+          searchTotal: search.total,
+          documents,
+          rules,
+          checks,
+          notificationCount: notifications.length,
+          paymentProviderCount: providers.length,
+        }),
+      );
       setMessage("");
     } catch (error) {
       setFailed(true);
@@ -124,12 +115,12 @@ export function PlatformAssurance() {
           : await request<unknown>("/notifications/process", {
               method: "POST",
             });
+      await load();
       setMessage(
         action === "search"
           ? "Поисковая проекция перестроена."
           : "Очередь уведомлений обработана.",
       );
-      await load();
       void result;
     } catch (error) {
       setFailed(true);
@@ -164,40 +155,30 @@ export function PlatformAssurance() {
           </p>
         </div>
         <div className={styles.actions}>
-          <Button
-            icon={
-              working === "search" ? (
-                <Spinner size="tiny" />
-              ) : (
-                <Search20Regular />
-              )
-            }
+          <DmButton
+            appearance="secondary"
+            icon={<Search20Regular />}
             onClick={() => void run("search")}
             disabled={Boolean(working)}
           >
-            Перестроить поиск
-          </Button>
-          <Button
-            icon={
-              working === "notifications" ? (
-                <Spinner size="tiny" />
-              ) : (
-                <Send20Regular />
-              )
-            }
+            {working === "search" ? "Перестраиваем…" : "Перестроить поиск"}
+          </DmButton>
+          <DmButton
+            appearance="secondary"
+            icon={<Send20Regular />}
             onClick={() => void run("notifications")}
             disabled={Boolean(working)}
           >
-            Обработать очередь
-          </Button>
-          <Button
+            {working === "notifications" ? "Обрабатываем…" : "Обработать очередь"}
+          </DmButton>
+          <DmButton
             appearance="subtle"
             icon={<ArrowSync20Regular />}
             onClick={() => void load()}
             disabled={loading}
           >
             Обновить
-          </Button>
+          </DmButton>
         </div>
       </div>
       <div className={styles.metrics}>
@@ -252,11 +233,13 @@ export function PlatformAssurance() {
         </div>
       </div>
       {message ? (
-        <div
-          className={`${styles.message} ${failed ? styles.error : ""}`}
-          role={failed ? "alert" : "status"}
-        >
-          {message}
+        <div className={styles.feedback}>
+          <DmFeedback
+            tone={failed ? "danger" : "success"}
+            title={failed ? "Операция не выполнена" : "Операция выполнена"}
+            description={message}
+            alert={failed}
+          />
         </div>
       ) : null}
     </section>

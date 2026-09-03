@@ -1,6 +1,15 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
+import {
+  DmButton,
+  DmFeedback,
+  DmField,
+  DmInput,
+  DmSelect,
+  LoadingState,
+  StatusTag,
+} from "@marketplace/ui";
 import { formatAdminStatus } from "./admin-labels";
 import styles from "./supplier-controls.module.css";
 import { adminAuthHeaders } from "./admin-auth";
@@ -91,7 +100,16 @@ export function SupplierControls() {
   const [recalls, setRecalls] = useState<Recall[]>([]);
   const [decision, setDecision] = useState<PriceDecision | null>(null);
   const [message, setMessage] = useState("");
+  const [messageTone, setMessageTone] = useState<"success" | "danger">("success");
   const [loading, setLoading] = useState(true);
+
+  const report = useCallback(
+    (description: string, tone: "success" | "danger" = "success") => {
+      setMessage(description);
+      setMessageTone(tone);
+    },
+    [],
+  );
 
   const request = useCallback(
     async <T,>(path: string, init?: RequestInit): Promise<T> => {
@@ -167,15 +185,16 @@ export function SupplierControls() {
       }
       setMessage("");
     } catch (error) {
-      setMessage(
+      report(
         error instanceof Error
           ? error.message
           : "Контрольные операции недоступны.",
+        "danger",
       );
     } finally {
       setLoading(false);
     }
-  }, [offerId, request, supplierId]);
+  }, [offerId, report, request, supplierId]);
 
   useEffect(() => {
     void load();
@@ -203,10 +222,11 @@ export function SupplierControls() {
       );
       form.reset();
       await load();
-      setMessage("Кандидат утверждён: Product и Variant созданы атомарно.");
+      report("Кандидат утверждён: Product и Variant созданы атомарно.");
     } catch (error) {
-      setMessage(
+      report(
         error instanceof Error ? error.message : "Кандидат не утверждён.",
+        "danger",
       );
     }
   }
@@ -220,10 +240,11 @@ export function SupplierControls() {
         }),
       });
       await load();
-      setMessage("Кандидат отклонён с сохранением решения.");
+      report("Кандидат отклонён с сохранением решения.");
     } catch (error) {
-      setMessage(
+      report(
         error instanceof Error ? error.message : "Кандидат не отклонён.",
+        "danger",
       );
     }
   }
@@ -244,10 +265,11 @@ export function SupplierControls() {
         }),
       });
       await load();
-      setMessage("Ценовая ступень создана без пересечения диапазонов.");
+      report("Ценовая ступень создана без пересечения диапазонов.");
     } catch (error) {
-      setMessage(
+      report(
         error instanceof Error ? error.message : "Ступень не создана.",
+        "danger",
       );
     }
   }
@@ -271,12 +293,13 @@ export function SupplierControls() {
         },
       );
       await load();
-      setMessage(
+      report(
         "Договорная цена активирована, предыдущая сохранена как INACTIVE.",
       );
     } catch (error) {
-      setMessage(
+      report(
         error instanceof Error ? error.message : "Договорная цена не создана.",
+        "danger",
       );
     }
   }
@@ -297,9 +320,9 @@ export function SupplierControls() {
         },
       );
       setDecision(result);
-      setMessage("Цена вычислена детерминированным resolver.");
+      report("Цена вычислена детерминированным resolver.");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Цена не вычислена.");
+      report(error instanceof Error ? error.message : "Цена не вычислена.", "danger");
     }
   }
 
@@ -314,12 +337,13 @@ export function SupplierControls() {
         }),
       });
       await load();
-      setMessage(
+      report(
         "Остатки проверены. Предложения с устаревшими данными приостановлены.",
       );
     } catch (error) {
-      setMessage(
+      report(
         error instanceof Error ? error.message : "Не удалось проверить остатки.",
+        "danger",
       );
     }
   }
@@ -339,11 +363,11 @@ export function SupplierControls() {
         }),
       });
       await load();
-      setMessage(
+      report(
         "Партия отозвана, доступность обнулена, затронутые резервы зафиксированы.",
       );
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Отзыв не создан.");
+      report(error instanceof Error ? error.message : "Отзыв не создан.", "danger");
     }
   }
 
@@ -359,11 +383,11 @@ export function SupplierControls() {
         },
       );
       await load();
-      setMessage(
+      report(
         "Recall закрыт, партия переведена в UNDER_REVIEW без автоматического возврата остатка.",
       );
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Recall не закрыт.");
+      report(error instanceof Error ? error.message : "Recall не закрыт.", "danger");
     }
   }
 
@@ -386,12 +410,12 @@ export function SupplierControls() {
           <p>У каждого решения сохраняются причина и история изменений.</p>
         </div>
         <div className={styles.actions}>
-          <select
+          <DmSelect
             aria-label="Поставщик"
             value={supplierId}
-            onChange={(event) => {
+            onChange={(_, data) => {
               setOfferId("");
-              setSupplierId(event.target.value);
+              setSupplierId(data.value);
             }}
           >
             {suppliers.map((supplier) => (
@@ -402,20 +426,20 @@ export function SupplierControls() {
                 {supplier.organization.displayName}
               </option>
             ))}
-          </select>
-          <button onClick={() => void load()}>Обновить</button>
+          </DmSelect>
+          <DmButton appearance="secondary" onClick={() => void load()}>Обновить</DmButton>
         </div>
       </div>
-      {message && (
-        <div className={styles.notice} role="status">
-          {message}
-        </div>
-      )}
+      {message ? (
+        <DmFeedback
+          tone={messageTone}
+          title={messageTone === "danger" ? "Операция не выполнена" : "Операция выполнена"}
+          description={message}
+          alert={messageTone === "danger"}
+        />
+      ) : null}
       {loading ? (
-        <div className={styles.loading}>
-          <i />
-          <i />
-        </div>
+        <LoadingState label="Загружаем контроль поставщика" />
       ) : (
         <div className={styles.grid}>
           <article className={styles.panel}>
@@ -427,63 +451,56 @@ export function SupplierControls() {
               </div>
             </header>
             <form className={styles.form} onSubmit={approve}>
-              <label className={styles.wide}>
-                Кандидат
-                <select name="candidateId" required>
+              <DmField className={styles.wide} label="Кандидат" required>
+                <DmSelect name="candidateId" required>
                   <option value="">Выберите</option>
                   {pending.map((candidate) => (
                     <option key={candidate.id} value={candidate.id}>
                       {candidate.proposedName}
                     </option>
                   ))}
-                </select>
-              </label>
-              <label className={styles.wide}>
-                Каноническое название
-                <input name="canonicalName" required />
-              </label>
-              <label>
-                Slug
-                <input name="slug" required />
-              </label>
-              <label>
-                Тип
-                <input name="productType" defaultValue="material" required />
-              </label>
-              <label>
-                Индустрия
-                <select name="industryId" required>
+                </DmSelect>
+              </DmField>
+              <DmField className={styles.wide} label="Каноническое название" required>
+                <DmInput name="canonicalName" required />
+              </DmField>
+              <DmField label="Slug" required>
+                <DmInput name="slug" required />
+              </DmField>
+              <DmField label="Тип" required>
+                <DmInput name="productType" defaultValue="material" required />
+              </DmField>
+              <DmField label="Индустрия" required>
+                <DmSelect name="industryId" required>
                   <option value="">Выберите</option>
                   {industries.map((industry) => (
                     <option key={industry.id} value={industry.id}>
                       {industry.nameRu}
                     </option>
                   ))}
-                </select>
-              </label>
-              <label>
-                Категория
-                <select name="categoryId" required>
+                </DmSelect>
+              </DmField>
+              <DmField label="Категория" required>
+                <DmSelect name="categoryId" required>
                   <option value="">Выберите</option>
                   {categories.map((category) => (
                     <option key={category.id} value={category.id}>
                       {category.nameRu}
                     </option>
                   ))}
-                </select>
-              </label>
-              <label>
-                Единица
-                <select name="saleUnitId">
+                </DmSelect>
+              </DmField>
+              <DmField label="Единица">
+                <DmSelect name="saleUnitId">
                   <option value="">Не задана</option>
                   {units.map((unit) => (
                     <option key={unit.id} value={unit.id}>
                       {unit.nameRu}
                     </option>
                   ))}
-                </select>
-              </label>
-              <button className={styles.primary}>Утвердить</button>
+                </DmSelect>
+              </DmField>
+              <DmButton type="submit" appearance="primary">Утвердить</DmButton>
             </form>
             <div className={styles.records}>
               {candidates.slice(0, 6).map((candidate) => (
@@ -495,9 +512,9 @@ export function SupplierControls() {
                     </small>
                   </div>
                   {candidate.status === "PENDING" ? (
-                    <button onClick={() => void reject(candidate)}>
+                    <DmButton appearance="secondary" onClick={() => void reject(candidate)}>
                       Отклонить
-                    </button>
+                    </DmButton>
                   ) : (
                     <b>
                       {candidate.approvedProduct?.canonicalName ??
@@ -518,11 +535,10 @@ export function SupplierControls() {
                 <p>Contract → tier → base</p>
               </div>
             </header>
-            <label className={styles.offerSelect}>
-              Предложение
-              <select
+            <DmField className={styles.offerSelect} label="Предложение">
+              <DmSelect
                 value={offerId}
-                onChange={(event) => setOfferId(event.target.value)}
+                onChange={(_, data) => setOfferId(data.value)}
               >
                 <option value="">Выберите</option>
                 {offers.map((offer) => (
@@ -530,76 +546,73 @@ export function SupplierControls() {
                     {offer.productVariant.product.canonicalName}
                   </option>
                 ))}
-              </select>
-            </label>
+              </DmSelect>
+            </DmField>
             <form className={styles.form} onSubmit={createTier}>
-              <label>
-                От количества
-                <input
+              <DmField label="От количества" required>
+                <DmInput
                   name="minimumQuantity"
                   type="number"
                   min="0.000001"
                   required
                 />
-              </label>
-              <label>
-                До количества
-                <input name="maximumQuantity" type="number" min="0.000001" />
-              </label>
-              <label>
-                Цена, тиын
-                <input name="unitPriceMinor" type="number" min="0" required />
-              </label>
-              <button className={styles.secondary}>Добавить tier</button>
+              </DmField>
+              <DmField label="До количества">
+                <DmInput name="maximumQuantity" type="number" min="0.000001" />
+              </DmField>
+              <DmField label="Цена, тиын" required>
+                <DmInput name="unitPriceMinor" type="number" min="0" required />
+              </DmField>
+              <DmButton type="submit" appearance="secondary">Добавить ступень</DmButton>
             </form>
             <form className={styles.form} onSubmit={createContract}>
-              <label className={styles.wide}>
-                Покупатель
-                <select name="buyerOrganizationId" required>
+              <DmField className={styles.wide} label="Покупатель" required>
+                <DmSelect name="buyerOrganizationId" required>
                   <option value="">Выберите</option>
                   {buyers.map((buyer) => (
                     <option key={buyer.id} value={buyer.id}>
                       {buyer.displayName}
                     </option>
                   ))}
-                </select>
-              </label>
-              <label>
-                Договор
-                <input name="contractReference" placeholder="KZ-2026-001" />
-              </label>
-              <label>
-                Цена, тиын
-                <input name="amountMinor" type="number" min="0" required />
-              </label>
-              <label>
-                Мин. количество
-                <input
+                </DmSelect>
+              </DmField>
+              <DmField label="Договор">
+                <DmInput name="contractReference" placeholder="KZ-2026-001" />
+              </DmField>
+              <DmField label="Цена, тиын" required>
+                <DmInput name="amountMinor" type="number" min="0" required />
+              </DmField>
+              <DmField label="Минимальное количество">
+                <DmInput
                   name="minimumQuantity"
                   type="number"
                   min="0.000001"
                   defaultValue="1"
                 />
-              </label>
-              <button className={styles.primary}>Активировать contract</button>
+              </DmField>
+              <DmButton type="submit" appearance="primary">Активировать договорную цену</DmButton>
             </form>
             <form className={styles.resolve} onSubmit={resolvePrice}>
-              <select name="buyerOrganizationId">
-                <option value="">Публичная цена</option>
-                {buyers.map((buyer) => (
-                  <option key={buyer.id} value={buyer.id}>
-                    {buyer.displayName}
-                  </option>
-                ))}
-              </select>
-              <input
-                name="quantity"
-                type="number"
-                min="0.000001"
-                defaultValue="20"
-                required
-              />
-              <button>Рассчитать</button>
+              <DmField label="Покупатель для расчёта">
+                <DmSelect name="buyerOrganizationId">
+                  <option value="">Публичная цена</option>
+                  {buyers.map((buyer) => (
+                    <option key={buyer.id} value={buyer.id}>
+                      {buyer.displayName}
+                    </option>
+                  ))}
+                </DmSelect>
+              </DmField>
+              <DmField label="Количество" required>
+                <DmInput
+                  name="quantity"
+                  type="number"
+                  min="0.000001"
+                  defaultValue="20"
+                  required
+                />
+              </DmField>
+              <DmButton type="submit" appearance="secondary">Рассчитать</DmButton>
               {decision && (
                 <output>
                   {decision.source}: {decision.amountMinor ?? "Нет данных"}{" "}
@@ -630,17 +643,16 @@ export function SupplierControls() {
               </div>
             </header>
             <form className={styles.form} onSubmit={recomputeFreshness}>
-              <label>
-                Порог, минут
-                <input
+              <DmField label="Порог, минут" required>
+                <DmInput
                   name="staleAfterMinutes"
                   type="number"
                   min="1"
                   defaultValue="60"
                   required
                 />
-              </label>
-              <button className={styles.primary}>Пересчитать сейчас</button>
+              </DmField>
+              <DmButton type="submit" appearance="primary">Пересчитать сейчас</DmButton>
             </form>
             <div className={styles.records}>
               {balances.map((balance) => (
@@ -651,9 +663,9 @@ export function SupplierControls() {
                     </strong>
                     <small>Доступно {balance.quantityAvailable}</small>
                   </div>
-                  <em data-status={balance.freshnessStatus}>
+                  <StatusTag tone={balance.freshnessStatus === "STALE" ? "danger" : "success"}>
                     {formatAdminStatus(balance.freshnessStatus)}
-                  </em>
+                  </StatusTag>
                 </div>
               ))}
             </div>
@@ -668,9 +680,8 @@ export function SupplierControls() {
               </div>
             </header>
             <form className={styles.form} onSubmit={recallLot}>
-              <label className={styles.wide}>
-                Партия
-                <select name="inventoryLotId" required>
+              <DmField className={styles.wide} label="Партия" required>
+                <DmSelect name="inventoryLotId" required>
                   <option value="">Выберите</option>
                   {lots
                     .filter(
@@ -682,30 +693,27 @@ export function SupplierControls() {
                         {lot.lotNumber}. {formatAdminStatus(lot.status)}. {lot.quantityAvailable}
                       </option>
                     ))}
-                </select>
-              </label>
-              <label>
-                Источник
-                <input
+                </DmSelect>
+              </DmField>
+              <DmField label="Источник" required>
+                <DmInput
                   name="source"
                   defaultValue="manufacturer_notice"
                   required
                 />
-              </label>
-              <label>
-                Критичность
-                <select name="severity" defaultValue="HIGH">
-                  <option>LOW</option>
-                  <option>MEDIUM</option>
-                  <option>HIGH</option>
-                  <option>CRITICAL</option>
-                </select>
-              </label>
-              <label className={styles.wide}>
-                Причина
-                <input name="reason" required />
-              </label>
-              <button className={styles.danger}>Отозвать партию</button>
+              </DmField>
+              <DmField label="Критичность" required>
+                <DmSelect name="severity" defaultValue="HIGH">
+                  <option value="LOW">Низкая</option>
+                  <option value="MEDIUM">Средняя</option>
+                  <option value="HIGH">Высокая</option>
+                  <option value="CRITICAL">Критическая</option>
+                </DmSelect>
+              </DmField>
+              <DmField className={styles.wide} label="Причина" required>
+                <DmInput name="reason" required />
+              </DmField>
+              <DmButton type="submit" appearance="primary" className={styles.dangerAction}>Отозвать партию</DmButton>
             </form>
             <div className={styles.records}>
               {recalls.map((recall) => (
@@ -719,9 +727,9 @@ export function SupplierControls() {
                     </small>
                   </div>
                   {recall.status === "ACTIVE" ? (
-                    <button onClick={() => void resolveRecall(recall)}>
+                    <DmButton appearance="secondary" onClick={() => void resolveRecall(recall)}>
                       Закрыть
-                    </button>
+                    </DmButton>
                   ) : (
                     <b>Закрыт</b>
                   )}
