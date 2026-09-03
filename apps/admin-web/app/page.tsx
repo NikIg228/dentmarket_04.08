@@ -165,8 +165,8 @@ export default function OperationsWorkspace() {
     organizations: <><ResourceLists /><FoundationManagement /></>,
     access: <><SupplierControls /><PlatformAssurance /></>,
     catalog: <><ProductCorrectionQueue /><CatalogQuality /><CommerceFoundation /></>,
-    imports: <><CatalogImportReviewQueue /><IntegrationOperations /><ConnectorReadinessRegistry /></>,
-    orders: <><SupplierOperations /><AgreementOperations /></>,
+    imports: <><CatalogImportReviewQueue /><SupplierOperations /><IntegrationOperations /><ConnectorReadinessRegistry /></>,
+    orders: <><OperationQueue /><AgreementOperations /></>,
     security: <TrustOperations />,
     settings: <CommerceSkeleton />,
   };

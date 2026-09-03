@@ -1,6 +1,17 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
+import {
+  DmButton,
+  DmFeedback,
+  DmField,
+  DmInput,
+  DmSelect,
+  DmTextarea,
+  EmptyState,
+  LoadingState,
+  StatusTag,
+} from "@marketplace/ui";
 import { formatAdminStatus } from "./admin-labels";
 import styles from "./supplier-operations.module.css";
 import { adminAuthHeaders } from "./admin-auth";
@@ -95,6 +106,16 @@ export function SupplierOperations() {
   const [balances, setBalances] = useState<Balance[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
+  const [messageTone, setMessageTone] = useState<"success" | "danger" | "info">("info");
+  const [busy, setBusy] = useState<string | null>(null);
+
+  const report = useCallback(
+    (description: string, tone: "success" | "danger" | "info" = "success") => {
+      setMessage(description);
+      setMessageTone(tone);
+    },
+    [],
+  );
 
   const request = useCallback(
     async <T,>(path: string, init?: RequestInit): Promise<T> => {
@@ -123,9 +144,7 @@ export function SupplierOperations() {
       setSuppliers(supplierData);
       const activeSupplierId = supplierId || supplierData[0]?.organizationId;
       if (!activeSupplierId) {
-        setMessage(
-          "Сначала создайте карточку поставщика.",
-        );
+        report("Сначала создайте карточку поставщика.", "info");
         return;
       }
       if (!supplierId) setSupplierId(activeSupplierId);
@@ -150,15 +169,16 @@ export function SupplierOperations() {
       setBalances(balanceData);
       setMessage("");
     } catch (error) {
-      setMessage(
+      report(
         error instanceof Error
           ? error.message
           : "Раздел поставщика недоступен.",
+        "danger",
       );
     } finally {
       setLoading(false);
     }
-  }, [request, supplierId]);
+  }, [report, request, supplierId]);
 
   useEffect(() => {
     void load();
@@ -172,6 +192,8 @@ export function SupplierOperations() {
     event.preventDefault();
     const form = event.currentTarget;
     const data = new FormData(form);
+    setBusy("warehouse");
+    setMessage("");
     try {
       await request(`/suppliers/${supplierId}/warehouses`, {
         method: "POST",
@@ -183,11 +205,14 @@ export function SupplierOperations() {
       });
       form.reset();
       await load();
-      setMessage("Склад поставщика создан.");
+      report("Склад поставщика создан.");
     } catch (error) {
-      setMessage(
+      report(
         error instanceof Error ? error.message : "Не удалось создать склад.",
+        "danger",
       );
+    } finally {
+      setBusy(null);
     }
   }
 
@@ -195,6 +220,8 @@ export function SupplierOperations() {
     event.preventDefault();
     const form = event.currentTarget;
     const data = new FormData(form);
+    setBusy("source");
+    setMessage("");
     try {
       await request(`/suppliers/${supplierId}/data-sources`, {
         method: "POST",
@@ -205,17 +232,22 @@ export function SupplierOperations() {
       });
       form.reset();
       await load();
-      setMessage("Способ загрузки добавлен.");
+      report("Способ загрузки добавлен.");
     } catch (error) {
-      setMessage(
+      report(
         error instanceof Error ? error.message : "Не удалось добавить способ загрузки.",
+        "danger",
       );
+    } finally {
+      setBusy(null);
     }
   }
 
   async function uploadCsv(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
+    setBusy("upload");
+    setMessage("");
     try {
       const batch = await request<ImportBatch>(
         `/suppliers/${supplierId}/import-batches`,
@@ -245,15 +277,20 @@ export function SupplierOperations() {
         { method: "POST" },
       );
       await load();
-      setMessage("Файл загружен. Товары проверены по каталогу.");
+      report("Файл загружен. Товары проверены по каталогу.");
     } catch (error) {
-      setMessage(
+      report(
         error instanceof Error ? error.message : "Не удалось загрузить файл.",
+        "danger",
       );
+    } finally {
+      setBusy(null);
     }
   }
 
   async function confirmMatch(item: ExternalItem, variantId: string) {
+    setBusy(`match:${item.id}`);
+    setMessage("");
     try {
       await request(
         `/suppliers/${supplierId}/external-items/${item.id}/match`,
@@ -263,13 +300,16 @@ export function SupplierOperations() {
         },
       );
       await load();
-      setMessage(
+      report(
         `Товар ${item.externalId} связан с карточкой каталога.`,
       );
     } catch (error) {
-      setMessage(
+      report(
         error instanceof Error ? error.message : "Не удалось подтвердить товар.",
+        "danger",
       );
+    } finally {
+      setBusy(null);
     }
   }
 
@@ -277,6 +317,8 @@ export function SupplierOperations() {
     event.preventDefault();
     const form = event.currentTarget;
     const data = new FormData(form);
+    setBusy("offer");
+    setMessage("");
     try {
       await request(`/suppliers/${supplierId}/offers`, {
         method: "POST",
@@ -289,9 +331,11 @@ export function SupplierOperations() {
       });
       form.reset();
       await load();
-      setMessage("Черновик предложения создан.");
+      report("Черновик предложения создан.");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Предложение не создано.");
+      report(error instanceof Error ? error.message : "Предложение не создано.", "danger");
+    } finally {
+      setBusy(null);
     }
   }
 
@@ -300,6 +344,8 @@ export function SupplierOperations() {
     const data = new FormData(event.currentTarget);
     const offer = offers.find(({ id }) => id === data.get("offerId"));
     if (!offer) return;
+    setBusy("publish");
+    setMessage("");
     try {
       await request(`/suppliers/${supplierId}/offers/${offer.id}/price`, {
         method: "PUT",
@@ -328,13 +374,16 @@ export function SupplierOperations() {
         body: JSON.stringify({ status: "PUBLISHED", marketplaceVisible: true }),
       });
       await load();
-      setMessage(
+      report(
         "Цена и остаток обновлены. Предложение опубликовано.",
       );
     } catch (error) {
-      setMessage(
+      report(
         error instanceof Error ? error.message : "Предложение не опубликовано.",
+        "danger",
       );
+    } finally {
+      setBusy(null);
     }
   }
 
@@ -342,6 +391,8 @@ export function SupplierOperations() {
     event.preventDefault();
     const form = event.currentTarget;
     const data = new FormData(form);
+    setBusy("lot");
+    setMessage("");
     try {
       await request(`/suppliers/${supplierId}/inventory/lots`, {
         method: "POST",
@@ -355,15 +406,19 @@ export function SupplierOperations() {
       });
       form.reset();
       await load();
-      setMessage("Партия добавлена. Товары с ближайшим сроком годности будут отгружаться первыми.");
+      report("Партия добавлена. Товары с ближайшим сроком годности будут отгружаться первыми.");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Партия не создана.");
+      report(error instanceof Error ? error.message : "Партия не создана.", "danger");
+    } finally {
+      setBusy(null);
     }
   }
 
   async function reserve(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
+    setBusy("reserve");
+    setMessage("");
     try {
       await request(
         `/suppliers/${supplierId}/inventory/balances/${data.get("balanceId")}/reservations`,
@@ -378,9 +433,11 @@ export function SupplierOperations() {
         },
       );
       await load();
-      setMessage("Резерв создан. Повторный запрос не изменит количество дважды.");
+      report("Резерв создан. Повторный запрос не изменит количество дважды.");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Резерв не создан.");
+      report(error instanceof Error ? error.message : "Резерв не создан.", "danger");
+    } finally {
+      setBusy(null);
     }
   }
 
@@ -400,10 +457,11 @@ export function SupplierOperations() {
           </p>
         </div>
         <div className={styles.actions}>
-          <select
+          <DmSelect
             aria-label="Активный поставщик"
             value={supplierId}
-            onChange={(event) => setSupplierId(event.target.value)}
+            onChange={(_, data) => setSupplierId(data.value)}
+            disabled={loading || Boolean(busy)}
           >
             {suppliers.map((supplier) => (
               <option
@@ -413,23 +471,37 @@ export function SupplierOperations() {
                 {supplier.organization.displayName}
               </option>
             ))}
-          </select>
-          <button onClick={() => void load()}>Обновить</button>
+          </DmSelect>
+          <DmButton
+            appearance="secondary"
+            onClick={() => void load()}
+            disabled={loading || Boolean(busy)}
+          >
+            Обновить
+          </DmButton>
         </div>
       </div>
-      {message && (
-        <div className={styles.notice} role="status">
-          {message}
-        </div>
-      )}
+      {message ? (
+        <DmFeedback
+          tone={messageTone}
+          title={
+            messageTone === "danger"
+              ? "Операция не выполнена"
+              : messageTone === "success"
+                ? "Операция выполнена"
+                : "Нужна настройка"
+          }
+          description={message}
+          alert={messageTone === "danger"}
+        />
+      ) : null}
       {loading ? (
-        <div className={styles.loading}>
-          <i />
-          <i />
-          <i />
-        </div>
+        <LoadingState label="Загружаем данные поставщика" />
       ) : !activeSupplier ? (
-        <div className={styles.empty}>Поставщик не найден.</div>
+        <EmptyState
+          title="Поставщик не найден"
+          description="Создайте или выберите поставщика, чтобы настроить загрузку, предложения и остатки."
+        />
       ) : (
         <div className={styles.grid}>
           <article className={styles.panel}>
@@ -458,36 +530,35 @@ export function SupplierOperations() {
               </b>
             </div>
             <form className={styles.form} onSubmit={createWarehouse}>
-              <label>
-                Код склада
-                <input name="code" required placeholder="AST-02" />
-              </label>
-              <label>
-                Название
-                <input name="name" required placeholder="Склад Астана" />
-              </label>
-              <label className={styles.wide}>
-                Адрес
-                <input name="addressLine" placeholder="ул. ..." />
-              </label>
-              <button className={styles.secondary}>Добавить склад</button>
+              <DmField label="Код склада" required>
+                <DmInput name="code" required placeholder="AST-02" />
+              </DmField>
+              <DmField label="Название" required>
+                <DmInput name="name" required placeholder="Склад Астана" />
+              </DmField>
+              <DmField className={styles.wide} label="Адрес">
+                <DmInput name="addressLine" placeholder="ул. ..." />
+              </DmField>
+              <DmButton type="submit" appearance="secondary" disabled={Boolean(busy)}>
+                {busy === "warehouse" ? "Добавляем…" : "Добавить склад"}
+              </DmButton>
             </form>
             <form className={styles.form} onSubmit={createSource}>
-              <label>
-                Название
-                <input name="name" required placeholder="Прайс отдела продаж" />
-              </label>
-              <label>
-                Тип
-                <select name="type" defaultValue="CSV">
-                  <option>CSV</option>
-                  <option>EXCEL</option>
-                  <option>MANUAL</option>
+              <DmField label="Название" required>
+                <DmInput name="name" required placeholder="Прайс отдела продаж" />
+              </DmField>
+              <DmField label="Тип" required>
+                <DmSelect name="type" defaultValue="CSV" required>
+                  <option value="CSV">CSV</option>
+                  <option value="EXCEL">Excel</option>
+                  <option value="MANUAL">Ручной ввод</option>
                   <option value="API">Прямое подключение</option>
                   <option value="ERP">1С</option>
-                </select>
-              </label>
-              <button className={styles.secondary}>Добавить способ</button>
+                </DmSelect>
+              </DmField>
+              <DmButton type="submit" appearance="secondary" disabled={Boolean(busy)}>
+                {busy === "source" ? "Добавляем…" : "Добавить способ"}
+              </DmButton>
             </form>
           </article>
 
@@ -500,26 +571,30 @@ export function SupplierOperations() {
               </div>
             </header>
             <form className={styles.form} onSubmit={uploadCsv}>
-              <label>
-                Способ загрузки
-                <select name="sourceId" required>
+              <DmField label="Способ загрузки" required>
+                <DmSelect name="sourceId" required>
                   <option value="">Выберите</option>
                   {activeSupplier.dataSources.map((source) => (
                     <option key={source.id} value={source.id}>
                       {source.name}
                     </option>
                   ))}
-                </select>
-              </label>
-              <label>
-                Имя файла
-                <input name="fileName" defaultValue="web-price.csv" required />
-              </label>
-              <label className={styles.wide}>
-                CSV
-                <textarea name="csv" rows={5} defaultValue={demoCsv} required />
-              </label>
-              <button className={styles.primary}>Загрузить и обработать</button>
+                </DmSelect>
+              </DmField>
+              <DmField label="Имя файла" required>
+                <DmInput name="fileName" defaultValue="web-price.csv" required />
+              </DmField>
+              <DmField
+                className={styles.wide}
+                label="Данные CSV"
+                hint="Первая строка должна содержать названия колонок. Исходный файл сохраняется для аудита."
+                required
+              >
+                <DmTextarea name="csv" rows={5} defaultValue={demoCsv} required />
+              </DmField>
+              <DmButton type="submit" appearance="primary" disabled={Boolean(busy)}>
+                {busy === "upload" ? "Обрабатываем…" : "Загрузить и обработать"}
+              </DmButton>
             </form>
             <div className={styles.records}>
               {batches.slice(0, 3).map((batch) => (
@@ -554,13 +629,15 @@ export function SupplierOperations() {
                       </small>
                     </div>
                     {!item.matchedVariantId && candidate && (
-                      <button
+                      <DmButton
+                        appearance="secondary"
+                        disabled={Boolean(busy)}
                         onClick={() =>
                           void confirmMatch(item, candidate.productVariant.id)
                         }
                       >
-                        Подтвердить
-                      </button>
+                        {busy === `match:${item.id}` ? "Подтверждаем…" : "Подтвердить"}
+                      </DmButton>
                     )}
                   </div>
                 );
@@ -577,9 +654,8 @@ export function SupplierOperations() {
               </div>
             </header>
             <form className={styles.form} onSubmit={createOffer}>
-              <label className={styles.wide}>
-                Вариант
-                <select name="productVariantId" required>
+              <DmField className={styles.wide} label="Вариант товара" required>
+                <DmSelect name="productVariantId" required>
                   <option value="">Выберите</option>
                   {products.flatMap((product) =>
                     product.variants.map((variant) => (
@@ -588,80 +664,75 @@ export function SupplierOperations() {
                       </option>
                     )),
                   )}
-                </select>
-              </label>
-              <label>
-                Способ загрузки
-                <select name="sourceId">
+                </DmSelect>
+              </DmField>
+              <DmField label="Способ загрузки">
+                <DmSelect name="sourceId">
                   <option value="">Ручной</option>
                   {activeSupplier.dataSources.map((source) => (
                     <option key={source.id} value={source.id}>
                       {source.name}
                     </option>
                   ))}
-                </select>
-              </label>
-              <label>
-                SKU поставщика
-                <input name="supplierSku" />
-              </label>
-              <button className={styles.primary}>Создать предложение</button>
+                </DmSelect>
+              </DmField>
+              <DmField label="SKU поставщика">
+                <DmInput name="supplierSku" />
+              </DmField>
+              <DmButton type="submit" appearance="primary" disabled={Boolean(busy)}>
+                {busy === "offer" ? "Создаём…" : "Создать предложение"}
+              </DmButton>
             </form>
             <form className={styles.form} onSubmit={activateOffer}>
-              <label className={styles.wide}>
-                Предложение
-                <select name="offerId" required>
+              <DmField className={styles.wide} label="Предложение" required>
+                <DmSelect name="offerId" required>
                   <option value="">Выберите</option>
                   {offers.map((offer) => (
                     <option key={offer.id} value={offer.id}>
                       {offer.productVariant.product.canonicalName}
                     </option>
                   ))}
-                </select>
-              </label>
-              <label>
-                Цена, тиын
-                <input
+                </DmSelect>
+              </DmField>
+              <DmField label="Цена, тиын" required>
+                <DmInput
                   name="amountMinor"
                   type="number"
                   min="0"
                   defaultValue="129000"
                   required
                 />
-              </label>
-              <label>
-                On hand
-                <input
+              </DmField>
+              <DmField label="Фактический остаток" required>
+                <DmInput
                   name="quantityOnHand"
                   type="number"
                   min="0"
                   defaultValue="24"
                   required
                 />
-              </label>
-              <label>
-                Safety stock
-                <input
+              </DmField>
+              <DmField label="Страховой запас">
+                <DmInput
                   name="safetyStock"
                   type="number"
                   min="0"
                   defaultValue="2"
                 />
-              </label>
-              <label>
-                Склад
-                <select name="warehouseId" required>
+              </DmField>
+              <DmField label="Склад" required>
+                <DmSelect name="warehouseId" required>
                   <option value="">Выберите</option>
                   {activeSupplier.warehouses.map((warehouse) => (
                     <option key={warehouse.id} value={warehouse.id}>
                       {warehouse.name}
                     </option>
                   ))}
-                </select>
-              </label>
-              <button className={styles.primary}>
-                Цена + остаток + publish
-              </button>
+                </DmSelect>
+              </DmField>
+              <DmButton type="submit" appearance="primary" disabled={Boolean(busy)}>
+                {busy === "publish" ? "Публикуем…" : "Обновить и опубликовать"}
+              </DmButton>
             </form>
             <div className={styles.records}>
               {offers.slice(0, 5).map((offer) => (
@@ -675,11 +746,11 @@ export function SupplierOperations() {
                       v{offer.version}
                     </small>
                   </div>
-                  <b>
+                  <StatusTag tone={offer.publication?.marketplaceVisible ? "success" : "neutral"}>
                     {offer.prices.find(({ status }) => status === "ACTIVE")
-                      ?.amountMinor ?? "Нет данных"}{" "}
-                    KZT¢
-                  </b>
+                      ?.amountMinor ?? "Нет цены"}{" "}
+                    тиын
+                  </StatusTag>
                 </div>
               ))}
             </div>
@@ -694,9 +765,8 @@ export function SupplierOperations() {
               </div>
             </header>
             <form className={styles.form} onSubmit={createLot}>
-              <label className={styles.wide}>
-                Balance
-                <select name="balanceId" required>
+              <DmField className={styles.wide} label="Остаток" required>
+                <DmSelect name="balanceId" required>
                   <option value="">Выберите</option>
                   {balances.map((balance) => (
                     <option key={balance.id} value={balance.id}>
@@ -704,54 +774,57 @@ export function SupplierOperations() {
                       {balance.quantityAvailable}
                     </option>
                   ))}
-                </select>
-              </label>
-              <label>
-                Номер партии
-                <input name="lotNumber" required placeholder="LOT-2026-001" />
-              </label>
-              <label>
-                Годен до
-                <input name="expirationDate" type="date" required />
-              </label>
-              <label>
-                Количество
-                <input name="quantityOnHand" type="number" min="0" required />
-              </label>
-              <button className={styles.secondary}>Добавить lot</button>
+                </DmSelect>
+              </DmField>
+              <DmField label="Номер партии" required>
+                <DmInput name="lotNumber" required placeholder="LOT-2026-001" />
+              </DmField>
+              <DmField label="Годен до" required>
+                <DmInput name="expirationDate" type="date" required />
+              </DmField>
+              <DmField label="Количество" required>
+                <DmInput name="quantityOnHand" type="number" min="0" required />
+              </DmField>
+              <DmButton type="submit" appearance="secondary" disabled={Boolean(busy)}>
+                {busy === "lot" ? "Добавляем…" : "Добавить партию"}
+              </DmButton>
             </form>
             <form className={styles.form} onSubmit={reserve}>
-              <label>
-                Balance
-                <select name="balanceId" required>
+              <DmField label="Остаток" required>
+                <DmSelect name="balanceId" required>
                   <option value="">Выберите</option>
                   {balances.map((balance) => (
                     <option key={balance.id} value={balance.id}>
                       {balance.warehouse.code} · {balance.quantityAvailable}
                     </option>
                   ))}
-                </select>
-              </label>
-              <label>
-                Количество
-                <input
+                </DmSelect>
+              </DmField>
+              <DmField label="Количество" required>
+                <DmInput
                   name="quantity"
                   type="number"
                   min="0.000001"
                   step="0.000001"
                   required
                 />
-              </label>
-              <label className={styles.wide}>
-                Idempotency key
-                <input
+              </DmField>
+              <DmField
+                className={styles.wide}
+                label="Ключ идемпотентности"
+                hint="Повтор запроса с тем же ключом не уменьшит остаток второй раз."
+                required
+              >
+                <DmInput
                   name="idempotencyKey"
                   minLength={8}
                   required
                   placeholder="checkout-demo-001"
                 />
-              </label>
-              <button className={styles.primary}>Зарезервировать</button>
+              </DmField>
+              <DmButton type="submit" appearance="primary" disabled={Boolean(busy)}>
+                {busy === "reserve" ? "Резервируем…" : "Зарезервировать"}
+              </DmButton>
             </form>
             <div className={styles.records}>
               {balances.slice(0, 5).map((balance) => (
@@ -765,9 +838,9 @@ export function SupplierOperations() {
                       lots {balance.lots.length}
                     </small>
                   </div>
-                  <b>
-                    {balance.quantityAvailable} / {balance.quantityOnHand}
-                  </b>
+                  <StatusTag tone={balance.freshnessStatus === "FRESH" ? "success" : "warning"}>
+                    {balance.quantityAvailable} из {balance.quantityOnHand}
+                  </StatusTag>
                 </div>
               ))}
             </div>
