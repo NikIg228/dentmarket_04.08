@@ -1,6 +1,5 @@
 "use client";
 
-import { Button } from "@fluentui/react-components";
 import {
   Add20Regular,
   ArrowClockwise20Regular,
@@ -8,10 +7,21 @@ import {
   Link20Regular,
   Play20Regular,
 } from "@fluentui/react-icons";
+import {
+  DmButton,
+  DmCheckbox,
+  DmFeedback,
+  DmField,
+  DmInput,
+  DmSelect,
+  LoadingState,
+  StatusTag,
+} from "@marketplace/ui";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { formatAdminStatus } from "./admin-labels";
 import styles from "./integration-operations.module.css";
 import { adminAuthHeaders } from "./admin-auth";
+import { summarizeIntegrationHealth } from "./integration-operations-view-model";
 
 type Supplier = {
   organizationId: string;
@@ -108,6 +118,16 @@ const jobTypes = [
   "INVENTORY_SYNC",
   "RECONCILIATION",
 ];
+const dataTypeLabels: Record<string, string> = {
+  CATALOG: "Каталог",
+  PRICE: "Цены",
+  INVENTORY: "Остатки",
+  ORDER: "Заказы",
+  RESERVATION: "Резервы",
+  SHIPMENT: "Отгрузки",
+  RETURN: "Возвраты",
+  IMAGE: "Изображения",
+};
 
 function providerLabel(provider: string) {
   return provider === "ONE_C"
@@ -149,6 +169,7 @@ export function IntegrationOperations() {
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
   const [message, setMessage] = useState("");
+  const [messageTone, setMessageTone] = useState<"success" | "danger">("success");
   const [oneTimeSecret, setOneTimeSecret] = useState<{
     title: string;
     lines: string[];
@@ -232,6 +253,7 @@ export function IntegrationOperations() {
       if (activeSupplierId) await loadSupplier(activeSupplierId, connectionId);
       setMessage("");
     } catch (error) {
+      setMessageTone("danger");
       setMessage(
         error instanceof Error ? error.message : "Подключения недоступны.",
       );
@@ -249,16 +271,12 @@ export function IntegrationOperations() {
     [connectionId, connections],
   );
   const counts = useMemo(
-    () => ({
-      active: connections.filter(({ status }) => status === "ACTIVE").length,
-      queued: jobs.filter(({ status }) =>
-        ["PENDING", "FAILED", "RUNNING"].includes(status),
-      ).length,
-      dead: jobs.filter(({ status }) => status === "DEAD_LETTER").length,
-      mismatches: reconciliation.filter(
-        ({ status }) => status !== "MATCHED" && status !== "RESOLVED",
-      ).length,
-    }),
+    () =>
+      summarizeIntegrationHealth({
+        connectionStatuses: connections.map(({ status }) => status),
+        jobStatuses: jobs.map(({ status }) => status),
+        reconciliationStatuses: reconciliation.map(({ status }) => status),
+      }),
     [connections, jobs, reconciliation],
   );
 
@@ -269,11 +287,14 @@ export function IntegrationOperations() {
   ) {
     if (!supplierId) return;
     setWorking(true);
+    setMessage("");
     try {
       await action();
       await loadSupplier(supplierId, preferredConnectionId);
+      setMessageTone("success");
       setMessage(success);
     } catch (error) {
+      setMessageTone("danger");
       setMessage(
         error instanceof Error ? error.message : "Операция не выполнена.",
       );
@@ -290,6 +311,7 @@ export function IntegrationOperations() {
     const token = String(data.get("accessToken") ?? "").trim();
     const enableWebhook = data.get("enableWebhook") === "on";
     setWorking(true);
+    setMessage("");
     try {
       const result = await request<CreateResult>(
         `/suppliers/${supplierId}/integrations`,
@@ -323,10 +345,12 @@ export function IntegrationOperations() {
       );
       form.reset();
       await loadSupplier(supplierId, result.connection.id);
+      setMessageTone("success");
       setMessage(
         "Подключение создано. Первичная проверка поставлена в очередь.",
       );
     } catch (error) {
+      setMessageTone("danger");
       setMessage(
         error instanceof Error ? error.message : "Подключение не создано.",
       );
@@ -419,6 +443,7 @@ export function IntegrationOperations() {
   async function rotateEnrollment() {
     if (!selected) return;
     setWorking(true);
+    setMessage("");
     try {
       const result = await request<{
         agentId: string;
@@ -437,8 +462,10 @@ export function IntegrationOperations() {
         ],
       });
       await loadSupplier(supplierId, selected.id);
+      setMessageTone("success");
       setMessage("Токен агента перевыпущен. Старый токен недействителен.");
     } catch (error) {
+      setMessageTone("danger");
       setMessage(
         error instanceof Error ? error.message : "Токен не перевыпущен.",
       );
@@ -461,15 +488,15 @@ export function IntegrationOperations() {
           </p>
         </div>
         <div className={styles.toolbar}>
-          <label>
-            Поставщик
-            <select
+          <DmField label="Поставщик">
+            <DmSelect
               value={supplierId}
-              onChange={(event) => {
-                const id = event.target.value;
+              onChange={(_, data) => {
+                const id = data.value;
                 setSupplierId(id);
                 void loadSupplier(id);
               }}
+              disabled={loading || working}
             >
               {suppliers.map((supplier) => (
                 <option
@@ -479,24 +506,27 @@ export function IntegrationOperations() {
                   {supplier.organization.displayName}
                 </option>
               ))}
-            </select>
-          </label>
-          <Button
-            appearance="outline"
+            </DmSelect>
+          </DmField>
+          <DmButton
+            appearance="secondary"
             icon={<ArrowClockwise20Regular />}
             onClick={() => void load()}
-            disabled={working}
+            disabled={loading || working}
           >
             Обновить
-          </Button>
+          </DmButton>
         </div>
       </div>
 
-      {message && (
-        <div className={styles.notice} role="status">
-          {message}
-        </div>
-      )}
+      {message ? (
+        <DmFeedback
+          tone={messageTone}
+          title={messageTone === "danger" ? "Операция не выполнена" : "Операция выполнена"}
+          description={message}
+          alert={messageTone === "danger"}
+        />
+      ) : null}
       {oneTimeSecret && (
         <div className={styles.secret} role="alert">
           <Key20Regular />
@@ -506,21 +536,18 @@ export function IntegrationOperations() {
               <code key={line}>{line}</code>
             ))}
           </div>
-          <button
+          <DmButton
+            appearance="subtle"
             aria-label="Закрыть данные подключения"
             onClick={() => setOneTimeSecret(null)}
           >
             Закрыть
-          </button>
+          </DmButton>
         </div>
       )}
 
       {loading ? (
-        <div className={styles.loading} aria-label="Загрузка подключений">
-          <i />
-          <i />
-          <i />
-        </div>
+        <LoadingState label="Загружаем подключения" />
       ) : (
         <>
           <div className={styles.metrics}>
@@ -554,49 +581,50 @@ export function IntegrationOperations() {
                   </div>
                   <Add20Regular />
                 </header>
-                <label>
-                  Система
-                  <select
+                <DmField label="Система" required>
+                  <DmSelect
                     value={provider}
-                    onChange={(event) => setProvider(event.target.value)}
+                    onChange={(_, data) => setProvider(data.value)}
+                    disabled={working}
                   >
                     <option value="MOCK">Тестовое подключение</option>
                     <option value="MOYSKLAD">МойСклад</option>
                     <option value="ONE_C">1С</option>
-                  </select>
-                </label>
-                <label>
-                  Название
-                  <input
+                  </DmSelect>
+                </DmField>
+                <DmField label="Название" required>
+                  <DmInput
                     name="displayName"
                     required
                     minLength={2}
                     placeholder="Основной склад"
                   />
-                </label>
+                </DmField>
                 {provider === "MOYSKLAD" && (
-                  <label className={styles.full}>
-                    Ключ доступа
-                    <input
+                  <DmField className={styles.full} label="Ключ доступа" required>
+                    <DmInput
                       name="accessToken"
                       type="password"
                       required
                       autoComplete="new-password"
                     />
-                  </label>
+                  </DmField>
                 )}
-                <label className={`${styles.check} ${styles.full}`}>
-                  <input name="enableWebhook" type="checkbox" /> Получать обновления автоматически
-                </label>
-                <Button
+                <DmCheckbox
+                  className={`${styles.check} ${styles.full}`}
+                  name="enableWebhook"
+                  label="Получать обновления автоматически"
+                  disabled={working}
+                />
+                <DmButton
                   className={styles.full}
                   type="submit"
                   appearance="primary"
                   icon={<Link20Regular />}
                   disabled={working}
                 >
-                  Подключить
-                </Button>
+                  {working ? "Подключаем…" : "Подключить"}
+                </DmButton>
               </form>
 
               <div className={styles.connectionList}>
@@ -610,7 +638,8 @@ export function IntegrationOperations() {
                   </div>
                 ) : (
                   connections.map((connection) => (
-                    <button
+                    <DmButton
+                      appearance="subtle"
                       key={connection.id}
                       className={
                         connection.id === connectionId
@@ -629,10 +658,10 @@ export function IntegrationOperations() {
                           {connection.mode}
                         </small>
                       </span>
-                      <em data-status={connection.status}>
+                      <StatusTag tone={connection.status === "ACTIVE" ? "success" : connection.status === "ERROR" ? "danger" : "neutral"}>
                         {formatAdminStatus(connection.status)}
-                      </em>
-                    </button>
+                      </StatusTag>
+                    </DmButton>
                   ))
                 )}
               </div>
@@ -655,32 +684,32 @@ export function IntegrationOperations() {
                     </div>
                     <div className={styles.statusActions}>
                       {selected.status === "PAUSED" ? (
-                        <Button
+                        <DmButton
                           appearance="primary"
                           onClick={() => void changeStatus("ACTIVE")}
                           disabled={working}
                         >
                           Возобновить
-                        </Button>
+                        </DmButton>
                       ) : (
                         selected.status !== "REVOKED" && (
-                          <Button
-                            appearance="outline"
+                          <DmButton
+                            appearance="secondary"
                             onClick={() => void changeStatus("PAUSED")}
                             disabled={working}
                           >
                             Пауза
-                          </Button>
+                          </DmButton>
                         )
                       )}
                       {selected.status !== "REVOKED" && (
-                        <Button
+                        <DmButton
                           appearance="subtle"
                           onClick={() => void changeStatus("REVOKED")}
                           disabled={working}
                         >
                           Отозвать
-                        </Button>
+                        </DmButton>
                       )}
                     </div>
                   </header>
@@ -702,31 +731,29 @@ export function IntegrationOperations() {
                           Последняя связь: {dateTime(selected.agent.lastHeartbeatAt)}
                         </small>
                       </span>
-                      <Button
+                      <DmButton
                         icon={<Key20Regular />}
-                        appearance="outline"
+                        appearance="secondary"
                         onClick={() => void rotateEnrollment()}
                         disabled={working}
                       >
                         Новый ключ
-                      </Button>
+                      </DmButton>
                     </div>
                   )}
 
                   <div className={styles.controls}>
                     <form onSubmit={(event) => void createBinding(event)}>
                       <h4>Выбрать данные</h4>
-                      <label>
-                        Тип данных
-                        <select name="dataType">
+                      <DmField label="Тип данных">
+                        <DmSelect name="dataType">
                           {dataTypes.map((type) => (
-                            <option key={type}>{type}</option>
+                            <option key={type} value={type}>{dataTypeLabels[type] ?? type}</option>
                           ))}
-                        </select>
-                      </label>
-                      <label>
-                        Область
-                        <select name="scope">
+                        </DmSelect>
+                      </DmField>
+                      <DmField label="Область">
+                        <DmSelect name="scope">
                           <option value="global">Весь поставщик</option>
                           {warehouses.map((warehouse) => (
                             <option
@@ -743,63 +770,59 @@ export function IntegrationOperations() {
                                 offer.productVariant.product.canonicalName}
                             </option>
                           ))}
-                        </select>
-                      </label>
-                      <label>
-                        Приоритет
-                        <input
+                        </DmSelect>
+                      </DmField>
+                      <DmField label="Приоритет">
+                        <DmInput
                           name="priority"
                           type="number"
                           min="0"
                           defaultValue="100"
                         />
-                      </label>
-                      <Button
+                      </DmField>
+                      <DmButton
                         type="submit"
-                        appearance="outline"
+                        appearance="secondary"
                         disabled={working}
                       >
                         Добавить
-                      </Button>
+                      </DmButton>
                     </form>
                     <form onSubmit={(event) => void enqueueJob(event)}>
                       <h4>Обновить данные</h4>
-                      <label>
-                        Операция
-                        <select name="jobType">
+                      <DmField label="Операция">
+                        <DmSelect name="jobType">
                           {jobTypes.map((type) => (
-                            <option key={type}>{type}</option>
+                            <option key={type} value={type}>{jobTypeLabels[type] ?? type}</option>
                           ))}
-                        </select>
-                      </label>
-                      <Button
+                        </DmSelect>
+                      </DmField>
+                      <DmButton
                         type="submit"
                         appearance="primary"
                         icon={<Play20Regular />}
                         disabled={working}
                       >
-                        Запустить
-                      </Button>
+                        {working ? "Запускаем…" : "Запустить"}
+                      </DmButton>
                     </form>
                     <form onSubmit={(event) => void upsertMapping(event)}>
                       <h4>Связать записи</h4>
-                      <label>
-                        Что связать
-                        <select
+                      <DmField label="Что связать">
+                        <DmSelect
                           value={mappingType}
-                          onChange={(event) =>
+                          onChange={(_, data) =>
                             setMappingType(
-                              event.target.value as "WAREHOUSE" | "VARIANT",
+                              data.value as "WAREHOUSE" | "VARIANT",
                             )
                           }
                         >
                           <option value="WAREHOUSE">Склад</option>
                           <option value="VARIANT">Вариант товара</option>
-                        </select>
-                      </label>
-                      <label>
-                        Код в учётной системе
-                        <input
+                        </DmSelect>
+                      </DmField>
+                      <DmField label="Код в учётной системе" required>
+                        <DmInput
                           name="externalId"
                           required
                           placeholder={
@@ -808,10 +831,9 @@ export function IntegrationOperations() {
                               : "product UUID"
                           }
                         />
-                      </label>
-                      <label>
-                        Карточка в DentMarket
-                        <select name="internalId" required>
+                      </DmField>
+                      <DmField label="Карточка в DentMarket" required>
+                        <DmSelect name="internalId" required>
                           {mappingType === "WAREHOUSE"
                             ? warehouses.map((warehouse) => (
                                 <option key={warehouse.id} value={warehouse.id}>
@@ -827,15 +849,15 @@ export function IntegrationOperations() {
                                   {offer.supplierSku ?? "без SKU"}
                                 </option>
                               ))}
-                        </select>
-                      </label>
-                      <Button
+                        </DmSelect>
+                      </DmField>
+                      <DmButton
                         type="submit"
-                        appearance="outline"
+                        appearance="secondary"
                         disabled={working}
                       >
                         Сохранить
-                      </Button>
+                      </DmButton>
                     </form>
                   </div>
 
@@ -852,7 +874,7 @@ export function IntegrationOperations() {
                       <div>
                         {selected.bindings.map((binding) => (
                           <span key={binding.id}>
-                            <b>{binding.dataType}</b>
+                            <b>{dataTypeLabels[binding.dataType] ?? binding.dataType}</b>
                             <small>приоритет {binding.priority}</small>
                           </span>
                         ))}
@@ -902,7 +924,9 @@ export function IntegrationOperations() {
                                   {job.maxAttempts}
                                 </small>
                               </span>
-                              <em data-status={job.status}>{formatAdminStatus(job.status)}</em>
+                              <StatusTag tone={job.status === "SUCCEEDED" ? "success" : job.status === "FAILED" || job.status === "DEAD_LETTER" ? "danger" : "warning"}>
+                                {formatAdminStatus(job.status)}
+                              </StatusTag>
                             </div>
                           ))}
                         </div>
@@ -925,7 +949,9 @@ export function IntegrationOperations() {
                                 <b>{entry.kind}</b>
                                 <small>{dateTime(entry.detectedAt)}</small>
                               </span>
-                              <em data-status={entry.status}>{formatAdminStatus(entry.status)}</em>
+                              <StatusTag tone={entry.status === "MATCHED" || entry.status === "RESOLVED" ? "success" : entry.status === "MISMATCH" ? "danger" : "warning"}>
+                                {formatAdminStatus(entry.status)}
+                              </StatusTag>
                             </div>
                           ))}
                         </div>
