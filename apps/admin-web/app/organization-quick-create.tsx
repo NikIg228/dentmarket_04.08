@@ -1,7 +1,14 @@
 "use client";
 
-import { FormEvent, useState } from "react";
-import { DmButton, DmCheckbox, DmField, DmInput } from "@marketplace/ui";
+import { FormEvent, useRef, useState } from "react";
+import {
+  DmButton,
+  DmCheckbox,
+  DmDialog,
+  DmFeedback,
+  DmField,
+  DmInput,
+} from "@marketplace/ui";
 import styles from "./organization-quick-create.module.css";
 import { adminAuthHeaders } from "./admin-auth";
 
@@ -19,6 +26,19 @@ export function OrganizationQuickCreate() {
     "idle",
   );
   const [message, setMessage] = useState("");
+  const triggerContainerRef = useRef<HTMLSpanElement>(null);
+
+  const changeOpen = (nextOpen: boolean) => {
+    setOpen(nextOpen);
+    if (nextOpen) {
+      setStatus("idle");
+      setMessage("");
+    } else {
+      queueMicrotask(() =>
+        triggerContainerRef.current?.querySelector("button")?.focus(),
+      );
+    }
+  };
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -64,39 +84,33 @@ export function OrganizationQuickCreate() {
 
   return (
     <>
-      <DmButton className={styles.primaryButton} appearance="primary" type="button" onClick={() => setOpen(true)}>
-        Создать организацию
-      </DmButton>
-      {open && (
-        <div
-          className={styles.backdrop}
-          role="presentation"
-          onMouseDown={(event) =>
-            event.target === event.currentTarget && setOpen(false)
-          }
-        >
-          <section
-            className={styles.dialog}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="organization-dialog-title"
-          >
-            <div className={styles.header}>
-              <div>
-                <h2 id="organization-dialog-title">Новая организация</h2>
-                <p>Реквизиты и доступные кабинеты.</p>
-              </div>
-              <DmButton
-                className={styles.closeButton}
-                appearance="secondary"
-                type="button"
-                onClick={() => setOpen(false)}
-                aria-label="Закрыть"
-              >
-                Закрыть
-              </DmButton>
-            </div>
-            <form className={styles.form} onSubmit={submit}>
+      <span ref={triggerContainerRef}>
+        <DmButton appearance="primary" type="button" onClick={() => changeOpen(true)}>
+          Создать организацию
+        </DmButton>
+      </span>
+      <DmDialog
+        open={open}
+        onOpenChange={changeOpen}
+        title="Новая организация"
+        description="Добавьте юридические реквизиты и выберите доступные кабинеты."
+        actions={
+          <>
+            <DmButton type="button" appearance="secondary" onClick={() => changeOpen(false)}>
+              Отмена
+            </DmButton>
+            <DmButton
+              type="submit"
+              form="organization-quick-create-form"
+              appearance="primary"
+              disabled={status === "saving"}
+            >
+              {status === "saving" ? "Сохранение..." : "Создать"}
+            </DmButton>
+          </>
+        }
+      >
+        <form id="organization-quick-create-form" className={styles.form} onSubmit={submit}>
               <DmField label="Юридическое название" required>
                 <DmInput name="legalName" required minLength={2} />
               </DmField>
@@ -127,36 +141,16 @@ export function OrganizationQuickCreate() {
                   ))}
                 </div>
               </fieldset>
-              {message && (
-                <div
-                  className={status === "error" ? styles.error : styles.success}
-                  role={status === "error" ? "alert" : "status"}
-                >
-                  {message}
-                </div>
-              )}
-              <div className={styles.actions}>
-                <DmButton
-                  type="button"
-                  appearance="secondary"
-                  className={styles.secondaryButton}
-                  onClick={() => setOpen(false)}
-                >
-                  Отмена
-                </DmButton>
-                <DmButton
-                  type="submit"
-                  appearance="primary"
-                  className={styles.primaryButton}
-                  disabled={status === "saving"}
-                >
-                  {status === "saving" ? "Сохранение..." : "Создать"}
-                </DmButton>
-              </div>
-            </form>
-          </section>
-        </div>
-      )}
+          {message ? (
+            <DmFeedback
+              tone={status === "error" ? "danger" : "success"}
+              title={status === "error" ? "Организация не создана" : "Организация создана"}
+              description={message}
+              alert={status === "error"}
+            />
+          ) : null}
+        </form>
+      </DmDialog>
     </>
   );
 }

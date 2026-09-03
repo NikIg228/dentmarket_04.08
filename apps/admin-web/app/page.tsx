@@ -129,10 +129,10 @@ export default function OperationsWorkspace() {
           </div>
           <div className={styles.moduleGrid}>
             {modules.map((module) => (
-              <button className={styles.module} key={module.id} type="button" onClick={() => setActive(module.id)}>
+              <DmButton appearance="subtle" className={styles.module} key={module.id} type="button" onClick={() => setActive(module.id)}>
                 <span className={styles.moduleTop}><strong>{module.title}</strong>{module.icon}</span>
                 <span className={styles.moduleDescription}>{module.description}</span>
-              </button>
+              </DmButton>
             ))}
           </div>
         </section>

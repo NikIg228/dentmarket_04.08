@@ -17,7 +17,7 @@
 .heading h2,
 .card h3 {
   margin: 0;
-  color: #17243a;
+  color: var(--dm-text-primary);
 }
 .heading h2 {
   font-size: 24px;
@@ -26,7 +26,7 @@
 .heading p,
 .cardHeader p {
   margin: 6px 0 0;
-  color: #667286;
+  color: var(--dm-text-muted);
   line-height: 1.5;
 }
 .heading p {
@@ -39,25 +39,15 @@
   gap: 14px;
   min-width: 0;
 }
-.message {
-  box-sizing: border-box;
-  width: 100%;
-  min-width: 0;
-  max-width: 100%;
-}
-.message :global(.fui-MessageBarBody) {
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
 .card {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 16px;
   min-width: 0;
   padding: 20px;
-  border: 1px solid #d7dce4;
-  border-radius: 8px;
-  background: #fff;
+  border: 1px solid var(--dm-border);
+  border-radius: var(--dm-radius-card);
+  background: var(--dm-surface);
 }
 .cardHeader {
   display: flex;
@@ -86,26 +76,26 @@
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   margin: 0;
-  border: 1px solid #e1e5ea;
-  border-radius: 6px;
+  border: 1px solid var(--dm-border);
+  border-radius: var(--dm-radius-field);
   overflow: hidden;
 }
 .facts div {
   min-width: 0;
   padding: 12px;
-  border-right: 1px solid #e1e5ea;
+  border-right: 1px solid var(--dm-border);
 }
 .facts div:last-child {
   border-right: 0;
 }
 .facts dt {
-  color: #707b8d;
+  color: var(--dm-text-muted);
   font-size: 11px;
 }
 .facts dd {
   margin: 5px 0 0;
   overflow-wrap: anywhere;
-  color: #26364d;
+  color: var(--dm-text-secondary);
   font-size: 13px;
   font-weight: 700;
 }
@@ -125,26 +115,15 @@
   gap: 16px;
   min-width: 0;
   padding-top: 14px;
-  border-top: 1px solid #e1e5ea;
+  border-top: 1px solid var(--dm-border);
 }
 .publication > div:first-child {
   display: grid;
   gap: 5px;
 }
-.publication span,
-.state span {
-  color: #697589;
+.publication span {
+  color: var(--dm-text-muted);
   font-size: 12px;
-}
-.state {
-  display: grid;
-  justify-items: center;
-  gap: 8px;
-  padding: 36px 20px;
-  border: 1px dashed #c7ced8;
-  border-radius: 8px;
-  background: #fafbfc;
-  text-align: center;
 }
 @media (max-width: 700px) {
   .heading,
@@ -159,7 +138,7 @@
   }
   .facts div {
     border-right: 0;
-    border-bottom: 1px solid #e1e5ea;
+    border-bottom: 1px solid var(--dm-border);
   }
   .facts div:last-child {
     border-bottom: 0;
