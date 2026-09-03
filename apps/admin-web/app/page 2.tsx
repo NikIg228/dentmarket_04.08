@@ -18,10 +18,11 @@ import { OrganizationQuickCreate } from "./organization-quick-create";
 import { ResourceLists } from "./resource-lists";
 import { FoundationManagement } from "./foundation-management";
 import { LiveMetrics } from "./live-metrics";
-import { CommerceFoundation } from "./commerce-foundation";
+import { CatalogFoundation } from "./catalog-foundation";
+import { AuditOperations } from "./audit-operations";
 import { SupplierOperations } from "./supplier-operations";
 import { SupplierControls } from "./supplier-controls";
-import { CommerceSkeleton } from "./commerce-skeleton";
+import { PlatformSettings } from "./platform-settings";
 import { IntegrationOperations } from "./integration-operations";
 import { PlatformAssurance } from "./platform-assurance";
 import { TrustOperations } from "./trust-operations";
@@ -189,14 +190,15 @@ export default function OperationsOverview() {
           <AgreementOperations />
           <PlatformAssurance />
           <TrustOperations />
+          <AuditOperations />
           <ResourceLists />
           <FoundationManagement />
-          <CommerceFoundation />
+          <CatalogFoundation />
           <SupplierOperations />
           <SupplierControls />
           <IntegrationOperations />
           <ConnectorReadinessRegistry />
-          <CommerceSkeleton />
+          <PlatformSettings />
         </div>
       </main>
     </div>

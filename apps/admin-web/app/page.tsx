@@ -15,9 +15,9 @@ import { AppShell, DmButton, DmInput, DmSelect } from "@marketplace/ui";
 import { useEffect, useState, type ReactNode } from "react";
 import styles from "./page.module.css";
 import { AgreementOperations } from "./agreement-operations";
+import { AuditOperations } from "./audit-operations";
+import { CatalogFoundation } from "./catalog-foundation";
 import { CatalogQuality } from "./catalog-quality";
-import { CommerceFoundation } from "./commerce-foundation";
-import { CommerceSkeleton } from "./commerce-skeleton";
 import { ConnectorReadinessRegistry } from "./connector-readiness-registry";
 import { FoundationManagement } from "./foundation-management";
 import { IntegrationOperations } from "./integration-operations";
@@ -25,6 +25,7 @@ import { LiveMetrics } from "./live-metrics";
 import { OperationQueue } from "./operation-queue";
 import { OrganizationQuickCreate } from "./organization-quick-create";
 import { PlatformAssurance } from "./platform-assurance";
+import { PlatformSettings } from "./platform-settings";
 import { ResourceLists } from "./resource-lists";
 import { SupplierControls } from "./supplier-controls";
 import { SupplierOperations } from "./supplier-operations";
@@ -164,11 +165,11 @@ export default function OperationsWorkspace() {
     overview,
     organizations: <><ResourceLists /><FoundationManagement /></>,
     access: <><SupplierControls /><PlatformAssurance /></>,
-    catalog: <><ProductCorrectionQueue /><CatalogQuality /><CommerceFoundation /></>,
+    catalog: <><ProductCorrectionQueue /><CatalogQuality /><CatalogFoundation /></>,
     imports: <><CatalogImportReviewQueue /><SupplierOperations /><IntegrationOperations /><ConnectorReadinessRegistry /></>,
     orders: <><OperationQueue /><AgreementOperations /></>,
-    security: <TrustOperations />,
-    settings: <CommerceSkeleton />,
+    security: <><TrustOperations /><AuditOperations /></>,
+    settings: <PlatformSettings onNavigate={setActive} />,
   };
 
   return (

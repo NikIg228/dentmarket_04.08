@@ -1,0 +1,24 @@
+.section { margin-top: 28px; overflow: hidden; border: 1px solid var(--dm-border); border-radius: var(--dm-radius-card); background: var(--dm-surface); box-shadow: var(--dm-shadow-card); }
+.header { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 22px 24px; border-bottom: 1px solid var(--dm-border); }
+.eyebrow { color: var(--dm-brand-primary); font-size: 10px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+.header h2 { margin: 6px 0 0; color: var(--dm-text-primary); font-size: 22px; letter-spacing: -.03em; }
+.header p { margin: 5px 0 0; color: var(--dm-text-muted); font-size: 12px; line-height: 1.5; }
+.section > :global(.dm-feedback), .section > :global(.dm-state) { margin: 16px 24px 0; }
+.body { padding: 20px 24px 24px; }
+.filter { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)) auto; gap: 12px; align-items: end; }
+.summary { margin: 18px 0 8px; color: var(--dm-text-muted); font-size: 10px; }
+.timeline { display: grid; border-top: 1px solid var(--dm-border); }
+.timeline article { display: grid; grid-template-columns: 8px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--dm-border); }
+.timeline i { width: 8px; height: 8px; border-radius: 50%; background: var(--dm-brand-primary); }
+.timeline article > div { display: grid; gap: 4px; min-width: 0; }
+.timeline strong { overflow: hidden; color: var(--dm-text-primary); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.timeline span, .timeline time { color: var(--dm-text-muted); font-size: 10px; }
+@media (max-width: 680px) {
+  .header { align-items: stretch; flex-direction: column; padding-right: 16px; padding-left: 16px; }
+  .header :global(.dm-button), .filter :global(.dm-button) { width: 100%; }
+  .section > :global(.dm-feedback), .section > :global(.dm-state) { margin-right: 16px; margin-left: 16px; }
+  .body { padding-right: 16px; padding-left: 16px; }
+  .filter { grid-template-columns: 1fr; }
+  .timeline article { grid-template-columns: 8px minmax(0, 1fr); }
+  .timeline time { grid-column: 2; }
+}
