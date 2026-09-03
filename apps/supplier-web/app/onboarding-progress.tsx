@@ -1,8 +1,16 @@
 "use client";
 
-import { Button, Field, Input, ProgressBar, Select, Spinner } from "@fluentui/react-components";
+import { ProgressBar, Spinner } from "@fluentui/react-components";
 import { CheckmarkCircle20Regular, Circle20Regular } from "@fluentui/react-icons";
 import { MarketplaceApiClient, type ApiContext } from "@marketplace/api-client";
+import {
+  DmButton as Button,
+  DmFeedback,
+  DmField as Field,
+  DmInput as Input,
+  DmSelect as Select,
+  LoadingState,
+} from "@marketplace/ui";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import styles from "./onboarding-progress.module.css";
 
@@ -27,8 +35,8 @@ export function OnboardingProgress({ apiContext, supplierId, onNavigate }: { api
     finally { setBusy(null); }
   };
   useEffect(() => { load(); window.addEventListener("dentmarket:onboarding-changed", load); return () => window.removeEventListener("dentmarket:onboarding-changed", load); }, [load]);
-  if (error) return <div className={styles.error}>Прогресс настройки временно недоступен: {error}</div>;
-  if (!progress) return <div className={styles.loading}><Spinner size="tiny" /><span>Проверяем готовность организации</span></div>;
+  if (error) return <DmFeedback tone="danger" title="Готовность временно недоступна" description={error} alert action={<Button appearance="secondary" onClick={load}>Повторить</Button>} />;
+  if (!progress) return <LoadingState label="Проверяем готовность организации" />;
   if (progress.status === "READY") return null;
   const pending = new Set(progress.steps.filter((step) => !step.complete).map((step) => step.id));
   return <section className={styles.panel}><header><div><p>Подготовка к продажам</p><h2>{progress.completedSteps} из {progress.totalSteps} шагов завершено</h2></div><strong>{progress.progressPercent}%</strong></header><ProgressBar value={progress.progressPercent / 100} /><div className={styles.steps}>{progress.steps.map((step) => <div key={step.id} data-complete={step.complete}><span>{step.complete ? <CheckmarkCircle20Regular /> : <Circle20Regular />}</span><div><strong>{step.label}</strong><small>{step.complete ? "Готово" : step.action}</small></div>{!step.complete && step.id === "credentials" ? <Button size="small" onClick={() => onNavigate("compliance")}>Добавить</Button> : null}{!step.complete && step.id === "catalog" ? <Button size="small" onClick={() => onNavigate("offers")}>Добавить</Button> : null}</div>)}</div>

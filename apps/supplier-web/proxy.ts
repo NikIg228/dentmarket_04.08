@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const dev = process.env.NODE_ENV !== "production";
   const apiOrigin = new URL(
     process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:4012/api",

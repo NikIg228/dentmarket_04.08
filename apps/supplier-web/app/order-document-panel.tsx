@@ -1,8 +1,15 @@
 "use client";
 
-import { Button, Spinner } from "@fluentui/react-components";
+import { Spinner } from "@fluentui/react-components";
 import type { MarketplaceApiClient, OrderDocumentResponse } from "@marketplace/api-client";
-import { StatusTag, errorMessage, formatDate, formatStatus } from "@marketplace/ui";
+import {
+  DmButton as Button,
+  DmFeedback,
+  StatusTag,
+  errorMessage,
+  formatDate,
+  formatStatus,
+} from "@marketplace/ui";
 import { useState } from "react";
 import styles from "./order-document-panel.module.css";
 
@@ -79,8 +86,8 @@ export function OrderDocumentPanel({
         </div>
         <span>{documents.length}/3</span>
       </header>
-      {error ? <div className={styles.error} role="alert">{error}</div> : null}
-      {success ? <div className={styles.success} role="status">{success}</div> : null}
+      {error ? <DmFeedback tone="danger" title="Документы не обновлены" description={error} alert /> : null}
+      {success ? <DmFeedback tone="success" title="Комплект обновлён" description={success} /> : null}
       {documents.length ? (
         <div className={styles.list}>
           {documents.map((document) => (

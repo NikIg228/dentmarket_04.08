@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 import { connection } from "next/server";
-import { Inter } from "next/font/google";
+import { Manrope } from "next/font/google";
 import { MarketplaceProvider } from "@marketplace/ui";
 import "@marketplace/ui/styles.css";
 import "./globals.css";
 
-const inter = Inter({
+const manrope = Manrope({
   subsets: ["cyrillic", "latin"],
   variable: "--font-sans",
 });
@@ -23,7 +23,7 @@ export default async function RootLayout({
   await connection();
   return (
     <html lang="ru">
-      <body className={inter.variable}>
+      <body className={manrope.variable}>
         <MarketplaceProvider>{children}</MarketplaceProvider>
       </body>
     </html>

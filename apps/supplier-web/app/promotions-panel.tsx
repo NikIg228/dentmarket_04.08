@@ -1,8 +1,8 @@
 "use client";
 
-import { Button, Field, Input, Select, Spinner, Textarea } from "@fluentui/react-components";
+import { Spinner } from "@fluentui/react-components";
 import { MarketplaceApiClient, type ApiContext } from "@marketplace/api-client";
-import { EmptyState, ErrorState, PageHeader, Section, StatusTag, errorMessage, formatDate, formatMoney, formatStatus } from "@marketplace/ui";
+import { DmButton as Button, DmField as Field, DmInput as Input, DmSelect as Select, DmTextarea as Textarea, EmptyState, ErrorState, PageHeader, Section, StatusTag, errorMessage, formatDate, formatMoney, formatStatus } from "@marketplace/ui";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import styles from "./promotions-panel.module.css";
 

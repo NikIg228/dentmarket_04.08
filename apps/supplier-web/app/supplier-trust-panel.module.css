@@ -1,6 +1,6 @@
 .stack { display: grid; gap: 18px; }
 .loading { min-height: 240px; display: grid; place-items: center; }
-.error { padding: 12px 14px; border: 1px solid #e6b7b2; border-radius: 12px; color: #8c2f28; background: #fff5f3; }
+.error { padding: 12px 14px; border: 1px solid var(--dm-danger-text); border-radius: var(--dm-radius-card); color: var(--dm-danger-text); background: var(--dm-danger-surface); }
 .ratingHero { display: grid; grid-template-columns: minmax(280px, .8fr) minmax(0, 1.7fr); overflow: hidden; border: 1px solid var(--colorNeutralStroke2); border-radius: 14px; background: var(--colorNeutralBackground1); }
 .score { min-height: 220px; display: grid; align-content: center; gap: 7px; padding: 26px; color: var(--colorNeutralForegroundOnBrand); background: var(--colorBrandBackground); }
 .score span { font-size: 12px; font-weight: 650; }

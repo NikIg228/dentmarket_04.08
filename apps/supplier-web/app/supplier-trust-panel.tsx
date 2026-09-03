@@ -1,8 +1,8 @@
 "use client";
 
-import { Button, Spinner } from "@fluentui/react-components";
+import { Spinner } from "@fluentui/react-components";
 import { MarketplaceApiClient, type ApiContext } from "@marketplace/api-client";
-import { EmptyState, ErrorState, PageHeader, Section, StatusTag, errorMessage, formatDate, formatStatus } from "@marketplace/ui";
+import { DmButton as Button, EmptyState, ErrorState, PageHeader, Section, StatusTag, errorMessage, formatDate, formatStatus } from "@marketplace/ui";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import styles from "./supplier-trust-panel.module.css";
 

@@ -1,8 +1,9 @@
 "use client";
 
-import { Button, ProgressBar, Spinner } from "@fluentui/react-components";
+import { ProgressBar, Spinner } from "@fluentui/react-components";
 import { ArrowClockwise20Regular, CheckmarkCircle20Regular, Circle20Regular } from "@fluentui/react-icons";
 import { MarketplaceApiClient, type ApiContext } from "@marketplace/api-client";
+import { DmButton as Button } from "@marketplace/ui";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import styles from "./connector-onboarding.module.css";
 

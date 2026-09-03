@@ -1,8 +1,18 @@
 "use client";
 
-import { Button, Field, Input, Select, Spinner } from "@fluentui/react-components";
+import { Spinner } from "@fluentui/react-components";
 import type { MarketplaceApiClient, OrderDocumentResponse } from "@marketplace/api-client";
-import { StatusTag, errorMessage, formatDate, formatStatus } from "@marketplace/ui";
+import {
+  DmButton as Button,
+  DmFeedback,
+  DmField as Field,
+  DmInput as Input,
+  DmSelect as Select,
+  StatusTag,
+  errorMessage,
+  formatDate,
+  formatStatus,
+} from "@marketplace/ui";
 import { useMemo, useState } from "react";
 import styles from "./shipment-panel.module.css";
 
@@ -157,8 +167,8 @@ export function ShipmentPanel({
         <div><strong>Отгрузки</strong><p>Статусы синхронизируются с заказом и уведомляют клинику.</p></div>
         <span>{shipments.length}</span>
       </header>
-      {error ? <div className={styles.error} role="alert">{error}</div> : null}
-      {success ? <div className={styles.success} role="status">{success}</div> : null}
+      {error ? <DmFeedback tone="danger" title="Отгрузка не обновлена" description={error} alert /> : null}
+      {success ? <DmFeedback tone="success" title="Отгрузка обновлена" description={success} /> : null}
       {shipments.length ? (
         <div className={styles.list}>
           {shipments.map((shipment) => {
