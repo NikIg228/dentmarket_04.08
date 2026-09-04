@@ -21,7 +21,7 @@ export default defineConfig({
   },
   webServer: [
     {
-      command: "pnpm --filter @marketplace/api start",
+      command: "npm run start --workspace=@marketplace/api",
       cwd: workspace,
       url: "http://127.0.0.1:4012/api/health",
       env: {
@@ -38,7 +38,7 @@ export default defineConfig({
       timeout: 120_000,
     },
     {
-      command: "pnpm --filter @marketplace/buyer-web start",
+      command: "npm run start --workspace=@marketplace/buyer-web",
       cwd: workspace,
       url: "http://127.0.0.1:3001",
       env: { NEXT_PUBLIC_API_URL: apiUrl },
@@ -46,7 +46,7 @@ export default defineConfig({
       timeout: 60_000,
     },
     {
-      command: "pnpm --filter @marketplace/supplier-web start",
+      command: "npm run start --workspace=@marketplace/supplier-web",
       cwd: workspace,
       url: "http://127.0.0.1:3002",
       env: { NEXT_PUBLIC_API_URL: apiUrl },

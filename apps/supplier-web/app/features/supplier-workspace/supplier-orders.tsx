@@ -1,4 +1,4 @@
-import { ClipboardTaskListLtr24Regular } from "@fluentui/react-icons";
+import { ClipboardTaskListLtr24Regular } from "@fluentui/react-icons/svg/clipboard-task-list-ltr";
 import type { MarketplaceApiClient } from "@marketplace/api-client";
 import {
   DmTable,

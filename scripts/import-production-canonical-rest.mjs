@@ -7,7 +7,13 @@ import { parse } from "../apps/api/node_modules/csv-parse/lib/sync.js";
 const projectRef = "tlxxicjzppflpkcgnauo";
 const now = new Date().toISOString();
 const baseUrl = `https://${projectRef}.supabase.co/rest/v1`;
-const apiKeys = JSON.parse(execFileSync("pnpm", ["dlx", "supabase", "projects", "api-keys", "--project-ref", projectRef], { encoding: "utf8" }));
+const apiKeys = JSON.parse(
+  execFileSync(
+    "npx",
+    ["--yes", "supabase", "projects", "api-keys", "--project-ref", projectRef],
+    { encoding: "utf8", shell: process.platform === "win32" },
+  ),
+);
 const serviceKey = apiKeys.keys.find((key) => key.id === "service_role")?.api_key;
 if (!serviceKey) throw new Error("Supabase service role key is unavailable");
 

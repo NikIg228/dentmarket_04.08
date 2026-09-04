@@ -108,21 +108,21 @@ trust/reputation, billing/tariffs и advanced recommendations остаются �
 Базовый минимум для любого TypeScript change:
 
 ```powershell
-pnpm typecheck
-pnpm test
+npm run typecheck
+npm test
 git diff --check
 ```
 
 Дополнительно выбирайте проверку по риску, а не по удобству:
 
-- контракт покупки — `pnpm verify:core-contract`;
+- контракт покупки — `npm run verify:core-contract`;
 - checkout, tenant isolation, rollback или конкурентный остаток —
-  `pnpm verify:postgres`;
-- runtime API/worker — `pnpm verify:runtime-split`;
-- production environment — `pnpm verify:production-config`;
-- затронутый UI critical flow — `pnpm verify:web` после запуска требуемого
+  `npm run verify:postgres`;
+- runtime API/worker — `npm run verify:runtime-split`;
+- production environment — `npm run verify:production-config`;
+- затронутый UI critical flow — `npm run verify:web` после запуска требуемого
   окружения;
-- релизная готовность — `pnpm verify:release`.
+- релизная готовность — `npm run verify:release`.
 
 Не ставьте `[x]` в планах и документации, пока проверка реально не прошла и
 её результат не зафиксирован.

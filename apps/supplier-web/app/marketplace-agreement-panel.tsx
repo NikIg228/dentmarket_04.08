@@ -1,7 +1,10 @@
 "use client";
 
 import { Spinner } from "@fluentui/react-components";
-import { CheckmarkCircle24Regular, Document24Regular, ShieldCheckmark24Regular, Warning24Regular } from "@fluentui/react-icons";
+import { CheckmarkCircle24Regular } from "@fluentui/react-icons/svg/checkmark-circle";
+import { Document24Regular } from "@fluentui/react-icons/svg/document";
+import { ShieldCheckmark24Regular } from "@fluentui/react-icons/svg/shield-checkmark";
+import { Warning24Regular } from "@fluentui/react-icons/svg/warning";
 import { MarketplaceApiClient, type ApiContext } from "@marketplace/api-client";
 import { NcalayerClient } from "@marketplace/eds-client";
 import { DmButton, DmField, DmInput, ErrorState, PageHeader, Section, StatusTag, errorMessage, formatDate, formatStatus } from "@marketplace/ui";

@@ -42,7 +42,7 @@ host, хотя для managed connector это не является допус�
    endpoint, но только через gateway.
 
 Прямой `fetch` в этих production adapters запрещён отдельным CI gate
-`pnpm verify:outbound-security`.
+`npm run verify:outbound-security`.
 
 ## Последствия
 

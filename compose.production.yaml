@@ -16,7 +16,7 @@ services:
   api:
     <<: *runtime
     image: ${REGISTRY:?Set REGISTRY}/marketplace-api:${APP_RELEASE:?Set APP_RELEASE}
-    command: ["/bin/sh", "-c", "pnpm --filter @marketplace/api exec prisma migrate deploy && exec pnpm --filter @marketplace/api start"]
+    command: ["/bin/sh", "-c", "npm exec --workspace=@marketplace/api -- prisma migrate deploy && exec npm run start --workspace=@marketplace/api"]
     env_file: ["${ENV_FILE:-.env.production}"]
     environment: { PROCESS_ROLE: api }
     expose: ["4000"]
@@ -34,7 +34,7 @@ services:
   worker:
     <<: *runtime
     image: ${REGISTRY:?Set REGISTRY}/marketplace-api:${APP_RELEASE:?Set APP_RELEASE}
-    command: ["pnpm", "--filter", "@marketplace/api", "start:worker"]
+    command: ["npm", "run", "start:worker", "--workspace=@marketplace/api"]
     env_file: ["${ENV_FILE:-.env.production}"]
     environment: { PROCESS_ROLE: worker }
     stop_grace_period: 45s

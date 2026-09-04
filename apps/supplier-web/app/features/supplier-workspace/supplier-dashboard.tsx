@@ -1,9 +1,7 @@
-import {
-  Box24Regular,
-  BuildingShop24Regular,
-  ClipboardTaskListLtr24Regular,
-  Money24Regular,
-} from "@fluentui/react-icons";
+import { Box24Regular } from "@fluentui/react-icons/svg/box";
+import { BuildingShop24Regular } from "@fluentui/react-icons/svg/building-shop";
+import { ClipboardTaskListLtr24Regular } from "@fluentui/react-icons/svg/clipboard-task-list-ltr";
+import { Money24Regular } from "@fluentui/react-icons/svg/money";
 import {
   DmButton,
   EmptyState,

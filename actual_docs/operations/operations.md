@@ -35,7 +35,7 @@ drill-базу, сверяет data/object checksums, migrations и API readines
 ```powershell
 $env:RESTORE_DRILL_ADMIN_DATABASE_URL="postgresql://ADMIN_USER:ADMIN_PASSWORD@127.0.0.1:5432/postgres"
 $env:RESTORE_DRILL_USE_OBJECT_FIXTURE="true"
-pnpm verify:backup-restore
+npm run verify:backup-restore
 ```
 
 Docker-based локальный backup для maintenance-контура:

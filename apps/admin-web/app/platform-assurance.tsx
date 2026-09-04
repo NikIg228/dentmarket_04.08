@@ -1,14 +1,12 @@
 "use client";
 
 import { DmButton, DmFeedback } from "@marketplace/ui";
-import {
-  ArrowSync20Regular,
-  Document20Regular,
-  Money20Regular,
-  Search20Regular,
-  Send20Regular,
-  ShieldCheckmark20Regular,
-} from "@fluentui/react-icons";
+import { ArrowSync20Regular } from "@fluentui/react-icons/svg/arrow-sync";
+import { Document20Regular } from "@fluentui/react-icons/svg/document";
+import { Money20Regular } from "@fluentui/react-icons/svg/money";
+import { Search20Regular } from "@fluentui/react-icons/svg/search";
+import { Send20Regular } from "@fluentui/react-icons/svg/send";
+import { ShieldCheckmark20Regular } from "@fluentui/react-icons/svg/shield-checkmark";
 import { useCallback, useEffect, useState } from "react";
 import styles from "./platform-assurance.module.css";
 import { adminAuthHeaders } from "./admin-auth";

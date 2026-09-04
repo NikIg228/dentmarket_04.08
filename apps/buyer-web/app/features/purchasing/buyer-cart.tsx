@@ -1,13 +1,11 @@
 "use client";
 
 import { Spinner } from "@fluentui/react-components";
-import {
-  Alert24Regular,
-  ArrowSync24Regular,
-  Cart24Regular,
-  CheckmarkCircle24Regular,
-  ShoppingBag24Regular,
-} from "@fluentui/react-icons";
+import { Alert24Regular } from "@fluentui/react-icons/svg/alert";
+import { ArrowSync24Regular } from "@fluentui/react-icons/svg/arrow-sync";
+import { Cart24Regular } from "@fluentui/react-icons/svg/cart";
+import { CheckmarkCircle24Regular } from "@fluentui/react-icons/svg/checkmark-circle";
+import { ShoppingBag24Regular } from "@fluentui/react-icons/svg/shopping-bag";
 import {
   DmButton,
   DmConflictState,

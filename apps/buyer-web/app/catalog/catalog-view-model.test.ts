@@ -67,4 +67,36 @@ describe("catalog view model", () => {
     expect(catalogImageUrl(product)).toContain("composite.png");
     expect(catalogPackagingLabel(product)).toBe("Шприц 4 г");
   });
+
+  it("prefers a same-origin catalog asset over an external source", () => {
+    const withLocalMedia = {
+      ...product,
+      media: [
+        {
+          ...product.media[0]!,
+          securePath: "/catalog/products/composite.webp",
+        },
+      ],
+    };
+
+    expect(catalogImageUrl(withLocalMedia)).toBe(
+      "/catalog/products/composite.webp",
+    );
+  });
+
+  it("routes protected media through the configured API base", () => {
+    const withProtectedMedia = {
+      ...product,
+      media: [
+        {
+          ...product.media[0]!,
+          securePath: "/catalog/media/media-id?ticket=signed",
+        },
+      ],
+    };
+
+    expect(catalogImageUrl(withProtectedMedia, "/api")).toBe(
+      "/api/catalog/media/media-id?ticket=signed",
+    );
+  });
 });

@@ -20,10 +20,10 @@ For a deliberate pilot-data refresh, retrieve the password from Keychain, set a
 session-scoped `DATABASE_URL`, and run:
 
 ```sh
-ALLOW_PRODUCTION_SEED=true pnpm db:seed
+ALLOW_PRODUCTION_SEED=true npm run db:seed
 
 The historical mixed seed is available only as
-`pnpm --filter @marketplace/api prisma:seed:legacy` for forensic comparison.
+`npm run prisma:seed:legacy --workspace=@marketplace/api` for forensic comparison.
 Do not use it for a new local, test or pilot environment.
 ```
 

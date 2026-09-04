@@ -1,7 +1,8 @@
 "use client";
 
 import { ProgressBar, Spinner } from "@fluentui/react-components";
-import { CheckmarkCircle20Regular, Circle20Regular } from "@fluentui/react-icons";
+import { CheckmarkCircle20Regular } from "@fluentui/react-icons/svg/checkmark-circle";
+import { Circle20Regular } from "@fluentui/react-icons/svg/circle";
 import { MarketplaceApiClient, type ApiContext } from "@marketplace/api-client";
 import {
   DmButton as Button,

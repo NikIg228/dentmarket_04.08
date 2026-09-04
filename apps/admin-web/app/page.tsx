@@ -1,37 +1,37 @@
 "use client";
 
-import {
-  BuildingShop24Regular,
-  Cart24Regular,
-  Cube24Regular,
-  Database24Regular,
-  DocumentTable24Regular,
-  PeopleTeam24Regular,
-  Search24Regular,
-  Settings24Regular,
-  ShieldLock24Regular,
-} from "@fluentui/react-icons";
+import { BuildingShop24Regular } from "@fluentui/react-icons/svg/building-shop";
+import { Cart24Regular } from "@fluentui/react-icons/svg/cart";
+import { Cube24Regular } from "@fluentui/react-icons/svg/cube";
+import { Database24Regular } from "@fluentui/react-icons/svg/database";
+import { DocumentTable24Regular } from "@fluentui/react-icons/svg/document-table";
+import { PeopleTeam24Regular } from "@fluentui/react-icons/svg/people-team";
+import { Search24Regular } from "@fluentui/react-icons/svg/search";
+import { Settings24Regular } from "@fluentui/react-icons/svg/settings";
+import { ShieldLock24Regular } from "@fluentui/react-icons/svg/shield-lock";
 import { AppShell, DmButton, DmInput, DmSelect } from "@marketplace/ui";
 import { useEffect, useState, type ReactNode } from "react";
 import styles from "./page.module.css";
-import { AgreementOperations } from "./agreement-operations";
-import { AuditOperations } from "./audit-operations";
-import { CatalogFoundation } from "./catalog-foundation";
-import { CatalogQuality } from "./catalog-quality";
-import { ConnectorReadinessRegistry } from "./connector-readiness-registry";
-import { FoundationManagement } from "./foundation-management";
-import { IntegrationOperations } from "./integration-operations";
+import {
+  AgreementOperations,
+  AuditOperations,
+  CatalogFoundation,
+  CatalogImportReviewQueue,
+  CatalogQuality,
+  ConnectorReadinessRegistry,
+  FoundationManagement,
+  IntegrationOperations,
+  OrganizationQuickCreate,
+  PlatformAssurance,
+  PlatformSettings,
+  ProductCorrectionQueue,
+  ResourceLists,
+  SupplierControls,
+  SupplierOperations,
+  TrustOperations,
+} from "./admin-section-components";
 import { LiveMetrics } from "./live-metrics";
 import { OperationQueue } from "./operation-queue";
-import { OrganizationQuickCreate } from "./organization-quick-create";
-import { PlatformAssurance } from "./platform-assurance";
-import { PlatformSettings } from "./platform-settings";
-import { ResourceLists } from "./resource-lists";
-import { SupplierControls } from "./supplier-controls";
-import { SupplierOperations } from "./supplier-operations";
-import { TrustOperations } from "./trust-operations";
-import { ProductCorrectionQueue } from "./product-correction-queue";
-import { CatalogImportReviewQueue } from "./catalog-import-review";
 import { clearAdminSession, isLocalAdminDevelopment, readAdminSession } from "./admin-auth";
 
 type SectionId =

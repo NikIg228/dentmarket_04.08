@@ -1,6 +1,6 @@
 "use client";
 
-import { Cart24Regular } from "@fluentui/react-icons";
+import { Cart24Regular } from "@fluentui/react-icons/svg/cart";
 import {
   MarketplaceApiClient,
   parseSessionHandoff,

@@ -16,9 +16,18 @@ export function availableCatalogOffers(product: CatalogProduct) {
   return product.offers.filter((offer) => offer.available);
 }
 
-export function catalogImageUrl(product: CatalogProduct): string | null {
-  const media = product.media.find((item) => item.sourceUrl || item.securePath);
-  return media?.sourceUrl ?? media?.securePath ?? null;
+export function catalogImageUrl(
+  product: CatalogProduct,
+  apiUrl = "/api",
+): string | null {
+  const media = product.media.find((item) => item.securePath || item.sourceUrl);
+  if (media?.securePath?.startsWith("/catalog/products/")) {
+    return media.securePath;
+  }
+  if (media?.securePath) {
+    return `${apiUrl.replace(/\/$/, "")}${media.securePath}`;
+  }
+  return media?.sourceUrl ?? null;
 }
 
 export function catalogPackagingLabel(product: CatalogProduct): string {

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Search24Regular } from "@fluentui/react-icons";
+import { Search24Regular } from "@fluentui/react-icons/svg/search";
 import { DmButton, DmInput } from "@marketplace/ui";
 import type { FormEvent } from "react";
 import { loginUrl } from "./public-links";

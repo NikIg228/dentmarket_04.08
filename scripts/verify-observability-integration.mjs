@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
-import { PrismaClient } from "../apps/api/node_modules/@prisma/client/index.js";
+import { PrismaClient } from "@prisma/client";
 
 const root = path.resolve(import.meta.dirname, "..");
 const apiEntry = path.join(root, "apps", "api", "dist", "src", "main.js");

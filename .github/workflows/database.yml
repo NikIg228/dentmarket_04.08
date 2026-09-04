@@ -24,18 +24,15 @@ jobs:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 11.9.0
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
+          cache: npm
+      - run: npm ci
       - name: Validate database secret
         run: test -n "$DATABASE_URL"
       - name: Apply pending Prisma migrations
-        run: pnpm --filter @marketplace/api exec prisma migrate deploy
+        run: npm exec --workspace=@marketplace/api -- prisma migrate deploy
       - name: Sync canonical catalog and SKU variants
         if: ${{ inputs.sync_catalog }}
-        run: pnpm catalog:sync-production:apply
+        run: npm run catalog:sync-production:apply

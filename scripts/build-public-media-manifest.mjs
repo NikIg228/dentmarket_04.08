@@ -8,7 +8,20 @@ import { fileURLToPath } from "node:url";
 const projectRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const outputPath = join(projectRoot, "data/archive/public-catalog-media-full.json");
 const restBase = "https://tlxxicjzppflpkcgnauo.supabase.co/rest/v1";
-const apiKey = JSON.parse(execFileSync("pnpm", ["dlx", "supabase", "projects", "api-keys", "--project-ref", "tlxxicjzppflpkcgnauo"], { encoding: "utf8" })).keys.find((key) => key.id === "service_role").api_key;
+const apiKey = JSON.parse(
+  execFileSync(
+    "npx",
+    [
+      "--yes",
+      "supabase",
+      "projects",
+      "api-keys",
+      "--project-ref",
+      "tlxxicjzppflpkcgnauo",
+    ],
+    { encoding: "utf8", shell: process.platform === "win32" },
+  ),
+).keys.find((key) => key.id === "service_role").api_key;
 const headers = { apikey: apiKey, Authorization: `Bearer ${apiKey}` };
 const rejectedAsset = (value) => /(logo|favicon|icon|sprite|avatar|cart|basket|loading|pixel|captcha|phone[-_]?ico|placeholder|no[-_]?image|default[-_]?image|\/(?:themes?|templates?|assets\/icons?|images?\/icons?)\/)/i.test(String(value ?? ""));
 

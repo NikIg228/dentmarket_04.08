@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckmarkCircle24Regular } from "@fluentui/react-icons";
+import { CheckmarkCircle24Regular } from "@fluentui/react-icons/svg/checkmark-circle";
 import {
   DmButton,
   DmDialog,

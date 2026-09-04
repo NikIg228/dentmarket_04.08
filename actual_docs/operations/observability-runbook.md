@@ -69,7 +69,7 @@
 ## Локальная проверка
 
 ```powershell
-pnpm verify:observability
+npm run verify:observability
 ```
 
 Команда валидирует unit behavior, правила/пороги, защиту endpoint и реальные

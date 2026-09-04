@@ -1,19 +1,17 @@
 "use client";
 
 import { Menu, MenuItem, MenuList, MenuPopover, MenuTrigger } from "@fluentui/react-components";
-import {
-  ArrowSync24Regular,
-  Box24Regular,
-  BuildingShop24Regular,
-  ClipboardTaskListLtr24Regular,
-  DataTrending24Regular,
-  Document24Regular,
-  Money24Regular,
-  MoreHorizontal24Regular,
-  PlugConnected24Regular,
-  ShieldCheckmark24Regular,
-  Star24Regular,
-} from "@fluentui/react-icons";
+import { ArrowSync24Regular } from "@fluentui/react-icons/svg/arrow-sync";
+import { Box24Regular } from "@fluentui/react-icons/svg/box";
+import { BuildingShop24Regular } from "@fluentui/react-icons/svg/building-shop";
+import { ClipboardTaskListLtr24Regular } from "@fluentui/react-icons/svg/clipboard-task-list-ltr";
+import { DataTrending24Regular } from "@fluentui/react-icons/svg/data-trending";
+import { Document24Regular } from "@fluentui/react-icons/svg/document";
+import { Money24Regular } from "@fluentui/react-icons/svg/money";
+import { MoreHorizontal24Regular } from "@fluentui/react-icons/svg/more-horizontal";
+import { PlugConnected24Regular } from "@fluentui/react-icons/svg/plug-connected";
+import { ShieldCheckmark24Regular } from "@fluentui/react-icons/svg/shield-checkmark";
+import { Star24Regular } from "@fluentui/react-icons/svg/star";
 import {
   MarketplaceApiClient,
   parseSessionHandoff,
@@ -30,14 +28,9 @@ import {
   errorMessage,
   type NavigationItem,
 } from "@marketplace/ui";
+import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { SupplierCompliance } from "./features/supplier-workspace/supplier-compliance";
 import { SupplierDashboard } from "./features/supplier-workspace/supplier-dashboard";
-import { SupplierDocuments } from "./features/supplier-workspace/supplier-documents";
-import { SupplierIntegrations } from "./features/supplier-workspace/supplier-integrations";
-import { SupplierInventory } from "./features/supplier-workspace/supplier-inventory";
-import { SupplierOffers } from "./features/supplier-workspace/supplier-offers";
-import { SupplierOrders } from "./features/supplier-workspace/supplier-orders";
 import type {
   Balance,
   ComplianceCheck,
@@ -56,9 +49,45 @@ import type {
 } from "./features/supplier-workspace/types";
 import type { OrderConfirmationDecision } from "./order-confirmation-panel";
 import { OnboardingProgress } from "./onboarding-progress";
-import { PromotionsPanel } from "./promotions-panel";
 import styles from "./page.module.css";
-import { SupplierTrustPanel } from "./supplier-trust-panel";
+import { loadSupplierSectionData } from "./supplier-section-data";
+
+const SupplierCompliance = dynamic(() =>
+  import("./features/supplier-workspace/supplier-compliance").then(
+    (module) => module.SupplierCompliance,
+  ),
+);
+const SupplierDocuments = dynamic(() =>
+  import("./features/supplier-workspace/supplier-documents").then(
+    (module) => module.SupplierDocuments,
+  ),
+);
+const SupplierIntegrations = dynamic(() =>
+  import("./features/supplier-workspace/supplier-integrations").then(
+    (module) => module.SupplierIntegrations,
+  ),
+);
+const SupplierInventory = dynamic(() =>
+  import("./features/supplier-workspace/supplier-inventory").then(
+    (module) => module.SupplierInventory,
+  ),
+);
+const SupplierOffers = dynamic(() =>
+  import("./features/supplier-workspace/supplier-offers").then(
+    (module) => module.SupplierOffers,
+  ),
+);
+const SupplierOrders = dynamic(() =>
+  import("./features/supplier-workspace/supplier-orders").then(
+    (module) => module.SupplierOrders,
+  ),
+);
+const PromotionsPanel = dynamic(() =>
+  import("./promotions-panel").then((module) => module.PromotionsPanel),
+);
+const SupplierTrustPanel = dynamic(() =>
+  import("./supplier-trust-panel").then((module) => module.SupplierTrustPanel),
+);
 
 const OPERATOR_ID = "00000000-0000-4000-8000-000000000002";
 const OPERATOR_ORG_ID = "00000000-0000-4000-8000-000000000001";
@@ -199,73 +228,54 @@ export default function SupplierWorkspace() {
       if (!silent) setLoading(true);
       setError(null);
       try {
-        const [
-          offerData,
-          balanceData,
-          orderData,
-          integrationData,
-          credentialData,
-          checkData,
-          documentData,
-          merchantData,
-          policyData,
-          overrideData,
-          sourceData,
-          importBatchData,
-          externalItemData,
-        ] = await Promise.all([
-          api.get<Offer[]>(`/suppliers/${supplierId}/offers`),
-          api.get<Balance[]>(`/suppliers/${supplierId}/inventory/balances`),
-          api.get<SupplierOrder[]>("/supplier-orders"),
-          api.get<Integration[]>(`/suppliers/${supplierId}/integrations`),
-          api.get<Credential[]>(`/compliance/organizations/${supplierId}/credentials`),
-          api.get<ComplianceCheck[]>("/compliance/checks"),
-          api.get<DocumentRecord[]>(`/documents?ownerOrganizationId=${supplierId}&limit=100`),
-          api.get<MerchantAccount[]>(`/organizations/${supplierId}/payment-merchant-accounts`),
-          api.get<FreshnessPolicy[]>(`/suppliers/${supplierId}/inventory/freshness/policies`),
-          api.get<DataOverride[]>(`/suppliers/${supplierId}/inventory/overrides`),
-          api.get<SupplierDataSource[]>(`/suppliers/${supplierId}/data-sources`),
-          api.get<ImportBatch[]>(`/suppliers/${supplierId}/import-batches`),
-          api.get<ExternalCatalogItem[]>(`/suppliers/${supplierId}/external-items`),
-        ]);
-        setOffers(offerData);
-        setBalances(balanceData);
-        setOrders(orderData);
-        setIntegrations(integrationData);
-        setCredentials(credentialData);
-        setChecks(checkData);
-        setDocuments(documentData);
-        setMerchantAccounts(merchantData);
-        setPolicies(policyData);
-        setOverrides(overrideData);
-        setDataSources(sourceData);
-        setImportBatches(importBatchData);
-        setExternalItems(externalItemData);
-        setPriceDrafts(
-          Object.fromEntries(
-            offerData.map((offer) => [
-              offer.id,
-              String(
-                Number(
-                  offer.prices.find((price) => price.status === "ACTIVE")
-                    ?.amountMinor ?? 0,
-                ) / 100,
-              ),
-            ]),
-          ),
-        );
-        setQuantityDrafts(
-          Object.fromEntries(
-            balanceData.map((balance) => [balance.id, balance.quantityOnHand]),
-          ),
-        );
+        const data = await loadSupplierSectionData(api, supplierId, active);
+        if (data.offers !== undefined) {
+          setOffers(data.offers);
+          setPriceDrafts(
+            Object.fromEntries(
+              data.offers.map((offer) => [
+                offer.id,
+                String(
+                  Number(
+                    offer.prices.find((price) => price.status === "ACTIVE")
+                      ?.amountMinor ?? 0,
+                  ) / 100,
+                ),
+              ]),
+            ),
+          );
+        }
+        if (data.balances !== undefined) {
+          setBalances(data.balances);
+          setQuantityDrafts(
+            Object.fromEntries(
+              data.balances.map((balance) => [
+                balance.id,
+                balance.quantityOnHand,
+              ]),
+            ),
+          );
+        }
+        if (data.orders !== undefined) setOrders(data.orders);
+        if (data.integrations !== undefined) setIntegrations(data.integrations);
+        if (data.credentials !== undefined) setCredentials(data.credentials);
+        if (data.checks !== undefined) setChecks(data.checks);
+        if (data.documents !== undefined) setDocuments(data.documents);
+        if (data.merchantAccounts !== undefined) {
+          setMerchantAccounts(data.merchantAccounts);
+        }
+        if (data.policies !== undefined) setPolicies(data.policies);
+        if (data.overrides !== undefined) setOverrides(data.overrides);
+        if (data.dataSources !== undefined) setDataSources(data.dataSources);
+        if (data.importBatches !== undefined) setImportBatches(data.importBatches);
+        if (data.externalItems !== undefined) setExternalItems(data.externalItems);
       } catch (cause) {
         setError(errorMessage(cause));
       } finally {
         if (!silent) setLoading(false);
       }
     },
-    [api, handoffChecked, supplierId],
+    [active, api, handoffChecked, supplierId],
   );
 
   useEffect(() => {

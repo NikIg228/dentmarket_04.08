@@ -63,16 +63,16 @@ Given / When / Then для happy path, ошибки и границы досту
 
 | Изменение                          | Обязательно                                       | При необходимости                                                  |
 | ---------------------------------- | ------------------------------------------------- | ------------------------------------------------------------------ |
-| Любой TS-код                       | `pnpm typecheck`, `pnpm test`, `git diff --check` | `pnpm build` для изменённого приложения                            |
-| Core API contract                  | `pnpm verify:core-contract`                       | `pnpm verify:pilot-backend` для полного purchase flow              |
-| Prisma/checkout/tenant/idempotency | `pnpm verify:postgres`                            | migration на чистой локальной БД                                   |
-| API/worker/config                  | `pnpm verify:runtime-split`                       | `pnpm verify:production-config`                                    |
-| Buyer/Supplier/Admin critical UI   | typecheck + relevant unit test                    | `pnpm verify:web` и ручной keyboard/mobile smoke                   |
+| Любой TS-код                       | `npm run typecheck`, `npm test`, `git diff --check` | `npm run build` для изменённого приложения                            |
+| Core API contract                  | `npm run verify:core-contract`                       | `npm run verify:pilot-backend` для полного purchase flow              |
+| Prisma/checkout/tenant/idempotency | `npm run verify:postgres`                            | migration на чистой локальной БД                                   |
+| API/worker/config                  | `npm run verify:runtime-split`                       | `npm run verify:production-config`                                    |
+| Buyer/Supplier/Admin critical UI   | typecheck + relevant unit test                    | `npm run verify:web` и ручной keyboard/mobile smoke                   |
 | Landing/public UI                  | typecheck + build приложения                      | Lighthouse/visual review, если меняется performance-critical экран |
-| Security/file/integration          | целевой `verify:*` сценарий                       | `pnpm audit --prod --audit-level high`                             |
-| Release candidate                  | `pnpm verify:release`                             | `docker compose config --quiet`                                    |
+| Security/file/integration          | целевой `verify:*` сценарий                       | `npm audit --omit=dev --audit-level=high`                             |
+| Release candidate                  | `npm run verify:release`                             | `docker compose config --quiet`                                    |
 
-`pnpm verify:web` и API verification scripts требуют подготовленного local
+`npm run verify:web` и API verification scripts требуют подготовленного local
 окружения. Не скрывайте этот факт: если окружение не было поднято, укажите
 проверку как не выполненную.
 

@@ -36,14 +36,33 @@ docker compose up --build
 
 ```bash
 cp .env.example .env
-pnpm install
-pnpm db:generate
-pnpm --filter @marketplace/api exec prisma migrate deploy
-pnpm db:seed
-pnpm dev
+npm install
+npm run db:generate
+npm exec --workspace=@marketplace/api -- prisma migrate deploy
+npm run db:seed
+npm run dev
 ```
 
 Нужны PostgreSQL 17, Redis 7 и, если `AV_SCAN_MODE` не `disabled`, ClamAV. Для локального файлового режима установите `OBJECT_STORAGE_DRIVER=local`.
+
+`npm run dev` и `npm run dev:local` поднимают весь проект: API, Admin, Buyer,
+Supplier и Landing. Для экономии ресурсов можно запустить только API и один
+интерфейс: `npm run dev:buyer`, `npm run dev:supplier`, `npm run dev:admin` или
+`npm run dev:landing`. После чистой установки первый watch-build API на Windows
+может занять несколько минут; веб-приложения стартуют автоматически после
+успешного ответа API health-check.
+
+Полный нативный запуск доступен через один локальный gateway и один внешний
+порт:
+
+- Landing: `http://dentmarket.localhost:3080`
+- Marketplace / Buyer: `http://marketplace.localhost:3080`
+- Supplier: `http://supplier.localhost:3080`
+- Admin: `http://admin.localhost:3080`
+- API на любом из этих доменов: `/api/*`
+
+Next.js-приложения сохраняют внутренние порты для маршрутизации и hot reload,
+но открывать их напрямую не требуется.
 
 Seed создаёт development context:
 
@@ -94,20 +113,20 @@ x-organization-id: 00000000-0000-4000-8000-000000000030
 ## Проверки
 
 ```bash
-pnpm typecheck
-pnpm test
-pnpm build
-pnpm verify:search-commerce
-pnpm verify:document-compliance
-pnpm verify:security
-pnpm verify:onboarding-agreement
-pnpm verify:trust-geo
-pnpm verify:production-config
-pnpm verify:postgres
-pnpm verify:web
+npm run typecheck
+npm test
+npm run build
+npm run verify:search-commerce
+npm run verify:document-compliance
+npm run verify:security
+npm run verify:onboarding-agreement
+npm run verify:trust-geo
+npm run verify:production-config
+npm run verify:postgres
+npm run verify:web
 ```
 
-`pnpm verify:postgres` — обязательный integration gate на локальной PostgreSQL. Он применяет миграции, создаёт изолированные по идентификаторам fixtures, проверяет rollback, конкурентный checkout, идемпотентность и tenant isolation, затем удаляет тестовые данные. Docker и внешние сервисы для локального запуска не требуются.
+`npm run verify:postgres` — обязательный integration gate на локальной PostgreSQL. Он применяет миграции, создаёт изолированные по идентификаторам fixtures, проверяет rollback, конкурентный checkout, идемпотентность и tenant isolation, затем удаляет тестовые данные. Docker и внешние сервисы для локального запуска не требуются.
 
 ## Backup и restore
 

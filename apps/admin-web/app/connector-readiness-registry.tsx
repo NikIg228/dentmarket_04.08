@@ -1,6 +1,7 @@
 "use client";
 
-import { ArrowClockwise20Regular, PlugConnected20Regular } from "@fluentui/react-icons";
+import { ArrowClockwise20Regular } from "@fluentui/react-icons/svg/arrow-clockwise";
+import { PlugConnected20Regular } from "@fluentui/react-icons/svg/plug-connected";
 import {
   DmButton,
   EmptyState,

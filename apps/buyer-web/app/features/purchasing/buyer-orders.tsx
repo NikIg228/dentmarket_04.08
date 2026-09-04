@@ -1,11 +1,9 @@
 "use client";
 
-import {
-  Box24Regular,
-  CheckmarkCircle24Regular,
-  ClipboardTaskListLtr24Regular,
-  ShoppingBag24Regular,
-} from "@fluentui/react-icons";
+import { Box24Regular } from "@fluentui/react-icons/svg/box";
+import { CheckmarkCircle24Regular } from "@fluentui/react-icons/svg/checkmark-circle";
+import { ClipboardTaskListLtr24Regular } from "@fluentui/react-icons/svg/clipboard-task-list-ltr";
+import { ShoppingBag24Regular } from "@fluentui/react-icons/svg/shopping-bag";
 import type { MarketplaceApiClient } from "@marketplace/api-client";
 import {
   DmButton,

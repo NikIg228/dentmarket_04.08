@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { mkdir, rm } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
-import { PrismaClient } from "../apps/api/node_modules/@prisma/client/index.js";
+import { PrismaClient } from "@prisma/client";
 
 const root = path.resolve(import.meta.dirname, "..");
 const apiDirectory = path.join(root, "apps", "api");
@@ -42,11 +42,11 @@ function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
-function runPnpm(args, env) {
+function runNpm(args, env) {
   const windows = process.platform === "win32";
-  const executable = windows ? (process.env.ComSpec ?? "cmd.exe") : "pnpm";
+  const executable = windows ? (process.env.ComSpec ?? "cmd.exe") : "npm";
   const commandArgs = windows
-    ? ["/d", "/s", "/c", `pnpm ${args.join(" ")}`]
+    ? ["/d", "/s", "/c", `npm ${args.join(" ")}`]
     : args;
   const result = spawnSync(executable, commandArgs, {
     cwd: root,
@@ -55,7 +55,7 @@ function runPnpm(args, env) {
   });
   if (result.status !== 0)
     throw new Error(
-      `pnpm ${args.join(" ")} failed with exit code ${result.status}`,
+      `npm ${args.join(" ")} failed with exit code ${result.status}`,
     );
 }
 
@@ -490,11 +490,11 @@ try {
     AV_SCAN_MODE: "disabled",
     LOG_LEVEL: "warn",
   };
-  runPnpm(
-    ["--filter", "@marketplace/api", "exec", "prisma", "migrate", "deploy"],
+  runNpm(
+    ["exec", "--workspace=@marketplace/api", "--", "prisma", "migrate", "deploy"],
     testEnvironment,
   );
-  runPnpm(["db:seed:test"], testEnvironment);
+  runNpm(["run", "db:seed:test"], testEnvironment);
   await prisma.$connect();
   const [rollbackOffer, idempotencyOffer, concurrencyOffer] =
     await createFixtureCatalog();

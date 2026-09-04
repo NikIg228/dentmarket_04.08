@@ -22,11 +22,19 @@ vi.mock("@fluentui/react-components", () => ({
   webDarkTheme: {},
 }));
 
-vi.mock("@fluentui/react-icons", () => ({
+vi.mock("@fluentui/react-icons/svg/dismiss", () => ({
   Dismiss24Regular: () => null,
+}));
+vi.mock("@fluentui/react-icons/svg/navigation", () => ({
   Navigation24Regular: () => null,
+}));
+vi.mock("@fluentui/react-icons/svg/sign-out", () => ({
   SignOut24Regular: () => null,
+}));
+vi.mock("@fluentui/react-icons/svg/weather-moon", () => ({
   WeatherMoon24Regular: () => null,
+}));
+vi.mock("@fluentui/react-icons/svg/weather-sunny", () => ({
   WeatherSunny24Regular: () => null,
 }));
 import {

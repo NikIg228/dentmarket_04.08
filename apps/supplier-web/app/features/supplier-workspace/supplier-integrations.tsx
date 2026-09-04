@@ -1,9 +1,7 @@
-import {
-  Box24Regular,
-  CloudArrowUp24Regular,
-  DataTrending24Regular,
-  PlugConnected24Regular,
-} from "@fluentui/react-icons";
+import { Box24Regular } from "@fluentui/react-icons/svg/box";
+import { CloudArrowUp24Regular } from "@fluentui/react-icons/svg/cloud-arrow-up";
+import { DataTrending24Regular } from "@fluentui/react-icons/svg/data-trending";
+import { PlugConnected24Regular } from "@fluentui/react-icons/svg/plug-connected";
 import type { ApiContext } from "@marketplace/api-client";
 import {
   DmButton,

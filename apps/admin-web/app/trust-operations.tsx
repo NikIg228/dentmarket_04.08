@@ -1,10 +1,8 @@
 "use client";
 
-import {
-  ArrowClockwise20Regular,
-  CheckmarkCircle20Regular,
-  ShieldError20Regular,
-} from "@fluentui/react-icons";
+import { ArrowClockwise20Regular } from "@fluentui/react-icons/svg/arrow-clockwise";
+import { CheckmarkCircle20Regular } from "@fluentui/react-icons/svg/checkmark-circle";
+import { ShieldError20Regular } from "@fluentui/react-icons/svg/shield-error";
 import { MarketplaceApiClient } from "@marketplace/api-client";
 import {
   DmButton,

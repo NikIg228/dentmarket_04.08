@@ -2,18 +2,18 @@
 
 ## Already automated
 
-- `pnpm typecheck`
-- `pnpm test`
-- `pnpm build`
-- `pnpm verify:production-config`
-- `pnpm verify:production-connectors`
-- `pnpm verify:backup-restore` — logical local/CI rehearsal, не provider evidence
+- `npm run typecheck`
+- `npm test`
+- `npm run build`
+- `npm run verify:production-config`
+- `npm run verify:production-connectors`
+- `npm run verify:backup-restore` — logical local/CI rehearsal, не provider evidence
 - API health and readiness checks
 - Agreement gate: publication, marketplace visibility, confirmation, checkout, capture and order export
 - Supplier onboarding readiness and import diagnostics
 - Search/index/catalog quality report
 - Operator work queue: `/api/operations/work-queue` aggregates commercial blockers before go-live.
-- `pnpm verify:security-storage` checks encrypted storage columns, key format/rotation and plaintext-sensitive configuration.
+- `npm run verify:security-storage` checks encrypted storage columns, key format/rotation and plaintext-sensitive configuration.
 
 ## Requires real credentials or external confirmation
 

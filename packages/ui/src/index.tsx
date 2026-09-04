@@ -28,13 +28,11 @@ import {
   type SelectProps,
   type TextareaProps,
 } from "@fluentui/react-components";
-import {
-  Dismiss24Regular,
-  Navigation24Regular,
-  SignOut24Regular,
-  WeatherMoon24Regular,
-  WeatherSunny24Regular,
-} from "@fluentui/react-icons";
+import { Dismiss24Regular } from "@fluentui/react-icons/svg/dismiss";
+import { Navigation24Regular } from "@fluentui/react-icons/svg/navigation";
+import { SignOut24Regular } from "@fluentui/react-icons/svg/sign-out";
+import { WeatherMoon24Regular } from "@fluentui/react-icons/svg/weather-moon";
+import { WeatherSunny24Regular } from "@fluentui/react-icons/svg/weather-sunny";
 import type { ReactNode } from "react";
 import {
   createContext,

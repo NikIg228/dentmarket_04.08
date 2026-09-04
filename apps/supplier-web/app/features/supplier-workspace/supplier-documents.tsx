@@ -1,4 +1,5 @@
-import { Document24Regular, Money24Regular } from "@fluentui/react-icons";
+import { Document24Regular } from "@fluentui/react-icons/svg/document";
+import { Money24Regular } from "@fluentui/react-icons/svg/money";
 import {
   DmButton,
   DmTable,

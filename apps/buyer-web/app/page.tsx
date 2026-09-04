@@ -13,26 +13,24 @@ import {
   Select,
   Spinner,
 } from "@fluentui/react-components";
-import {
-  Alert24Regular,
-  ArrowSync24Regular,
-  Box24Regular,
-  Cart24Regular,
-  ClipboardTaskListLtr24Regular,
-  Document24Regular,
-  Dismiss24Regular,
-  Filter24Regular,
-  Bot24Regular,
-  Grid24Regular,
-  List24Regular,
-  MoreHorizontal24Regular,
-  PersonSupport24Regular,
-  Location24Regular,
-  Search24Regular,
-  ShoppingBag24Regular,
-  Star16Filled,
-  Tag24Regular,
-} from "@fluentui/react-icons";
+import { Alert24Regular } from "@fluentui/react-icons/svg/alert";
+import { ArrowSync24Regular } from "@fluentui/react-icons/svg/arrow-sync";
+import { Bot24Regular } from "@fluentui/react-icons/svg/bot";
+import { Box24Regular } from "@fluentui/react-icons/svg/box";
+import { Cart24Regular } from "@fluentui/react-icons/svg/cart";
+import { ClipboardTaskListLtr24Regular } from "@fluentui/react-icons/svg/clipboard-task-list-ltr";
+import { Dismiss24Regular } from "@fluentui/react-icons/svg/dismiss";
+import { Document24Regular } from "@fluentui/react-icons/svg/document";
+import { Filter24Regular } from "@fluentui/react-icons/svg/filter";
+import { Grid24Regular } from "@fluentui/react-icons/svg/grid";
+import { List24Regular } from "@fluentui/react-icons/svg/list";
+import { Location24Regular } from "@fluentui/react-icons/svg/location";
+import { MoreHorizontal24Regular } from "@fluentui/react-icons/svg/more-horizontal";
+import { PersonSupport24Regular } from "@fluentui/react-icons/svg/person-support";
+import { Search24Regular } from "@fluentui/react-icons/svg/search";
+import { ShoppingBag24Regular } from "@fluentui/react-icons/svg/shopping-bag";
+import { Star16Filled } from "@fluentui/react-icons/svg/star";
+import { Tag24Regular } from "@fluentui/react-icons/svg/tag";
 import {
   MarketplaceApiClient,
   parseSessionHandoff,
@@ -72,10 +70,15 @@ import type {
   SupplierOrder,
 } from "./features/purchasing/types";
 import { SmartCommercePanel } from "./smart-commerce-panel";
-import publicCatalogData from "./data/public-catalog-fallback.json";
-import publicCatalogMedia from "./data/public-catalog-media.json";
 import { PublicHeader } from "./public-header";
 import { loginUrl } from "./public-links";
+import { canonicalSearchQuery } from "./catalog-search";
+import type {
+  ProductVariantOption,
+  SearchMedia,
+  SearchProduct,
+  SearchResult,
+} from "./catalog-search-types";
 import {
   deliveryLabel,
   isCompareOfferAvailable,
@@ -90,6 +93,7 @@ type SessionHandoff = SessionHandoffEnvelope;
 const SESSION_KEY = "dentmarket:buyer-session";
 const SEARCH_HISTORY_KEY = "dentmarket:search-history";
 const LOGIN_URL = loginUrl;
+const CATALOG_PAGE_SIZE = 24;
 const dentalSearchSuggestions = [
   "светник",
   "текучка",
@@ -98,24 +102,6 @@ const dentalSearchSuggestions = [
   "гутта",
   "карпулы",
 ];
-const dentalSearchAliases: Record<string, string[]> = {
-  светник: ["светильник", "лампа"],
-  текучка: ["композит", "текучий"],
-  коффер: ["коффердам", "изоляция"],
-  гутта: ["гуттаперча"],
-  карпулы: ["карпула", "анестезия"],
-  перчаткии: ["перчатки"],
-  "перчатки нитрил": ["перчатки нитриловые"],
-  компазит: ["композит"],
-  композитт: ["композит"],
-  гуттаперчя: ["гуттаперча"],
-  эндодонтия: ["эндо", "эндодонтический"],
-  эндошка: ["эндодонтия", "эндодонтический", "эндомотор"],
-};
-const canonicalSearchQuery = (query: string) => {
-  const normalized = query.trim().toLocaleLowerCase("ru");
-  return dentalSearchAliases[normalized]?.[0] ?? query.trim();
-};
 const ruCount = (count: number, one: string, few: string, many: string) => {
   const mod10 = count % 10;
   const mod100 = count % 100;
@@ -132,86 +118,6 @@ function readSessionHandoff(): SessionHandoff | null {
   return parseSessionHandoff(serialized, "BUYER");
 }
 
-type SearchOffer = {
-  id: string;
-  variantId?: string;
-  supplier: { id: string; name: string };
-  priceMinor: string | null;
-  currency: string | null;
-  normalizedPriceMinor: string | null;
-  packaging: {
-    name: string | null;
-    quantityInBaseUnit: string;
-    unit: string | null;
-  };
-  available: boolean;
-  confirmationMode: string;
-  deliveryMethods: string[];
-  supplierSku?: string | null;
-  verifiedDocuments?: boolean;
-  officialDistributor?: boolean;
-  supplierWarranty?: boolean;
-  promotion?: {
-    label: string;
-    percentage: number | null;
-    endsAt: string | null;
-  } | null;
-};
-type ProductVariantOption = {
-  id: string;
-  sku: string | null;
-  gtin: string | null;
-  label: string;
-  attributes?: Record<string, unknown>;
-};
-type SearchMedia = {
-  id: string;
-  sourceUrl: string | null;
-  securePath?: string | null;
-  normalizedStorageKey: string | null;
-  altText: string | null;
-  width: number | null;
-  height: number | null;
-  metadata?: {
-    exactProductPhoto?: boolean;
-    rightsStatus?: string;
-    sourceImageUrl?: string | null;
-  } | null;
-};
-type SearchProduct = {
-  id: string;
-  name: string;
-  description?: string | null;
-  descriptionSources?: unknown;
-  brand: string | null;
-  manufacturer: string | null;
-  media?: SearchMedia[];
-  categories: Array<{ id: string; name: string }>;
-  minNormalizedPriceMinor: string | null;
-  isAvailable: boolean;
-  reviewSummary?: { count: number; averageRating: number | null };
-  variants?: ProductVariantOption[];
-  offers: SearchOffer[];
-  sourceUrl?: string | null;
-  sourceUpdatedAt?: string | null;
-  attributes?: Array<string[]>;
-  photoStatus?: string;
-};
-type SearchResult = {
-  total: number;
-  offset?: number;
-  limit?: number;
-  interpretedQuery?: string[];
-  items: SearchProduct[];
-  facets: {
-    categories: Array<{ id: string; name: string; count: number }>;
-    suppliers: Array<{ id: string; name: string; count: number }>;
-  };
-};
-const publicMediaEntries = publicCatalogMedia.entries as Record<
-  string,
-  SearchMedia
->;
 const rejectedProductAsset = (value: string | null | undefined) =>
   /(logo|favicon|icon|sprite|avatar|cart|basket|loading|pixel|captcha|phone[-_]?ico|placeholder|no[-_]?image|default[-_]?image|\/(?:themes?|templates?|assets\/icons?|images?\/icons?)\/)/i.test(
     value ?? "",
@@ -224,7 +130,8 @@ const mediaSource = (media: SearchMedia | undefined) => {
     )
   )
     return null;
-  if (media.securePath?.startsWith("/catalog/")) return media.securePath;
+  if (media.securePath?.startsWith("/catalog/products/"))
+    return media.securePath;
   if (media.securePath) {
     const apiUrl = API_URL;
     return `${apiUrl}${media.securePath}`;
@@ -244,224 +151,20 @@ const priceDifferencePercent = (product: SearchProduct) => {
   if (prices.length < 2 || prices[0] === prices.at(-1)) return 0;
   return Math.round((1 - prices[0] / prices.at(-1)!) * 100);
 };
-const demoCatalogFallback: SearchProduct[] = [
-  {
-    id: "00000000-0000-4000-8000-000000000100",
-    name: "Перчатки нитриловые SafeTouch Ultra",
-    brand: "SafeTouch",
-    manufacturer: "SafeMed Industries",
-    categories: [
-      { id: "00000000-0000-4000-8000-000000000901", name: "Перчатки" },
-    ],
-    minNormalizedPriceMinor: "4750",
-    isAvailable: true,
-    offers: [
-      {
-        id: "00000000-0000-4000-8000-000000000180",
-        supplier: {
-          id: "00000000-0000-4000-8000-000000000060",
-          name: "MedConsum",
-        },
-        priceMinor: "475000",
-        currency: "KZT",
-        normalizedPriceMinor: "4750",
-        packaging: {
-          name: "Упаковка 100 штук",
-          quantityInBaseUnit: "100",
-          unit: "шт",
-        },
-        available: true,
-        confirmationMode: "AUTO",
-        deliveryMethods: ["CARRIER"],
-      },
-      {
-        id: "00000000-0000-4000-8000-000000000150",
-        supplier: {
-          id: "00000000-0000-4000-8000-000000000020",
-          name: "Demo Dental Supply",
-        },
-        priceMinor: "490000",
-        currency: "KZT",
-        normalizedPriceMinor: "4900",
-        packaging: {
-          name: "Упаковка 100 штук",
-          quantityInBaseUnit: "100",
-          unit: "шт",
-        },
-        available: true,
-        confirmationMode: "AUTO",
-        deliveryMethods: ["SUPPLIER_CITY"],
-      },
-    ],
-  },
-  {
-    id: "00000000-0000-4000-8000-000000000110",
-    name: "Нагрудники стоматологические CleanDent 2-слойные",
-    brand: "CleanDent",
-    manufacturer: "CleanDent Europe",
-    categories: [
-      { id: "00000000-0000-4000-8000-000000000902", name: "Нагрудники" },
-    ],
-    minNormalizedPriceMinor: "2360",
-    isAvailable: true,
-    offers: [
-      {
-        id: "00000000-0000-4000-8000-000000000200",
-        supplier: {
-          id: "00000000-0000-4000-8000-000000000070",
-          name: "TechDent Systems",
-        },
-        priceMinor: "1180000",
-        currency: "KZT",
-        normalizedPriceMinor: "2360",
-        packaging: {
-          name: "Упаковка 500 штук",
-          quantityInBaseUnit: "500",
-          unit: "шт",
-        },
-        available: true,
-        confirmationMode: "AUTO",
-        deliveryMethods: ["SUPPLIER_CITY"],
-      },
-    ],
-  },
-  {
-    id: "00000000-0000-4000-8000-000000000120",
-    name: "Бахилы MediStep усиленные",
-    brand: "MediStep",
-    manufacturer: "MediStep Asia",
-    categories: [
-      { id: "00000000-0000-4000-8000-000000000903", name: "Бахилы" },
-    ],
-    minNormalizedPriceMinor: "7000",
-    isAvailable: true,
-    offers: [
-      {
-        id: "00000000-0000-4000-8000-000000000170",
-        supplier: {
-          id: "00000000-0000-4000-8000-000000000060",
-          name: "MedConsum",
-        },
-        priceMinor: "350000",
-        currency: "KZT",
-        normalizedPriceMinor: "7000",
-        packaging: {
-          name: "Упаковка 50 пар",
-          quantityInBaseUnit: "50",
-          unit: "пар",
-        },
-        available: true,
-        confirmationMode: "AUTO",
-        deliveryMethods: ["CARRIER"],
-      },
-    ],
-  },
-  {
-    id: "00000000-0000-4000-8000-000000000130",
-    name: "Стоматологическая установка DentTech X5",
-    brand: "DentTech",
-    manufacturer: "DentTech GmbH",
-    categories: [
-      { id: "00000000-0000-4000-8000-000000000904", name: "Оборудование" },
-    ],
-    minNormalizedPriceMinor: "85000000",
-    isAvailable: true,
-    offers: [
-      {
-        id: "00000000-0000-4000-8000-000000000190",
-        supplier: {
-          id: "00000000-0000-4000-8000-000000000070",
-          name: "TechDent Systems",
-        },
-        priceMinor: "85000000",
-        currency: "KZT",
-        normalizedPriceMinor: "85000000",
-        packaging: { name: "Комплект", quantityInBaseUnit: "1", unit: "шт" },
-        available: true,
-        confirmationMode: "AUTO",
-        deliveryMethods: ["SPECIAL"],
-      },
-    ],
-  },
-];
-const generatedCatalogFallback: SearchProduct[] =
-  publicCatalogData.products.map((product) => ({
-    ...product,
-    media: publicMediaEntries[product.sourceUrl ?? ""]
-      ? [publicMediaEntries[product.sourceUrl ?? ""]]
-      : undefined,
-    photoStatus: publicMediaEntries[product.sourceUrl ?? ""]
-      ? "exact"
-      : product.photoStatus,
-    categories: [
-      { id: `public-category-${product.category}`, name: product.category },
-    ],
-  }));
-const publicCatalogFallback = [
-  ...generatedCatalogFallback,
-  ...demoCatalogFallback,
-];
-const fallbackSearch = (
-  query: string,
-  sort: string,
-  filters: {
-    unit?: string;
-    packaging?: string;
-    delivery?: string;
-    stock?: string;
-  } = {},
-  displayLimit = 60,
-): SearchResult => {
-  const normalized = query.trim().toLocaleLowerCase("ru");
-  const searchTerms = [
-    normalized,
-    ...(dentalSearchAliases[normalized] ?? []),
-  ].filter(Boolean);
-  const filtered = publicCatalogFallback.filter((product) => {
-    const offer = product.offers[0];
-    const text = [
-      product.name,
-      product.brand,
-      product.manufacturer,
-      product.categories[0]?.name,
-      offer?.supplier.name,
-      offer?.packaging.name,
-      offer?.packaging.unit,
-    ]
-      .filter(Boolean)
-      .join(" ")
-      .toLocaleLowerCase("ru");
-    return (
-      (!searchTerms.length ||
-        searchTerms.some((term) => text.includes(term))) &&
-      (!filters.unit || text.includes(filters.unit.toLocaleLowerCase("ru"))) &&
-      (!filters.packaging ||
-        text.includes(filters.packaging.toLocaleLowerCase("ru"))) &&
-      (!filters.delivery ||
-        offer?.deliveryMethods.includes(filters.delivery)) &&
-      (filters.stock !== "true" || offer?.available === true)
-    );
+async function fetchFallbackCatalogSearch(
+  params: URLSearchParams,
+): Promise<SearchResult> {
+  const response = await fetch(`/catalog-fallback?${params.toString()}`, {
+    cache: "no-store",
+    signal: AbortSignal.timeout(3500),
   });
-  filtered.sort((left, right) => {
-    if (sort === "PRICE_ASC")
-      return (
-        Number(left.minNormalizedPriceMinor || Number.MAX_SAFE_INTEGER) -
-        Number(right.minNormalizedPriceMinor || Number.MAX_SAFE_INTEGER)
-      );
-    if (sort === "PRICE_DESC")
-      return (
-        Number(right.minNormalizedPriceMinor || -1) -
-        Number(left.minNormalizedPriceMinor || -1)
-      );
-    if (sort === "NAME_ASC") return left.name.localeCompare(right.name, "ru");
-    return left.name.localeCompare(right.name, "ru");
-  });
-  return {
-    total: filtered.length,
-    items: filtered.slice(0, displayLimit),
-    facets: { categories: [], suppliers: [] },
-  };
-};
+  if (!response.ok) throw new Error("Catalog fallback is unavailable");
+  const result = (await response.json()) as Partial<SearchResult>;
+  if (!Array.isArray(result.items) || typeof result.total !== "number") {
+    throw new Error("Catalog fallback returned an invalid response");
+  }
+  return result as SearchResult;
+}
 
 async function fetchPublicCatalogSearch(
   query: string,
@@ -478,9 +181,8 @@ async function fetchPublicCatalogSearch(
       /* legacy plain-text city selection */
     }
   }
-  const apiUrl = API_URL;
   const response = await fetch(
-    `${apiUrl}/catalog/search?${params.toString()}`,
+    `/catalog-search?${params.toString()}`,
     {
       cache: "no-store",
       signal: AbortSignal.timeout(3500),
@@ -620,8 +322,6 @@ export default function BuyerWorkspace({
   // component's first render deterministic prevents Safari from leaving the
   // server markup interactive-looking but without event handlers.
   const initialQuery = "";
-  const initialOffset = 0;
-  const initialCatalogLimit = 60;
   const [handoff, setHandoff] = useState<SessionHandoff | null>(null);
   const [handoffChecked, setHandoffChecked] = useState(false);
   const buyerId = handoff?.organizationId ?? BUYER_ID;
@@ -689,14 +389,7 @@ export default function BuyerWorkspace({
   const [verifiedOnly, setVerifiedOnly] = useState(false);
   const [officialOnly, setOfficialOnly] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [search, setSearch] = useState<SearchResult | null>(() =>
-    fallbackSearch(
-      initialQuery,
-      "RELEVANCE",
-      { stock: "all" },
-      initialCatalogLimit,
-    ),
-  );
+  const [search, setSearch] = useState<SearchResult | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const catalogUrlAppliedRef = useRef(false);
   const [comparison, setComparison] = useState<Comparison | null>(null);
@@ -720,7 +413,7 @@ export default function BuyerWorkspace({
   const [orders, setOrders] = useState<SupplierOrder[]>([]);
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
   const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -745,26 +438,6 @@ export default function BuyerWorkspace({
       // Search history is an optional convenience and must never block catalog use.
     }
   }, []);
-
-  useEffect(() => {
-    if (!handoffChecked || handoff) return;
-    setSearch(
-      fallbackSearch(query, sort, {
-        unit: unitFilter,
-        packaging: packagingFilter,
-        delivery: deliveryFilter,
-        stock: "all",
-      }),
-    );
-  }, [
-    deliveryFilter,
-    handoff,
-    handoffChecked,
-    packagingFilter,
-    query,
-    sort,
-    unitFilter,
-  ]);
 
   const activeCart = carts.find((cart) => cart.status === "ACTIVE") ?? null;
   const buyerOrders = orders.filter(
@@ -862,6 +535,10 @@ export default function BuyerWorkspace({
     verifiedOnly ? "verified" : "",
     officialOnly ? "official" : "",
   ].filter(Boolean).length;
+  const nextCatalogPageSize = Math.min(
+    CATALOG_PAGE_SIZE,
+    Math.max(0, (search?.total ?? 0) - (search?.items.length ?? 0)),
+  );
   const rankedComparisonOffers = useMemo(
     () => rankCompareOffers(comparison?.offers ?? [], supplierTrust),
     [comparison, supplierTrust],
@@ -901,18 +578,47 @@ export default function BuyerWorkspace({
     ],
   );
 
+  const buildPublicSearchParams = useCallback(
+    (
+      nextQuery = query,
+      nextSort = sort,
+      limit = CATALOG_PAGE_SIZE,
+      offset?: number,
+    ) => {
+      const params = new URLSearchParams({
+        q: canonicalSearchQuery(nextQuery),
+        sort: nextSort,
+        limit: String(limit),
+      });
+      if (offset) params.set("offset", String(offset));
+      if (stockFilter === "true") params.set("inStock", "true");
+      if (unitFilter) params.set("unit", unitFilter);
+      if (packagingFilter) params.set("packaging", packagingFilter);
+      if (deliveryFilter) params.set("deliveryMethod", deliveryFilter);
+      return params;
+    },
+    [
+      deliveryFilter,
+      packagingFilter,
+      query,
+      sort,
+      stockFilter,
+      unitFilter,
+    ],
+  );
+
   const loadSearch = useCallback(
-    async (nextQuery = query, nextSort = sort) => {
+    async (
+      nextQuery = query,
+      nextSort = sort,
+      limit = CATALOG_PAGE_SIZE,
+    ) => {
       if (!handoff) {
-        const publicParams = new URLSearchParams({
-          q: canonicalSearchQuery(nextQuery),
-          sort: nextSort,
-          limit: "60",
-        });
-        if (stockFilter === "true") publicParams.set("inStock", "true");
-        if (unitFilter) publicParams.set("unit", unitFilter);
-        if (packagingFilter) publicParams.set("packaging", packagingFilter);
-        if (deliveryFilter) publicParams.set("deliveryMethod", deliveryFilter);
+        const publicParams = buildPublicSearchParams(
+          nextQuery,
+          nextSort,
+          limit,
+        );
         try {
           const live = await fetchPublicCatalogSearch(
             nextQuery,
@@ -924,16 +630,9 @@ export default function BuyerWorkspace({
             return;
           }
         } catch {
-          // The local catalog is the deliberate fail-safe for an unavailable API.
+          // The server-side snapshot is the deliberate fail-safe for an unavailable API.
         }
-        setSearch(
-          fallbackSearch(nextQuery, nextSort, {
-            unit: unitFilter,
-            packaging: packagingFilter,
-            delivery: deliveryFilter,
-            stock: stockFilter,
-          }),
-        );
+        setSearch(await fetchFallbackCatalogSearch(publicParams));
         return;
       }
       const params = buildSearchParams(nextQuery, nextSort);
@@ -945,12 +644,9 @@ export default function BuyerWorkspace({
         );
       } catch (cause) {
         setSearch(
-          fallbackSearch(nextQuery, nextSort, {
-            unit: unitFilter,
-            packaging: packagingFilter,
-            delivery: deliveryFilter,
-            stock: "all",
-          }),
+          await fetchFallbackCatalogSearch(
+            buildPublicSearchParams(nextQuery, nextSort, limit),
+          ),
         );
         if (handoff)
           setToast(
@@ -960,13 +656,11 @@ export default function BuyerWorkspace({
     },
     [
       api,
+      buildPublicSearchParams,
       buildSearchParams,
-      deliveryFilter,
       handoff,
-      packagingFilter,
       query,
       sort,
-      unitFilter,
     ],
   );
 
@@ -996,23 +690,7 @@ export default function BuyerWorkspace({
     setError(null);
     try {
       if (!handoff) {
-        setSearch(
-          fallbackSearch(
-            query,
-            sort,
-            {
-              unit: unitFilter,
-              packaging: packagingFilter,
-              delivery: deliveryFilter,
-              stock: "all",
-            },
-            initialOffset ? initialCatalogLimit : undefined,
-          ),
-        );
-        // Do not block the public catalog on a remote API cold start. If it
-        // responds, loadSearch replaces the fallback with live data.
-        setLoading(false);
-        if (!initialOffset) void loadSearch(query, sort);
+        await loadSearch(query, sort, CATALOG_PAGE_SIZE);
         setCarts([]);
         setCartValidation(null);
         setOrders([]);
@@ -1046,34 +724,32 @@ export default function BuyerWorkspace({
       setDocuments(documentResult);
       setNotifications(notificationResult);
     } catch (cause) {
-      if (handoff)
-        setSearch(
-          fallbackSearch(query, sort, {
-            unit: unitFilter,
-            packaging: packagingFilter,
-            delivery: deliveryFilter,
-            stock: "all",
-          }),
-        );
+      if (handoff) {
+        try {
+          setSearch(
+            await fetchFallbackCatalogSearch(
+              buildPublicSearchParams(query, sort),
+            ),
+          );
+        } catch {
+          // Preserve the primary API error when both catalog sources fail.
+        }
+      }
       setError(errorMessage(cause));
     } finally {
       setLoading(false);
     }
   }, [
     api,
+    buildPublicSearchParams,
     buildSearchParams,
     buyerId,
     handoff,
     handoffChecked,
     loadSearch,
-    deliveryFilter,
-    packagingFilter,
     query,
     requestCartValidation,
     sort,
-    unitFilter,
-    initialCatalogLimit,
-    initialOffset,
   ]);
 
   useEffect(() => {
@@ -1092,15 +768,11 @@ export default function BuyerWorkspace({
       Number.isFinite(parsedOffset) && parsedOffset > 0 ? parsedOffset : 0;
     if (!urlQuery && !offset) return;
     setQuery(urlQuery);
-    setSearch(
-      fallbackSearch(
-        urlQuery,
-        sort,
-        { stock: "all" },
-        Math.max(60, offset + 60),
-      ),
+    void loadSearch(
+      urlQuery,
+      sort,
+      Math.max(CATALOG_PAGE_SIZE, offset + CATALOG_PAGE_SIZE),
     );
-    if (!offset) void loadSearch(urlQuery, sort);
   }, [handoff, handoffChecked, loadSearch, sort]);
 
   const loadMoreProducts = async () => {
@@ -1108,24 +780,39 @@ export default function BuyerWorkspace({
     setBusy("load-more");
     try {
       if (!handoff) {
+        const publicParams = buildPublicSearchParams(
+          query,
+          sort,
+          CATALOG_PAGE_SIZE,
+          currentCount,
+        );
+        const live = await fetchPublicCatalogSearch(
+          query,
+          sort,
+          publicParams,
+        );
+        if (live) {
+          setSearch((previous) =>
+            previous
+              ? { ...live, items: [...previous.items, ...live.items] }
+              : live,
+          );
+          return;
+        }
         setSearch(
-          fallbackSearch(
-            query,
-            sort,
-            {
-              unit: unitFilter,
-              packaging: packagingFilter,
-              delivery: deliveryFilter,
-              stock: "all",
-            },
-            currentCount + 60,
+          await fetchFallbackCatalogSearch(
+            buildPublicSearchParams(
+              query,
+              sort,
+              currentCount + CATALOG_PAGE_SIZE,
+            ),
           ),
         );
         return;
       }
       const params = buildSearchParams(query, sort);
       params.set("offset", String(currentCount));
-      params.set("limit", "60");
+      params.set("limit", String(CATALOG_PAGE_SIZE));
       const next = await api.get<SearchResult>(`/marketplace/search?${params}`);
       setSearch((previous) =>
         previous
@@ -1133,20 +820,20 @@ export default function BuyerWorkspace({
           : next,
       );
     } catch {
-      setSearch(
-        fallbackSearch(
-          query,
-          sort,
-          {
-            unit: unitFilter,
-            packaging: packagingFilter,
-            delivery: deliveryFilter,
-            stock: "all",
-          },
-          currentCount + 60,
-        ),
-      );
-      setToast("Показываем следующую порцию резервного каталога");
+      try {
+        setSearch(
+          await fetchFallbackCatalogSearch(
+            buildPublicSearchParams(
+              query,
+              sort,
+              currentCount + CATALOG_PAGE_SIZE,
+            ),
+          ),
+        );
+        setToast("Показываем следующую порцию резервного каталога");
+      } catch (cause) {
+        setError(errorMessage(cause));
+      }
     } finally {
       setBusy(null);
     }
@@ -1668,16 +1355,6 @@ export default function BuyerWorkspace({
                   onInput={(event) => {
                     const value = event.currentTarget.value;
                     setQuery(value);
-                    if (!handoff) {
-                      setSearch(
-                        fallbackSearch(value, sort, {
-                          unit: unitFilter,
-                          packaging: packagingFilter,
-                          delivery: deliveryFilter,
-                          stock: "all",
-                        }),
-                      );
-                    }
                   }}
                   placeholder="Например: текучий композит, гутта, перчатки"
                 />
@@ -2029,7 +1706,12 @@ export default function BuyerWorkspace({
             </span>
           </div>
         ) : null}
-        {loading && isPublic ? (
+        {error && !search ? (
+          <ErrorState
+            description={error}
+            action={<Button onClick={() => void refresh()}>Повторить</Button>}
+          />
+        ) : loading && isPublic ? (
           <LoadingState label="Загружаем предложения" />
         ) : !visibleProducts.length ? (
           <EmptyState
@@ -2241,7 +1923,14 @@ export default function BuyerWorkspace({
                 void loadMoreProducts();
               }}
             >
-              {busy === "load-more" ? "Загружаем…" : "Показать ещё 60 товаров"}
+              {busy === "load-more"
+                ? "Загружаем…"
+                : `Показать ещё ${nextCatalogPageSize} ${ruCount(
+                    nextCatalogPageSize,
+                    "товар",
+                    "товара",
+                    "товаров",
+                  )}`}
             </a>
             <small>
               Показано {search.items.length} из {search.total}
@@ -2930,16 +2619,7 @@ export default function BuyerWorkspace({
             setQuery(value);
             if (!value.trim()) {
               void submitSearchFor("");
-              return;
             }
-            setSearch(
-              fallbackSearch(value, sort, {
-                unit: unitFilter,
-                packaging: packagingFilter,
-                delivery: deliveryFilter,
-                stock: "all",
-              }),
-            );
           }}
           onSearch={(value) => void submitSearchFor(value ?? query)}
         />

@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
-import { PrismaClient } from "../apps/api/node_modules/@prisma/client/index.js";
+import { PrismaClient } from "@prisma/client";
 import * as coreSchemas from "../packages/schemas/dist/index.js";
 
 const root = path.resolve(import.meta.dirname, "..");
@@ -254,7 +254,7 @@ try {
   }
   if (!fs.existsSync(apiEntry)) {
     throw new Error(
-      "Built API entry is missing. Run `pnpm --filter @marketplace/api build` first.",
+      "Built API entry is missing. Run `npm run build --workspace=@marketplace/api` first.",
     );
   }
 
@@ -281,7 +281,7 @@ try {
   );
   assert(
     buyer,
-    "Pilot buyer 970000000001 is missing; run `pnpm db:prepare-pilot`",
+    "Pilot buyer 970000000001 is missing; run `npm run db:prepare-pilot`",
   );
 
   api = spawn(process.execPath, [apiEntry], {

@@ -2,14 +2,12 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  ArrowRight24Regular,
-  Box24Regular,
-  CheckmarkCircle24Regular,
-  Filter24Regular,
-  ShieldCheckmark24Regular,
-  VehicleTruckProfile24Regular,
-} from "@fluentui/react-icons";
+import { ArrowRight24Regular } from "@fluentui/react-icons/svg/arrow-right";
+import { Box24Regular } from "@fluentui/react-icons/svg/box";
+import { CheckmarkCircle24Regular } from "@fluentui/react-icons/svg/checkmark-circle";
+import { Filter24Regular } from "@fluentui/react-icons/svg/filter";
+import { ShieldCheckmark24Regular } from "@fluentui/react-icons/svg/shield-checkmark";
+import { VehicleTruckProfile24Regular } from "@fluentui/react-icons/svg/vehicle-truck-profile";
 import {
   DmButton,
   DmCheckbox,
@@ -20,8 +18,8 @@ import {
   formatDate,
   formatMoney,
 } from "@marketplace/ui";
-import { MarketplaceApiClient, type CatalogSearchResponse } from "@marketplace/api-client";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import type { CatalogSearchResponse } from "@marketplace/api-client";
+import { useCallback, useEffect, useState } from "react";
 import { PublicHeader } from "../public-header";
 import {
   availableCatalogOffers,
@@ -55,7 +53,7 @@ function updateCatalogUrl(router: ReturnType<typeof useRouter>, request: Catalog
 function CatalogCard({ product }: { product: CatalogSearchResponse["items"][number] }) {
   const availableOffers = availableCatalogOffers(product);
   const priceMinor = selectCatalogPriceMinor(product);
-  const imageUrl = catalogImageUrl(product);
+  const imageUrl = catalogImageUrl(product, API_URL);
   const freshness = product.offers
     .flatMap((offer) => offer.freshness)
     .find((item) => item.updatedAt);
@@ -98,7 +96,6 @@ function CatalogCard({ product }: { product: CatalogSearchResponse["items"][numb
 
 export default function CatalogPage() {
   const router = useRouter();
-  const api = useMemo(() => new MarketplaceApiClient(API_URL, {}), []);
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SortOption>("RELEVANCE");
   const [categoryId, setCategoryId] = useState<string | undefined>();
@@ -111,14 +108,23 @@ export default function CatalogPage() {
     setLoading(true);
     setError(null);
     try {
-      const nextResponse = await api.searchPublicCatalog({
+      const params = new URLSearchParams({
         q: request.query,
-        categoryId: request.categoryId,
-        inStock: request.inStockOnly ? "true" : undefined,
         sort: request.sort,
-        offset: 0,
-        limit: PAGE_SIZE,
+        offset: "0",
+        limit: String(PAGE_SIZE),
       });
+      if (request.categoryId) params.set("categoryId", request.categoryId);
+      if (request.inStockOnly) params.set("inStock", "true");
+      const response = await fetch(`/catalog-search?${params.toString()}`, {
+        cache: "no-store",
+        signal: AbortSignal.timeout(3_500),
+      });
+      if (!response.ok) throw new Error("Catalog request failed");
+      const nextResponse = (await response.json()) as CatalogSearchResponse;
+      if (!Array.isArray(nextResponse.items)) {
+        throw new Error("Catalog response is invalid");
+      }
       setResponse(nextResponse);
     } catch {
       setResponse(null);
@@ -126,7 +132,7 @@ export default function CatalogPage() {
     } finally {
       setLoading(false);
     }
-  }, [api]);
+  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);

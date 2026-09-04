@@ -1,12 +1,10 @@
 "use client";
 
-import {
-  Add20Regular,
-  ArrowClockwise20Regular,
-  Key20Regular,
-  Link20Regular,
-  Play20Regular,
-} from "@fluentui/react-icons";
+import { Add20Regular } from "@fluentui/react-icons/svg/add";
+import { ArrowClockwise20Regular } from "@fluentui/react-icons/svg/arrow-clockwise";
+import { Key20Regular } from "@fluentui/react-icons/svg/key";
+import { Link20Regular } from "@fluentui/react-icons/svg/link";
+import { Play20Regular } from "@fluentui/react-icons/svg/play";
 import {
   DmButton,
   DmCheckbox,

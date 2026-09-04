@@ -3,8 +3,8 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "build": "next build --webpack",
-    "dev": "next dev --webpack --port 3000",
+    "build": "next build --webpack && node ../../scripts/verify-admin-bundle.mjs",
+    "dev": "next dev --port 3000",
     "start": "next start --port 3000",
     "typecheck": "tsc --noEmit",
     "lint": "tsc --noEmit",
@@ -13,8 +13,8 @@
   "dependencies": {
     "@fluentui/react-components": "^9.74.4",
     "@fluentui/react-icons": "^2.0.311",
-    "@marketplace/api-client": "workspace:*",
-    "@marketplace/ui": "workspace:*",
+    "@marketplace/api-client": "0.0.0",
+    "@marketplace/ui": "0.0.0",
     "next": "^16.2.11",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"

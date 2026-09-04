@@ -1,4 +1,5 @@
-import { ArrowSync24Regular, Box24Regular } from "@fluentui/react-icons";
+import { ArrowSync24Regular } from "@fluentui/react-icons/svg/arrow-sync";
+import { Box24Regular } from "@fluentui/react-icons/svg/box";
 import {
   DmButton,
   DmField,

@@ -22,7 +22,7 @@ export default defineConfig({
   },
   webServer: [
     {
-      command: "pnpm --filter @marketplace/api start",
+      command: "npm run start --workspace=@marketplace/api",
       cwd: workspace,
       url: "http://127.0.0.1:4012/api/health",
       env: {
@@ -39,7 +39,7 @@ export default defineConfig({
       reuseExistingServer: true,
       timeout: 120_000,
     },
-    { command: "pnpm --filter @marketplace/admin-web exec next start --port 3010", cwd: workspace, url: "http://127.0.0.1:3010", reuseExistingServer: true, timeout: 60_000 },
-    { command: "pnpm --filter @marketplace/buyer-web start", cwd: workspace, url: "http://127.0.0.1:3001", env: { NEXT_PUBLIC_API_URL: API_URL }, reuseExistingServer: true, timeout: 60_000 },
+    { command: "npm exec --workspace=@marketplace/admin-web -- next start --port 3010", cwd: workspace, url: "http://127.0.0.1:3010", reuseExistingServer: true, timeout: 60_000 },
+    { command: "npm run start --workspace=@marketplace/buyer-web", cwd: workspace, url: "http://127.0.0.1:3001", env: { NEXT_PUBLIC_API_URL: API_URL }, reuseExistingServer: true, timeout: 60_000 },
   ],
 });

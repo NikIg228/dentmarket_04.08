@@ -284,11 +284,11 @@ function parseMajorVersion(value) {
   return Number(match[1]);
 }
 
-function runPnpm(args, env) {
+function runNpm(args, env) {
   const windows = process.platform === "win32";
-  const command = windows ? (process.env.ComSpec ?? "cmd.exe") : "pnpm";
+  const command = windows ? (process.env.ComSpec ?? "cmd.exe") : "npm";
   const commandArgs = windows
-    ? ["/d", "/s", "/c", `pnpm ${args.join(" ")}`]
+    ? ["/d", "/s", "/c", `npm ${args.join(" ")}`]
     : args;
   const result = spawnSync(command, commandArgs, {
     cwd: root,
@@ -299,7 +299,7 @@ function runPnpm(args, env) {
   if (result.error) throw result.error;
   assert(
     result.status === 0,
-    `pnpm ${args.join(" ")} failed with exit code ${result.status}`,
+    `npm ${args.join(" ")} failed with exit code ${result.status}`,
   );
 }
 
@@ -796,11 +796,11 @@ async function main() {
     restoredSnapshot,
     "Restored PostgreSQL data differs from the source snapshot",
   );
-  runPnpm(
+  runNpm(
     [
-      "--filter",
-      "@marketplace/api",
       "exec",
+      "--workspace=@marketplace/api",
+      "--",
       "prisma",
       "migrate",
       "status",

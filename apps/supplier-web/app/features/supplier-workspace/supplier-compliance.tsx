@@ -1,4 +1,5 @@
-import { CloudArrowUp24Regular, ShieldCheckmark24Regular } from "@fluentui/react-icons";
+import { CloudArrowUp24Regular } from "@fluentui/react-icons/svg/cloud-arrow-up";
+import { ShieldCheckmark24Regular } from "@fluentui/react-icons/svg/shield-checkmark";
 import {
   DmButton,
   DmField,

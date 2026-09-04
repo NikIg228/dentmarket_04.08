@@ -79,7 +79,7 @@ DentMarket — B2B-маркетплейс стоматологических т�
 
 ### Стек подходит
 
-- `pnpm` корректно подходит для monorepo и не является риском для production.
+- `npm workspaces` является каноническим package-manager контрактом monorepo и поддерживается локальными, CI и production-командами.
 - NestJS подходит для большого доменного backend с RBAC, модулями и фоновыми задачами.
 - Prisma и PostgreSQL подходят для транзакционной B2B-торговли.
 - Next.js подходит для buyer, supplier и admin приложений. Разный UI сейчас — проблема дизайн-системы и организации frontend, а не ограничение Next.js.
@@ -912,10 +912,10 @@ Definition of Done: наблюдаемый итог, а не список фай
 4. Реализовать минимальное изменение.
 5. Выполнить migration и seed только при необходимости.
 6. Запустить targeted tests.
-7. Запустить `pnpm typecheck`.
-8. Запустить `pnpm test`.
-9. Запустить `pnpm verify:pilot-backend` для изменений ядра.
-10. Перед merge запустить `pnpm build`.
+7. Запустить `npm run typecheck`.
+8. Запустить `npm test`.
+9. Запустить `npm run verify:pilot-backend` для изменений ядра.
+10. Перед merge запустить `npm run build`.
 11. В одном коммите обновить документацию и verification evidence.
 
 Нельзя одновременно брать новую backend-функцию, редизайн трёх кабинетов и новую интеграцию. Это разные задачи и разные acceptance gates.
@@ -937,23 +937,23 @@ B1.2, B2.1–B2.3, B3.1–B3.3 и B4.1–B4.3 после этого этапа �
 ## 12. Команды локальной проверки
 
 ```powershell
-pnpm db:prepare-pilot
-pnpm typecheck
-pnpm test
-pnpm verify:runtime-split
-pnpm verify:outbox
-pnpm verify:observability
-pnpm verify:backup-restore
-pnpm verify:postgres
-pnpm verify:core-contract
-pnpm verify:pilot-backend
-pnpm build
+npm run db:prepare-pilot
+npm run typecheck
+npm test
+npm run verify:runtime-split
+npm run verify:outbox
+npm run verify:observability
+npm run verify:backup-restore
+npm run verify:postgres
+npm run verify:core-contract
+npm run verify:pilot-backend
+npm run build
 ```
 
 Для повседневного запуска:
 
 ```powershell
-pnpm dev:local
+npm run dev
 ```
 
 `verify:pilot-backend` создаёт тестовый заказ и предназначен для локальной пилотной БД. Для удалённой БД команда по умолчанию заблокирована.

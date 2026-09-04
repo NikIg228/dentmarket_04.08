@@ -1,4 +1,4 @@
-import { BuildingShop24Regular } from "@fluentui/react-icons";
+import { BuildingShop24Regular } from "@fluentui/react-icons/svg/building-shop";
 import type { MarketplaceApiClient } from "@marketplace/api-client";
 import {
   DmButton,

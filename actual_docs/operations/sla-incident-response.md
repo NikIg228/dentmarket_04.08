@@ -20,10 +20,10 @@
 ## Контрольные процедуры
 
 - Metrics: защищённый `GET /api/metrics`, versioned rules и инструкции — в
-  `observability-runbook.md`; локальный gate — `pnpm verify:observability`.
+  `observability-runbook.md`; локальный gate — `npm run verify:observability`.
 - Sentry: error rate, unhandled exceptions, release regression.
 - OTEL: latency p95/p99, 5xx, queue lag, database pool saturation.
-- Backup: `pnpm verify:backup-restore` по
+- Backup: `npm run verify:backup-restore` по
   [`backup-restore-runbook.md`](backup-restore-runbook.md); существующий artifact
   восстанавливается только в новую пустую `dentmarket_restore_drill_*` БД с
   подтверждением, равным точному имени target.

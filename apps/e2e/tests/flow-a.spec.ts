@@ -173,7 +173,7 @@ async function findComparablePilotProduct(): Promise<PilotProduct> {
   );
   if (!comparable) {
     throw new Error(
-      "No pilot product with two fresh published offers was found. Run `pnpm db:prepare-pilot`.",
+      "No pilot product with two fresh published offers was found. Run `npm run db:prepare-pilot`.",
     );
   }
   return { id: comparable[0], name: comparable[1].name };

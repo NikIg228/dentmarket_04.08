@@ -48,8 +48,8 @@ envelope. Clients must back off; they must not retry in a tight loop.
    command latency. Use a dedicated namespace for rate-limit keys.
 2. Set `REDIS_URL`, `TRUST_PROXY=true`, explicit HTTPS `CORS_ORIGINS`, JWT
    issuer/audience and `JWT_REQUIRE_MFA=true` through the secret manager.
-3. Run `pnpm build`, `pnpm verify:production-config` and
-   `pnpm verify:rate-limit-auth` before the immutable release is promoted.
+3. Run `npm run build`, `npm run verify:production-config` and
+   `npm run verify:rate-limit-auth` before the immutable release is promoted.
 4. Start API and worker separately. Confirm `/api/health/ready`, Redis
    readiness, request IDs, rate-limit headers and the production error envelope.
 5. Verify social/email login, MFA enrollment/challenge, refresh rotation,
@@ -95,11 +95,11 @@ envelope. Clients must back off; they must not retry in a tight loop.
 ## Evidence commands
 
 ```powershell
-pnpm verify:rate-limit-auth
-pnpm verify:security
-pnpm verify:production-config
-pnpm verify:runtime-split
-pnpm verify:postgres
+npm run verify:rate-limit-auth
+npm run verify:security
+npm run verify:production-config
+npm run verify:runtime-split
+npm run verify:postgres
 ```
 
 `verify:rate-limit-auth` proves the bounded production configuration, shared

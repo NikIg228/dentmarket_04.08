@@ -93,7 +93,7 @@ services:
     build:
       context: .
       target: api
-    command: ["/bin/sh", "-c", "pnpm --filter @marketplace/api exec prisma migrate deploy && pnpm --filter @marketplace/api start"]
+    command: ["/bin/sh", "-c", "npm exec --workspace=@marketplace/api -- prisma migrate deploy && exec npm run start --workspace=@marketplace/api"]
     depends_on:
       postgres:
         condition: service_healthy
@@ -137,7 +137,7 @@ services:
     build:
       context: .
       target: api
-    command: ["pnpm", "--filter", "@marketplace/api", "start:worker"]
+    command: ["npm", "run", "start:worker", "--workspace=@marketplace/api"]
     depends_on:
       api:
         condition: service_healthy
@@ -172,7 +172,7 @@ services:
     build:
       context: .
       target: api
-    command: ["pnpm", "db:seed"]
+    command: ["npm", "run", "db:seed"]
     depends_on:
       api:
         condition: service_healthy

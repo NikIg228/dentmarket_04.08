@@ -1,6 +1,6 @@
 {
   "framework": "nextjs",
-  "installCommand": "pnpm install --frozen-lockfile",
-  "buildCommand": "pnpm --filter @marketplace/buyer-web build",
+  "installCommand": "npm ci",
+  "buildCommand": "npm run build --workspace=@marketplace/buyer-web",
   "outputDirectory": "apps/buyer-web/.next"
 }

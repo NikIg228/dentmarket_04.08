@@ -1,17 +1,15 @@
 "use client";
 
 import { Button, Input } from "@fluentui/react-components";
-import {
-  BuildingShop24Regular,
-  Cart24Regular,
-  Cube24Regular,
-  Database24Regular,
-  DocumentTable24Regular,
-  PeopleTeam24Regular,
-  Search24Regular,
-  Settings24Regular,
-  ShieldLock24Regular,
-} from "@fluentui/react-icons";
+import { BuildingShop24Regular } from "@fluentui/react-icons/svg/building-shop";
+import { Cart24Regular } from "@fluentui/react-icons/svg/cart";
+import { Cube24Regular } from "@fluentui/react-icons/svg/cube";
+import { Database24Regular } from "@fluentui/react-icons/svg/database";
+import { DocumentTable24Regular } from "@fluentui/react-icons/svg/document-table";
+import { PeopleTeam24Regular } from "@fluentui/react-icons/svg/people-team";
+import { Search24Regular } from "@fluentui/react-icons/svg/search";
+import { Settings24Regular } from "@fluentui/react-icons/svg/settings";
+import { ShieldLock24Regular } from "@fluentui/react-icons/svg/shield-lock";
 import { useEffect, useState, type ReactNode } from "react";
 import styles from "./page.module.css";
 import { OrganizationQuickCreate } from "./organization-quick-create";

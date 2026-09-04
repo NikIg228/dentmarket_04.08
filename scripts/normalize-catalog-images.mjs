@@ -13,7 +13,7 @@
  */
 import { execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
-import { mkdir, readdir, writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -30,7 +30,20 @@ const concurrency = Math.max(1, Number(args.get("concurrency") ?? 6));
 const userAgent = "DentMarketCatalogImageBot/1.0 (+supplier-image-import)";
 
 function serviceRoleKey() {
-  return JSON.parse(execFileSync("pnpm", ["dlx", "supabase", "projects", "api-keys", "--project-ref", "tlxxicjzppflpkcgnauo"], { encoding: "utf8" })).keys.find((key) => key.id === "service_role").api_key;
+  return JSON.parse(
+    execFileSync(
+      "npx",
+      [
+        "--yes",
+        "supabase",
+        "projects",
+        "api-keys",
+        "--project-ref",
+        "tlxxicjzppflpkcgnauo",
+      ],
+      { encoding: "utf8", shell: process.platform === "win32" },
+    ),
+  ).keys.find((key) => key.id === "service_role").api_key;
 }
 
 const apiKey = serviceRoleKey();
@@ -111,9 +124,7 @@ async function fetchImageFromPage(pageUrl) {
 }
 
 async function normalize(bytes) {
-  const sharpPackage = (await readdir(join(projectRoot, "node_modules/.pnpm"))).find((name) => name.startsWith("sharp@"));
-  if (!sharpPackage) throw new Error("sharp is not installed; run pnpm install first");
-  const requireSharp = createRequire(join(projectRoot, "node_modules/.pnpm", sharpPackage, "node_modules/sharp/package.json"));
+  const requireSharp = createRequire(join(projectRoot, "package.json"));
   const sharp = requireSharp("sharp");
   return sharp(bytes).rotate().resize(1200, 1200, { fit: "contain", background: "#F7F8FA" }).webp({ quality: 86, effort: 4 }).toBuffer({ resolveWithObject: true });
 }

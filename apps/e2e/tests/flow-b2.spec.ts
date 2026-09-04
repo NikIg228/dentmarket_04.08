@@ -278,7 +278,7 @@ async function findPilotOffer(): Promise<PilotOffer> {
       };
   }
   throw new Error(
-    "No pilot offer with at least eight local-only units was found. Run `pnpm db:prepare-pilot`.",
+    "No pilot offer with at least eight local-only units was found. Run `npm run db:prepare-pilot`.",
   );
 }
 

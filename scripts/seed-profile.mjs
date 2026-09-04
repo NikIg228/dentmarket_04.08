@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { PrismaClient } from "../apps/api/node_modules/@prisma/client/index.js";
+import { PrismaClient } from "@prisma/client";
 
 const profile = process.argv[2];
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");

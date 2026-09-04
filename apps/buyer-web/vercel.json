@@ -1,5 +1,5 @@
 {
-  "installCommand": "cd ../.. && pnpm install --frozen-lockfile",
-  "buildCommand": "cd ../.. && pnpm --filter @marketplace/buyer-web build",
+  "installCommand": "cd ../.. && npm ci",
+  "buildCommand": "cd ../.. && npm run build --workspace=@marketplace/buyer-web",
   "outputDirectory": ".next"
 }

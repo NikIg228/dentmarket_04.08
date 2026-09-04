@@ -19,7 +19,7 @@
     "@aws-sdk/client-s3": "^3.1087.0",
     "@aws-sdk/s3-request-presigner": "^3.1087.0",
     "@fontsource/roboto": "^5.2.10",
-    "@marketplace/schemas": "workspace:*",
+    "@marketplace/schemas": "0.0.0",
     "@nestjs/common": "^11.1.28",
     "@nestjs/core": "^11.1.28",
     "@nestjs/platform-express": "^11.1.28",

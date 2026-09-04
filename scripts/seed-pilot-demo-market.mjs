@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { PrismaClient } from "../apps/api/node_modules/@prisma/client/index.js";
+import { PrismaClient } from "@prisma/client";
 
 const root = path.resolve(process.cwd());
 const catalog = JSON.parse(

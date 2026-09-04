@@ -383,17 +383,17 @@ Dialog используется для короткого решения; drawer
 ### Required verification
 
 ```powershell
-pnpm typecheck
-pnpm test
+npm run typecheck
+npm test
 git diff --check
-pnpm --filter @marketplace/buyer-web build
-pnpm --filter @marketplace/supplier-web build
-pnpm --filter @marketplace/admin-web build
-pnpm --filter @marketplace/landing-web build
-pnpm verify:web
+npm run build --workspace=@marketplace/buyer-web
+npm run build --workspace=@marketplace/supplier-web
+npm run build --workspace=@marketplace/admin-web
+npm run build --workspace=@marketplace/landing-web
+npm run verify:web
 ```
 
-Последние четыре команды выполняются после поднятия требуемого local environment и фиксируются с фактическим результатом. Полный `pnpm build` не считается пройденным по умолчанию, если команда остановилась по timeout.
+Последние четыре команды выполняются после поднятия требуемого local environment и фиксируются с фактическим результатом. Полный `npm run build` не считается пройденным по умолчанию, если команда остановилась по timeout.
 
 ## 12. Что делать сейчас
 

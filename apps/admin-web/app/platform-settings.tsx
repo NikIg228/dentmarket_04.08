@@ -1,9 +1,7 @@
 "use client";
 
-import {
-  ArrowClockwise20Regular,
-  Settings20Regular,
-} from "@fluentui/react-icons";
+import { ArrowClockwise20Regular } from "@fluentui/react-icons/svg/arrow-clockwise";
+import { Settings20Regular } from "@fluentui/react-icons/svg/settings";
 import {
   DmButton,
   DmFeedback,

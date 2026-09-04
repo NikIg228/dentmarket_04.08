@@ -1,6 +1,6 @@
 "use client";
 
-import { ShieldLock20Regular } from "@fluentui/react-icons";
+import { ShieldLock20Regular } from "@fluentui/react-icons/svg/shield-lock";
 import {
   DmButton,
   DmFeedback,

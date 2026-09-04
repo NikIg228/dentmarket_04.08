@@ -413,7 +413,7 @@ Buyer V2 создаётся как отдельная чистая реализ�
 Сохраняются:
 
 - TypeScript monorepo;
-- pnpm workspace и Turborepo;
+- npm workspaces и Turborepo;
 - NestJS modular monolith;
 - PostgreSQL и Prisma;
 - Redis/BullMQ для фоновых задач;

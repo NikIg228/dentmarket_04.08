@@ -44,7 +44,7 @@ secret store, не коммитьте его в `.env`:
 ```powershell
 $env:RESTORE_DRILL_ADMIN_DATABASE_URL="postgresql://ADMIN_USER:ADMIN_PASSWORD@127.0.0.1:5432/postgres"
 $env:RESTORE_DRILL_USE_OBJECT_FIXTURE="true"
-pnpm verify:backup-restore
+npm run verify:backup-restore
 Remove-Item Env:RESTORE_DRILL_ADMIN_DATABASE_URL
 Remove-Item Env:RESTORE_DRILL_USE_OBJECT_FIXTURE
 ```
@@ -59,7 +59,7 @@ Gate принимает native PostgreSQL client по умолчанию. В Lin
 ```bash
 POSTGRES_CLIENT_MODE=docker \
 RESTORE_DRILL_USE_OBJECT_FIXTURE=true \
-pnpm verify:backup-restore
+npm run verify:backup-restore
 ```
 
 Docker mode запускает client из `postgres:17-alpine`; database service остаётся
