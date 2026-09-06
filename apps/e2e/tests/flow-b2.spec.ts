@@ -27,9 +27,36 @@ const buyerPermissionCodes = [
   "order.create",
   "order.approve",
   "document.view",
+  "document.sign",
+  "document.upload",
+  "document.accounting.review",
   "notification.view",
+  "support.ticket.create",
+  "support.ticket.view",
+  "budget.view",
+  "budget.manage",
+  "ai.use",
+  "trust.incident.view",
+  "trust.incident.appeal",
+  "trust.comment.view",
+  "trust.comment.manage",
   "trust.review.view",
+  "trust.review.create",
   "trust.rating.view",
+  "geo.view",
+  "geo.manage",
+  "recommendation.use",
+];
+const supplierPermissionCodes = [
+  "organization.view", "catalog.product.view", "catalog.offer.edit", "catalog.offer.publish",
+  "import.manage", "matching.manage", "compliance.view", "compliance.credential.manage",
+  "inventory.view", "inventory.adjust", "inventory.freshness.manage", "order.confirm",
+  "document.view", "document.sign", "document.upload", "document.issue",
+  "document.accounting.review", "document.archive", "integration.view", "integration.manage",
+  "delivery.view", "delivery.manage", "shipment.manage", "promotion.view", "promotion.manage",
+  "support.ticket.create", "support.ticket.view", "ai.use", "trust.incident.view",
+  "trust.incident.appeal", "trust.comment.view", "trust.comment.manage", "trust.review.view",
+  "trust.review.respond", "trust.rating.view", "trust.rating.appeal", "geo.view", "geo.manage",
 ];
 
 type ActorFixture = {
@@ -176,17 +203,16 @@ async function createBuyerFixture(): Promise<ActorFixture> {
 async function createSupplierActor(
   organizationId: string,
   label: string,
-  allPermissions: boolean,
 ): Promise<ActorFixture> {
   const suffix = `${Date.now()}${Math.floor(Math.random() * 10000)}`.slice(-11);
   const userId = randomUUID();
   const roleId = randomUUID();
   const displayName = `B2 ${label} ${suffix}`;
   const permissions = await prisma.permission.findMany({
-    where: allPermissions ? undefined : { code: "order.confirm" },
-    select: { id: true },
+    where: { code: { in: supplierPermissionCodes } },
+    select: { id: true, code: true },
   });
-  expect(permissions.length).toBeGreaterThan(0);
+  expect(permissions.map(({ code }) => code).sort()).toEqual([...supplierPermissionCodes].sort());
 
   await prisma.$transaction(async (tx) => {
     await tx.user.create({
@@ -628,7 +654,6 @@ test.describe.serial("@flow-b2 supplier order confirmation", () => {
     supplier = await createSupplierActor(
       offer.supplierOrganizationId,
       "supplier",
-      true,
     );
     const anotherSupplier = await prisma.organization.findFirst({
       where: {
@@ -642,7 +667,6 @@ test.describe.serial("@flow-b2 supplier order confirmation", () => {
     foreignSupplier = await createSupplierActor(
       anotherSupplier.id,
       "foreign",
-      true,
     );
   });
 
@@ -930,6 +954,21 @@ test.describe.serial("@flow-b2 supplier order confirmation", () => {
         data: { decisions: [{ itemId: order.itemId, acceptedQuantity: order.quantity }] },
       }),
     );
+    const prepared = await responseJson<{ supplierOrderId: string; documents: Array<{ id: string; kind: string }> }>(
+      await request.post(`${API_URL}/supplier-orders/${order.orderId}/documents/prepare`, {
+        headers: identityHeaders(supplier),
+        data: {},
+      }),
+    );
+    expect(prepared.supplierOrderId).toBe(order.orderId);
+    expect(prepared.documents.map(({ kind }) => kind).sort()).toEqual(["INVOICE", "ORDER_SPECIFICATION"]);
+    const preparedAgain = await responseJson<{ documents: Array<{ id: string }> }>(
+      await request.post(`${API_URL}/supplier-orders/${order.orderId}/documents/prepare`, {
+        headers: identityHeaders(supplier),
+        data: {},
+      }),
+    );
+    expect(preparedAgain.documents.map(({ id }) => id).sort()).toEqual(prepared.documents.map(({ id }) => id).sort());
     await prisma.supplierOrder.update({
       where: { id: order.orderId },
       data: { paymentStatus: "PAID", status: "PAID", version: { increment: 1 } },
@@ -978,7 +1017,7 @@ test.describe.serial("@flow-b2 supplier order confirmation", () => {
     const supplierPanel = page.getByRole("region", {
       name: `Документы заказа ${order.orderNumber}`,
     });
-    await expect(supplierPanel).toContainText("Комплект ещё не сформирован");
+    await expect(supplierPanel).toContainText("2/3");
     await supplierPanel.getByRole("button", { name: "Сформировать документы" }).click();
     await expect(supplierPanel).toContainText("3/3");
     await expect(supplierPanel).toContainText("Спецификация");
@@ -994,7 +1033,7 @@ test.describe.serial("@flow-b2 supplier order confirmation", () => {
     expect(repeated.documents).toHaveLength(3);
 
     const persisted = await prisma.document.findMany({
-      where: { supplierOrderId: order.orderId, shipmentId: shipment.id },
+      where: { supplierOrderId: order.orderId },
       orderBy: { kind: "asc" },
     });
     expect(persisted).toHaveLength(3);
@@ -1003,13 +1042,12 @@ test.describe.serial("@flow-b2 supplier order confirmation", () => {
     for (const document of persisted) {
       expect(document.ownerOrganizationId).toBe(supplier.organizationId);
       expect(document.checkoutId).toBe(order.checkoutId);
+      expect(document.shipmentId).toBe(document.kind === "WAYBILL" ? shipment.id : null);
       expect(document.checksumSha256).toMatch(/^[a-f0-9]{64}$/);
       expect(document.immutableAt).not.toBeNull();
       expect(document.storageKey).toContain(`documents/${supplier.organizationId}/`);
-      expect(document.dataSnapshot).toMatchObject({
-        order: { number: order.orderNumber, currency: "KZT" },
-        recipient: { address: "г. Алматы, ул. Тестовая, 10" },
-      });
+      expect(document.dataSnapshot).toMatchObject({ order: { number: order.orderNumber, currency: "KZT" } });
+      if (document.kind === "WAYBILL") expect(document.dataSnapshot).toMatchObject({ recipient: { address: "г. Алматы, ул. Тестовая, 10" } });
     }
     expect(
       await prisma.auditLog.count({
@@ -1023,6 +1061,27 @@ test.describe.serial("@flow-b2 supplier order confirmation", () => {
     ).toBe(3);
 
     const invoice = persisted.find(({ kind }) => kind === "INVOICE")!;
+    const archive = await responseJson<{ items: Array<{ id: string; kind: string; accountingStatus: string; updatedAt: string; participants: Array<{ organizationId: string; organization: { displayName: string } }> }> }>(
+      await request.get(`${API_URL}/documents/archive?supplierOrderId=${order.orderId}`, { headers: identityHeaders(buyer) }),
+    );
+    expect(archive.items).toHaveLength(3);
+    expect(archive.items.every(({ participants }) => participants.some(({ organizationId }) => organizationId === buyer.organizationId) && participants.some(({ organizationId }) => organizationId === supplier.organizationId))).toBe(true);
+    const foreignArchiveRead = await request.get(`${API_URL}/documents/archive/${invoice.id}`, { headers: identityHeaders(foreignSupplier) });
+    expect(foreignArchiveRead.status()).toBe(404);
+    const archiveInvoice = archive.items.find(({ id }) => id === invoice.id)!;
+    const supplierOrganizationName = archiveInvoice.participants.find(({ organizationId }) => organizationId === supplier.organizationId)!.organization.displayName;
+    const reviewedInvoice = await responseJson<{ accountingStatus: string }>(
+      await request.patch(`${API_URL}/documents/archive/${invoice.id}/accounting-status`, {
+        headers: identityHeaders(buyer),
+        data: { status: "REVIEWED", reason: "Flow B2 accounting review", expectedUpdatedAt: archiveInvoice.updatedAt },
+      }),
+    );
+    expect(reviewedInvoice.accountingStatus).toBe("REVIEWED");
+    const staleAccountingUpdate = await request.patch(`${API_URL}/documents/archive/${invoice.id}/accounting-status`, {
+      headers: identityHeaders(buyer),
+      data: { status: "RECONCILED", reason: "Stale Flow B2 update", expectedUpdatedAt: archiveInvoice.updatedAt },
+    });
+    expect(staleAccountingUpdate.status()).toBe(409);
     const invoiceDownload = await request.get(`${API_URL}/documents/${invoice.id}/download`, {
       headers: identityHeaders(buyer),
     });
@@ -1049,8 +1108,23 @@ test.describe.serial("@flow-b2 supplier order confirmation", () => {
     const browserDownload = await downloadPromise;
     expect(browserDownload.suggestedFilename()).toContain(`INV-${order.orderNumber}`);
 
+    await page.goto(`${BUYER_URL}/documents`);
+    await expect(page.getByRole("heading", { name: "Документы", exact: true })).toBeVisible();
+    const buyerArchiveRow = page.getByRole("row").filter({ hasText: order.orderNumber }).filter({ hasText: "Счёт" }).first();
+    await expect(buyerArchiveRow).toContainText(supplierOrganizationName);
+    await expect(buyerArchiveRow).toContainText("Проверен");
+    await buyerArchiveRow.getByRole("button", { name: /^Счёт по заказу/ }).click();
+    await expect(page.getByRole("dialog")).toContainText(order.orderNumber);
+    await page.getByRole("dialog").getByRole("button", { name: "Закрыть" }).last().click();
+
+    const supplierHandoff = encodeURIComponent(JSON.stringify({ actorId: supplier.userId, organizationId: supplier.organizationId, displayName: supplier.displayName, organizationDisplayName: supplier.displayName, capability: "SUPPLIER" }));
+    await page.goto(`${SUPPLIER_URL}/documents#session=${supplierHandoff}`);
+    await expect(page.getByRole("heading", { name: "Документы", exact: true })).toBeVisible();
+    const supplierArchiveRow = page.getByRole("row").filter({ hasText: order.orderNumber }).filter({ hasText: "Счёт" }).first();
+    await expect(supplierArchiveRow).toContainText(buyer.displayName);
+
     await page.setViewportSize({ width: 390, height: 844 });
-    await expect(buyerPanel).toBeVisible();
+    await expect(supplierArchiveRow).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     expect(errors).toEqual([]);
   });

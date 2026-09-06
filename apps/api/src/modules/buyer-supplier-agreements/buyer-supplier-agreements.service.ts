@@ -47,6 +47,10 @@ export class BuyerSupplierAgreementsService {
     try {
       const created = await this.prisma.$transaction(async (tx) => {
         const agreement = await tx.buyerSupplierAgreement.create({ data: { agreementNumber, supplierOrganizationId: supplier.id, buyerOrganizationId: buyer.id, documentId: document.id, templateVersion: template.version, status: "AWAITING_SIGNATURE", renewalMode: input.renewalMode, autoRenew: input.renewalMode === "AUTO_ANNUAL", metadata: { initiatedByOrganizationId: context.organizationId } } });
+        await tx.documentParticipant.createMany({ data: [
+          { documentId: document.id, organizationId: supplier.id, role: "ISSUER" },
+          { documentId: document.id, organizationId: buyer.id, role: "RECIPIENT" },
+        ], skipDuplicates: true });
         await tx.auditLog.create({ data: { ...context, organizationId: context.organizationId, action: "buyer_supplier_agreement.initiated", entityType: "BuyerSupplierAgreement", entityId: agreement.id, after: { agreementNumber, supplierOrganizationId: supplier.id, buyerOrganizationId: buyer.id, templateVersion: template.version } } });
         await tx.outboxEvent.create({ data: { aggregateType: "BuyerSupplierAgreement", aggregateId: agreement.id, eventType: "BuyerSupplierAgreementInitiated", payload: { agreementId: agreement.id, documentId: document.id, supplierOrganizationId: supplier.id, buyerOrganizationId: buyer.id } } });
         return agreement;

@@ -16,7 +16,12 @@ import type {
   GenerateOrderDocumentPackRequest,
   CreateShipmentRequest,
   OrderDocumentPackResponse,
+  PreparedOrderDocumentsResponse,
   CreateCartRequest,
+  DocumentArchiveItem,
+  DocumentArchivePageResponse,
+  DocumentArchiveQueryInput,
+  DocumentArchiveSummaryResponse,
   OfferComparisonResponse,
   SearchCatalogRequest,
   SupplierOrderResponse,
@@ -31,6 +36,8 @@ import type {
   OutboxDeadLetterListResponse,
   OutboxReplayInput,
   OutboxReplayResponse,
+  UpdateDocumentAccountingStatusInput,
+  UploadDocumentInput,
 } from "@marketplace/schemas";
 
 export type {
@@ -42,6 +49,12 @@ export type {
   SupplierImportBatchResponse,
   SupplierImportDiagnosticsResponse,
   SupplierImportRollbackResponse,
+  DocumentArchiveItem,
+  DocumentArchivePageResponse,
+  DocumentArchiveQueryInput,
+  DocumentArchiveSummaryResponse,
+  UpdateDocumentAccountingStatusInput,
+  UploadDocumentInput,
 } from "@marketplace/schemas";
 
 export type ApiContext = {
@@ -304,6 +317,39 @@ export class MarketplaceApiClient {
       `/supplier-orders/${orderId}/document-pack`,
       input,
     );
+  }
+
+  prepareOrderDocuments(orderId: string) {
+    return this.post<PreparedOrderDocumentsResponse>(
+      `/supplier-orders/${orderId}/documents/prepare`,
+      {},
+    );
+  }
+
+  listDocumentArchive(input: DocumentArchiveQueryInput = {}) {
+    return this.get<DocumentArchivePageResponse>(
+      this.withQuery("/documents/archive", input),
+    );
+  }
+
+  getDocumentArchiveSummary() {
+    return this.get<DocumentArchiveSummaryResponse>("/documents/archive/summary");
+  }
+
+  getArchiveDocument(documentId: string) {
+    return this.get<DocumentArchiveItem>(`/documents/archive/${documentId}`);
+  }
+
+  updateDocumentAccountingStatus(documentId: string, input: UpdateDocumentAccountingStatusInput) {
+    return this.patch<DocumentArchiveItem>(`/documents/archive/${documentId}/accounting-status`, input);
+  }
+
+  uploadDocument(input: UploadDocumentInput) {
+    return this.post<DocumentArchiveItem>("/documents/upload", input);
+  }
+
+  downloadDocument(documentId: string) {
+    return this.download(`/documents/${documentId}/download`);
   }
 
   createSupplierImportBatch(

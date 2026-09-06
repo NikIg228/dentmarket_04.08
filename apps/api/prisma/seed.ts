@@ -35,6 +35,10 @@ const permissionCodes = [
   "refund.request",
   "refund.approve",
   "document.sign",
+  "document.upload",
+  "document.issue",
+  "document.accounting.review",
+  "document.archive",
   "organization.members.manage",
   "organization.roles.manage",
   "organization.view",
@@ -381,7 +385,7 @@ async function seed() {
     },
   });
   await prisma.supplierProfile.upsert({ where: { organizationId: demoSupplier.id }, update: { regulatoryDetails: { officialDistributor: true, supplierWarranty: true } }, create: { organizationId: demoSupplier.id, regulatoryDetails: { officialDistributor: true, supplierWarranty: true } } });
-  const supplierPermissionCodes = ["organization.view", "catalog.product.view", "catalog.offer.edit", "catalog.offer.publish", "import.manage", "matching.manage", "compliance.view", "compliance.credential.manage", "inventory.view", "inventory.adjust", "inventory.freshness.manage", "order.confirm", "document.view", "document.sign", "integration.view", "integration.manage", "delivery.view", "delivery.manage", "shipment.manage", "promotion.view", "promotion.manage", "support.ticket.create", "support.ticket.view", "ai.use", "trust.incident.view", "trust.incident.appeal", "trust.comment.view", "trust.comment.manage", "trust.review.view", "trust.review.respond", "trust.rating.view", "trust.rating.appeal", "geo.view", "geo.manage"];
+  const supplierPermissionCodes = ["organization.view", "catalog.product.view", "catalog.offer.edit", "catalog.offer.publish", "import.manage", "matching.manage", "compliance.view", "compliance.credential.manage", "inventory.view", "inventory.adjust", "inventory.freshness.manage", "order.confirm", "document.view", "document.sign", "document.upload", "document.issue", "document.accounting.review", "document.archive", "integration.view", "integration.manage", "delivery.view", "delivery.manage", "shipment.manage", "promotion.view", "promotion.manage", "support.ticket.create", "support.ticket.view", "ai.use", "trust.incident.view", "trust.incident.appeal", "trust.comment.view", "trust.comment.manage", "trust.review.view", "trust.review.respond", "trust.rating.view", "trust.rating.appeal", "geo.view", "geo.manage"];
   const demoSupplierUser = await prisma.user.upsert({ where: { email: "supplier@marketplace.local" }, update: { displayName: "Demo Dental Supply" }, create: { id: fixedId(510), email: "supplier@marketplace.local", displayName: "Demo Dental Supply", emailVerifiedAt: new Date() } });
   const demoSupplierRole = await prisma.role.upsert({
     where: {
@@ -435,7 +439,7 @@ async function seed() {
       capabilities: { create: { capability: "BUYER" } },
     },
   });
-  const buyerPermissionCodes = ["organization.view", "catalog.product.view", "order.create", "order.approve", "document.view", "document.sign", "notification.view", "support.ticket.create", "support.ticket.view", "budget.view", "budget.manage", "ai.use", "trust.incident.view", "trust.incident.appeal", "trust.comment.view", "trust.comment.manage", "trust.review.view", "trust.review.create", "trust.rating.view", "geo.view", "geo.manage", "recommendation.use"];
+  const buyerPermissionCodes = ["organization.view", "catalog.product.view", "order.create", "order.approve", "document.view", "document.sign", "document.upload", "document.accounting.review", "notification.view", "support.ticket.create", "support.ticket.view", "budget.view", "budget.manage", "ai.use", "trust.incident.view", "trust.incident.appeal", "trust.comment.view", "trust.comment.manage", "trust.review.view", "trust.review.create", "trust.rating.view", "geo.view", "geo.manage", "recommendation.use"];
   const demoBuyerUser = await prisma.user.upsert({
     where: { email: "buyer@marketplace.local" },
     update: { displayName: "Demo Dental Clinic" },

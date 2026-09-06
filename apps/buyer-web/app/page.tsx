@@ -2656,7 +2656,8 @@ export default function BuyerWorkspace({
       }
       onLogout={handoff ? () => void logout() : undefined}
       onNavigate={(item) => {
-        if (!handoff && item !== "catalog") window.location.assign(LOGIN_URL);
+        if (item === "documents" && handoff) window.location.assign("/documents");
+        else if (!handoff && item !== "catalog") window.location.assign(LOGIN_URL);
         else setActive(item);
       }}
       actions={

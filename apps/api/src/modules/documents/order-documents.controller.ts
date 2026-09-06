@@ -14,11 +14,23 @@ import { DocumentsService } from "./documents.service";
 export class OrderDocumentsController {
   constructor(private readonly documents: DocumentsService) {}
 
+  @Post(":orderId/documents/prepare")
+  @ApiUuidParam("orderId", "Supplier order identifier")
+  @ApiCoreResponse("PreparedOrderDocumentsResponse", 201)
+  @RequirePermissions("document.issue")
+  prepare(
+    @Param("orderId") orderId: string,
+    @Headers("x-user-id") actorId: string,
+    @Headers("x-organization-id") organizationId: string,
+  ) {
+    return this.documents.prepareOrderDocuments(orderId, { actorId, organizationId });
+  }
+
   @Post(":orderId/document-pack")
   @ApiUuidParam("orderId", "Supplier order identifier")
   @ApiCoreBody("GenerateOrderDocumentPackRequest")
   @ApiCoreResponse("OrderDocumentPackResponse", 201)
-  @RequirePermissions("document.manage")
+  @RequirePermissions("document.issue")
   generatePack(
     @Param("orderId") orderId: string,
     @Body() body: unknown,

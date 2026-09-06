@@ -399,7 +399,7 @@ Gate намеренно разрешён только для локальной 
 - [x] Миграция `20260818130000_outbox_delivery_semantics` применена как 29-я;
       dispatcher tests, PostgreSQL regression и runtime split прошли.
 
-Текущий статус: **B0.1–B0.6, B1.1–B1.2, B2.1–B2.3, B3.1–B3.3,
+Текущий статус: **B0.1–B0.6, B1.1–B1.2, B2.1–B2.4, B3.1–B3.3,
 B4.1–B4.3 и B4.5-R2E реализованы и проходят**.
 High source-code backlog B4.5-R1 закрыт фазами R1A и R1B. B4.5-R2A–R2E
 закрыли organization enumeration, XLSX decompression exhaustion, delayed
@@ -456,6 +456,7 @@ Gate: одна клиника оформляет заказы у одного и
 | [x]    | B2.1 | Полное/частичное подтверждение supplier order      | `pnpm verify:flow-b2`   |
 | [x]    | B2.2 | Статус отгрузки, уведомление клиники и audit trail | `pnpm verify:flow-b2`   |
 | [x]    | B2.3 | Минимальные документы заказа и отгрузки            | PostgreSQL + Playwright |
+| [x]    | B2.4 | Единый архив документов Buyer/Supplier              | PostgreSQL + Playwright |
 
 1. список новых заказов;
 2. подтверждение полного или частичного количества;
@@ -544,6 +545,64 @@ email-провайдер остаётся отдельным production-readines
 Ограничение B2.3: квалифицированная ЭЦП, внешний email, налоговый ЭСФ,
 production object storage и proof of delivery остаются отдельными
 production/legal gates и не имитируются локальным комплектом.
+
+### B2.4 — единый архив документов Buyer/Supplier
+
+Пользовательский результат: клиника и поставщик открывают отдельную страницу
+`/documents`, видят только документы своей организации и общих сделок, находят
+их по периоду, типу, контрагенту и заказу, открывают детали и скачивают
+неизменяемый файл. Поставщик формирует документы на правильном этапе заказа, а
+обе стороны видят подписи, версии и бухгалтерский статус.
+
+Non-goals: бухгалтерские проводки, налоговая отчётность, автоматический ЭСФ/СНТ,
+OCR, полноценная 1С-интеграция и признание mock-подписи юридически значимой.
+
+- [x] Общие Zod-схемы, OpenAPI и `@marketplace/api-client` описывают
+      пагинированный архив, summary, detail и фильтры.
+- [x] `Document` хранит отдельные lifecycle/accounting состояния, дату документа,
+      сумму-snapshot и явных участников; дополнительное соглашение не подменяет
+      новую версию основного договора.
+- [x] Tenant graph учитывает owner, buyer/supplier order parties и стороны
+      buyer-supplier/marketplace agreements; чужая организация получает `403`
+      на write-операции или скрывающий существование ресурса `404` на detail/read.
+- [x] Счёт формируется после подтверждения заказа до оплаты, подтверждение
+      оплаты — только после подтверждённого платёжного события, накладная — после
+      отгрузки; повтор каждого шага идемпотентен.
+- [x] Buyer и Supplier имеют отдельные `/documents` routes с loading, empty,
+      error, permission, filters, pagination, details и download states на
+      desktop и 390 px.
+- [x] Стандартные buyer/supplier роли имеют минимальные document permissions;
+      E2E использует те же роли, а не роль со всеми разрешениями.
+- [x] `npm run typecheck`, `npm test`, `npm run verify:core-contract`,
+      `npm run verify:postgres`, `npm run verify:flow-b2` и целевой Playwright
+      archive-flow проходят до отметки задачи выполненной.
+
+Выполнено в B2.4:
+
+- [x] Миграция `20260906120000_document_archive` добавляет категории,
+      бухгалтерский статус, дату и сумму-snapshot документа, payment/refund
+      references, основание дополнительного соглашения и явных участников.
+- [x] Все 32 миграции применяются к чистой PostgreSQL-базе; `prisma validate`
+      и повторный `npm run verify:postgres` проходят без pending migrations.
+- [x] Archive API возвращает summary, cursor pagination, поиск и фильтры по
+      категории, типу, статусу, периоду, заказу и контрагенту; detail показывает
+      стороны, подписи и цепочку версий.
+- [x] Мультивендорный checkout/payment intent не раскрывает общий документ всем
+      поставщикам: участники выводятся только из конкретного order, allocation,
+      refund или договора; отдельный regression покрывает эту границу.
+- [x] Upload принимает только проверенные PDF/DOCX до 10 МБ через quarantine,
+      сохраняет SHA-256 и immutable evidence; изменение бухгалтерского статуса
+      защищено permission, optimistic lock и audit trail.
+- [x] `npm run typecheck` проходит 15/15 задач, `npm test` — 14/14
+      (`@marketplace/api` 194/194, schemas 48/48), core contract — 301 operation
+      и 48 component schemas, seed profiles — 90 permissions и pilot 10/10/500.
+- [x] `npm run verify:flow-b2` проходит 4/4, целевой archive-flow — 1/1;
+      Buyer/Supplier production builds содержат `/documents`, проходят bundle
+      budgets, а Playwright проверяет tenant isolation и viewport 390 px.
+
+Ограничение B2.4: квалифицированная ЭЦП, юридическая валидация шаблонов,
+production object storage, внешний ЭДО, ЭСФ/СНТ, OCR и полноценная синхронизация
+с 1С остаются отдельными production/legal gates и не заявлены `LIVE_VERIFIED`.
 
 ### B3 — catalog operations
 

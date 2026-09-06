@@ -1,12 +1,15 @@
-import { BadRequestException, Body, Controller, Get, Headers, Param, Post, Query, Res, StreamableFile, UseGuards } from "@nestjs/common";
-import { completeDocumentSignatureSchema, createDocumentTemplateSchema, createDocumentVersionSchema, createGeneratedDocumentSchema, createSignatureSessionSchema, documentQuerySchema, uploadDocumentSchema } from "@marketplace/schemas";
+import { BadRequestException, Body, Controller, Get, Headers, Param, Patch, Post, Query, Res, StreamableFile, UseGuards } from "@nestjs/common";
+import { completeDocumentSignatureSchema, createDocumentTemplateSchema, createDocumentVersionSchema, createGeneratedDocumentSchema, createSignatureSessionSchema, documentArchiveQuerySchema, documentQuerySchema, updateDocumentAccountingStatusSchema, uploadDocumentSchema } from "@marketplace/schemas";
 import { ApiTags } from "@nestjs/swagger";
 import type { Response } from "express";
 import { PermissionsGuard } from "../access-control/permissions.guard";
 import { RequirePermissions } from "../access-control/require-permissions.decorator";
+import { ApiCoreBody, ApiCoreErrors, ApiCoreProtected, ApiCoreQuery, ApiCoreResponse, ApiUuidParam } from "../../platform/openapi/core-openapi";
 import { DocumentsService } from "./documents.service";
 
 @ApiTags("documents")
+@ApiCoreProtected()
+@ApiCoreErrors()
 @UseGuards(PermissionsGuard)
 @Controller("documents")
 export class DocumentsController {
@@ -26,6 +29,40 @@ export class DocumentsController {
   createTemplate(@Body() body: unknown, @Headers("x-user-id") actorId: string, @Headers("x-organization-id") organizationId: string) {
     const parsed = createDocumentTemplateSchema.safeParse(body); if (!parsed.success) throw new BadRequestException(parsed.error.flatten());
     return this.documents.createTemplate(parsed.data, this.context(actorId, organizationId));
+  }
+
+  @Get("archive/summary")
+  @ApiCoreResponse("DocumentArchiveSummaryResponse")
+  @RequirePermissions("document.view")
+  archiveSummary(@Headers("x-user-id") actorId: string, @Headers("x-organization-id") organizationId: string) {
+    return this.documents.archiveSummary(this.context(actorId, organizationId));
+  }
+
+  @Get("archive")
+  @ApiCoreQuery("DocumentArchiveQuery")
+  @ApiCoreResponse("DocumentArchivePageResponse")
+  @RequirePermissions("document.view")
+  archiveList(@Query() query: Record<string, unknown>, @Headers("x-user-id") actorId: string, @Headers("x-organization-id") organizationId: string) {
+    const parsed = documentArchiveQuerySchema.safeParse(query); if (!parsed.success) throw new BadRequestException(parsed.error.flatten());
+    return this.documents.listArchive(parsed.data, this.context(actorId, organizationId));
+  }
+
+  @Get("archive/:documentId")
+  @ApiUuidParam("documentId", "Document archive identifier")
+  @ApiCoreResponse("DocumentArchiveItem")
+  @RequirePermissions("document.view")
+  archiveGet(@Param("documentId") documentId: string, @Headers("x-user-id") actorId: string, @Headers("x-organization-id") organizationId: string) {
+    return this.documents.getArchive(documentId, this.context(actorId, organizationId));
+  }
+
+  @Patch("archive/:documentId/accounting-status")
+  @ApiUuidParam("documentId", "Document archive identifier")
+  @ApiCoreBody("UpdateDocumentAccountingStatusRequest")
+  @ApiCoreResponse("DocumentArchiveItem")
+  @RequirePermissions("document.accounting.review")
+  archiveAccountingStatus(@Param("documentId") documentId: string, @Body() body: unknown, @Headers("x-user-id") actorId: string, @Headers("x-organization-id") organizationId: string) {
+    const parsed = updateDocumentAccountingStatusSchema.safeParse(body); if (!parsed.success) throw new BadRequestException(parsed.error.flatten());
+    return this.documents.updateAccountingStatus(documentId, parsed.data, this.context(actorId, organizationId));
   }
 
   @Get()
@@ -49,7 +86,7 @@ export class DocumentsController {
   }
 
   @Post("upload")
-  @RequirePermissions("document.manage")
+  @RequirePermissions("document.upload")
   upload(@Body() body: unknown, @Headers("x-user-id") actorId: string, @Headers("x-organization-id") organizationId: string) {
     const parsed = uploadDocumentSchema.safeParse(body); if (!parsed.success) throw new BadRequestException(parsed.error.flatten());
     return this.documents.upload(parsed.data, this.context(actorId, organizationId));
@@ -77,7 +114,7 @@ export class DocumentsController {
   }
 
   @Post(":documentId/archive")
-  @RequirePermissions("document.manage")
+  @RequirePermissions("document.archive")
   archive(@Param("documentId") documentId: string, @Headers("x-user-id") actorId: string, @Headers("x-organization-id") organizationId: string) {
     return this.documents.archive(documentId, this.context(actorId, organizationId));
   }

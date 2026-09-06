@@ -22,6 +22,7 @@ const kindLabel: Record<string, string> = {
 type DocumentOrder = {
   id: string;
   orderNumber: string;
+  status?: string;
   documents?: OrderDocumentResponse[];
   shipments?: Array<{ id: string; status: string }>;
 };
@@ -39,6 +40,8 @@ export function OrderDocumentPanel({
   const shipment = order.shipments?.find(({ status }) =>
     ["DISPATCHED", "IN_TRANSIT", "PARTIALLY_DELIVERED", "DELIVERED"].includes(status),
   );
+  const prepaymentDocumentsReady = ["ORDER_SPECIFICATION", "INVOICE"].every((kind) => documents.some((document) => document.kind === kind));
+  const canPrepare = !order.status || !["DRAFT", "AWAITING_CONFIRMATION", "REJECTED", "CANCELLED"].includes(order.status);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -52,6 +55,21 @@ export function OrderDocumentPanel({
       await api.generateOrderDocumentPack(order.id, { shipmentId: shipment.id });
       await onChanged();
       setSuccess("Комплект сформирован из подтверждённых данных заказа.");
+    } catch (cause) {
+      setError(errorMessage(cause));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const prepare = async () => {
+    setBusy("prepare");
+    setError(null);
+    setSuccess(null);
+    try {
+      await api.prepareOrderDocuments(order.id);
+      await onChanged();
+      setSuccess("Спецификация и счёт сформированы. Счёт можно передать клинике до оплаты.");
     } catch (cause) {
       setError(errorMessage(cause));
     } finally {
@@ -104,7 +122,11 @@ export function OrderDocumentPanel({
           ))}
         </div>
       ) : <p className={styles.empty}>Комплект ещё не сформирован.</p>}
-      {documents.length < 3 ? (
+      {!prepaymentDocumentsReady && canPrepare ? (
+        <Button appearance="primary" disabled={busy !== null} onClick={() => void prepare()}>
+          {busy === "prepare" ? <Spinner size="tiny" label="Формируем" /> : "Сформировать спецификацию и счёт"}
+        </Button>
+      ) : !prepaymentDocumentsReady ? <p className={styles.notice}>Счёт и спецификация станут доступны после подтверждения заказа.</p> : documents.length < 3 ? (
         shipment ? (
           <Button appearance="primary" disabled={busy !== null} onClick={() => void generate()}>
             {busy === "generate" ? <Spinner size="tiny" label="Формируем" /> : "Сформировать документы"}

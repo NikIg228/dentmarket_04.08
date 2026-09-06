@@ -924,8 +924,16 @@ export type CreateShipmentRequest = z.input<typeof createShipmentSchema>;
 export type TransitionShipmentRequest = z.input<typeof transitionShipmentSchema>;
 export type TransitionFulfillmentStepInput = z.infer<typeof transitionFulfillmentStepSchema>;
 
-export const documentKindSchema = z.enum(["MARKETPLACE_SUPPLIER_AGREEMENT", "MARKETPLACE_BUYER_TERMS", "FRAMEWORK_SUPPLY_AGREEMENT", "ORDER_SPECIFICATION", "ORDER_CONFIRMATION", "INVOICE", "WAYBILL", "ACCOMPANYING_DOCUMENT", "TAX_CLOSING_DOCUMENT", "INSTALLATION_ACT", "TRAINING_ACT", "WARRANTY", "COMMISSIONING_ACT", "REGISTRATION_CERTIFICATE", "LICENSE", "CERTIFICATE", "OTHER"]);
+export const documentKindSchema = z.enum(["MARKETPLACE_SUPPLIER_AGREEMENT", "MARKETPLACE_BUYER_TERMS", "FRAMEWORK_SUPPLY_AGREEMENT", "CONTRACT_ADDENDUM", "ORDER_SPECIFICATION", "ORDER_CONFIRMATION", "INVOICE", "PAYMENT_CONFIRMATION", "REFUND_CONFIRMATION", "WAYBILL", "ACCEPTANCE_ACT", "ACCOMPANYING_DOCUMENT", "TAX_CLOSING_DOCUMENT", "INSTALLATION_ACT", "TRAINING_ACT", "WARRANTY", "COMMISSIONING_ACT", "REGISTRATION_CERTIFICATE", "LICENSE", "CERTIFICATE", "OTHER"]);
 export const documentFormatSchema = z.enum(["PDF", "DOCX"]);
+export const documentCategorySchema = z.enum(["CONTRACT", "ORDER", "PAYMENT", "SHIPMENT", "CLOSING", "COMPLIANCE", "OTHER"]);
+export const documentAccountingStatusSchema = z.enum(["NOT_APPLICABLE", "PENDING_REVIEW", "REVIEWED", "RECONCILED", "DISPUTED"]);
+export const documentPartyRoleSchema = z.enum(["OWNER", "ISSUER", "RECIPIENT", "SIGNER", "PLATFORM"]);
+const documentAmountMinorSchema = z.string().regex(/^\d+$/);
+const documentMoneyFields = {
+  amountMinor: documentAmountMinorSchema.nullable().optional(),
+  currency: z.string().regex(/^[A-Z]{3}$/).nullable().optional(),
+};
 
 export const createDocumentTemplateSchema = z.object({
   code: z.string().trim().min(2).max(120).regex(/^[A-Z0-9_.-]+$/),
@@ -948,11 +956,21 @@ export const createGeneratedDocumentSchema = z.object({
   checkoutId: z.uuid().nullable().optional(),
   supplierOrderId: z.uuid().nullable().optional(),
   shipmentId: z.uuid().nullable().optional(),
+  paymentIntentId: z.uuid().nullable().optional(),
+  paymentTransactionId: z.uuid().nullable().optional(),
+  refundId: z.uuid().nullable().optional(),
+  baseAgreementDocumentId: z.uuid().nullable().optional(),
+  category: documentCategorySchema.optional(),
+  accountingStatus: documentAccountingStatusSchema.optional(),
   title: z.string().trim().min(2).max(240),
   documentNumber: z.string().trim().min(1).max(120),
+  documentDate: z.iso.datetime().optional(),
+  ...documentMoneyFields,
   data: z.record(z.string(), z.unknown()),
   expiresAt: z.iso.datetime().nullable().optional(),
   metadata: z.record(z.string(), z.unknown()).nullable().optional(),
+}).superRefine((value, context) => {
+  if ((value.amountMinor == null) !== (value.currency == null)) context.addIssue({ code: "custom", message: "Document amount and currency must be provided together" });
 });
 
 export const uploadDocumentSchema = z.object({
@@ -962,14 +980,24 @@ export const uploadDocumentSchema = z.object({
   checkoutId: z.uuid().nullable().optional(),
   supplierOrderId: z.uuid().nullable().optional(),
   shipmentId: z.uuid().nullable().optional(),
+  paymentIntentId: z.uuid().nullable().optional(),
+  paymentTransactionId: z.uuid().nullable().optional(),
+  refundId: z.uuid().nullable().optional(),
+  baseAgreementDocumentId: z.uuid().nullable().optional(),
+  category: documentCategorySchema.optional(),
+  accountingStatus: documentAccountingStatusSchema.optional(),
   title: z.string().trim().min(2).max(240),
   documentNumber: z.string().trim().min(1).max(120),
+  documentDate: z.iso.datetime().optional(),
+  ...documentMoneyFields,
   fileName: z.string().trim().min(1).max(255),
   contentBase64: z.string().min(1).max(16_000_000),
   requiredSignatureCount: z.number().int().nonnegative().max(20).default(0),
   expiresAt: z.iso.datetime().nullable().optional(),
   externalId: z.string().trim().max(240).nullable().optional(),
   metadata: z.record(z.string(), z.unknown()).nullable().optional(),
+}).superRefine((value, context) => {
+  if ((value.amountMinor == null) !== (value.currency == null)) context.addIssue({ code: "custom", message: "Document amount and currency must be provided together" });
 });
 
 export const createDocumentVersionSchema = z.object({
@@ -1001,6 +1029,12 @@ export const documentQuerySchema = z.object({
   status: z.enum(["DRAFT", "GENERATING", "GENERATED", "AWAITING_SIGNATURE", "PARTIALLY_SIGNED", "SIGNED", "REJECTED", "EXPIRED", "SUPERSEDED", "ARCHIVED", "FAILED"]).optional(),
   kind: documentKindSchema.optional(),
   limit: z.coerce.number().int().min(1).max(200).default(50),
+});
+
+export const updateDocumentAccountingStatusSchema = z.object({
+  status: documentAccountingStatusSchema.exclude(["NOT_APPLICABLE"]),
+  reason: z.string().trim().min(2).max(1_000),
+  expectedUpdatedAt: z.iso.datetime(),
 });
 
 export const organizationCredentialTypeSchema = z.enum(["BUSINESS_LICENSE", "MEDICAL_LICENSE", "WHOLESALE_LICENSE", "MEDICAL_DEVICE_SALE_NOTIFICATION", "REGISTRATION_CERTIFICATE", "DISTRIBUTOR_AUTHORIZATION", "QUALITY_CERTIFICATE", "OTHER"]);
@@ -1095,6 +1129,7 @@ export type CreateDocumentVersionInput = z.infer<typeof createDocumentVersionSch
 export type CreateSignatureSessionInput = z.infer<typeof createSignatureSessionSchema>;
 export type CompleteDocumentSignatureInput = z.infer<typeof completeDocumentSignatureSchema>;
 export type DocumentQueryInput = z.infer<typeof documentQuerySchema>;
+export type UpdateDocumentAccountingStatusInput = z.infer<typeof updateDocumentAccountingStatusSchema>;
 export type CreateOrganizationCredentialInput = z.infer<typeof createOrganizationCredentialSchema>;
 export type ReviewOrganizationCredentialInput = z.infer<typeof reviewOrganizationCredentialSchema>;
 export type CreateComplianceRuleInput = z.infer<typeof createComplianceRuleSchema>;

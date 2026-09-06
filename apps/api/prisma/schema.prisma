@@ -503,10 +503,14 @@ enum DocumentKind {
   MARKETPLACE_SUPPLIER_AGREEMENT
   MARKETPLACE_BUYER_TERMS
   FRAMEWORK_SUPPLY_AGREEMENT
+  CONTRACT_ADDENDUM
   ORDER_SPECIFICATION
   ORDER_CONFIRMATION
   INVOICE
+  PAYMENT_CONFIRMATION
+  REFUND_CONFIRMATION
   WAYBILL
+  ACCEPTANCE_ACT
   ACCOMPANYING_DOCUMENT
   TAX_CLOSING_DOCUMENT
   INSTALLATION_ACT
@@ -528,6 +532,32 @@ enum DocumentSource {
   GENERATED
   UPLOADED
   INTEGRATION
+}
+
+enum DocumentCategory {
+  CONTRACT
+  ORDER
+  PAYMENT
+  SHIPMENT
+  CLOSING
+  COMPLIANCE
+  OTHER
+}
+
+enum DocumentAccountingStatus {
+  NOT_APPLICABLE
+  PENDING_REVIEW
+  REVIEWED
+  RECONCILED
+  DISPUTED
+}
+
+enum DocumentPartyRole {
+  OWNER
+  ISSUER
+  RECIPIENT
+  SIGNER
+  PLATFORM
 }
 
 enum DocumentStatus {
@@ -1031,6 +1061,7 @@ model Organization {
   paymentAllocations                PaymentAllocation[]       @relation("PaymentAllocationRecipient")
   paymentMerchants                  PaymentMerchantAccount[]  @relation("PaymentMerchantOrganization")
   ownedDocuments                    Document[]                @relation("DocumentOwner")
+  documentParticipations            DocumentParticipant[]
   signedDocuments                   DocumentSignature[]       @relation("DocumentSignerOrganization")
   credentials                       OrganizationCredential[]
   sellerChecks                      ComplianceCheck[]         @relation("ComplianceSeller")
@@ -2343,6 +2374,7 @@ model PaymentIntent {
   refunds               Refund[]
   fees                  PaymentFee[]
   reconciliationEntries PaymentReconciliationEntry[]
+  documents             Document[]
   createdAt             DateTime                     @default(now())
   updatedAt             DateTime                     @updatedAt
 
@@ -2484,6 +2516,7 @@ model PaymentTransaction {
   refund                Refund?
   payout                Payout?
   reconciliationEntries PaymentReconciliationEntry[]
+  documents             Document[]
   createdAt             DateTime                     @default(now())
   updatedAt             DateTime                     @updatedAt
 
@@ -2541,6 +2574,7 @@ model Refund {
   supplierOrder          SupplierOrder       @relation(fields: [supplierOrderId], references: [id], onDelete: Restrict)
   supplierOrderItem      SupplierOrderItem?  @relation(fields: [supplierOrderItemId], references: [id], onDelete: Restrict)
   paymentTransaction     PaymentTransaction? @relation(fields: [paymentTransactionId], references: [id], onDelete: Restrict)
+  documents              Document[]
   createdAt              DateTime            @default(now())
   updatedAt              DateTime            @updatedAt
 
@@ -2832,13 +2866,22 @@ model Document {
   checkoutId             String?                 @db.Uuid
   supplierOrderId        String?                 @db.Uuid
   shipmentId             String?                 @db.Uuid
+  paymentIntentId        String?                 @db.Uuid
+  paymentTransactionId   String?                 @db.Uuid
+  refundId               String?                 @db.Uuid
+  baseAgreementDocumentId String?                @db.Uuid
   previousVersionId      String?                 @db.Uuid
   kind                   DocumentKind
+  category               DocumentCategory        @default(OTHER)
   format                 DocumentFormat
   source                 DocumentSource
   status                 DocumentStatus          @default(DRAFT)
+  accountingStatus       DocumentAccountingStatus @default(NOT_APPLICABLE)
   title                  String
   documentNumber         String
+  documentDate           DateTime                @default(now())
+  amountMinor            Decimal?                @db.Decimal(20, 0)
+  currency               String?                 @db.Char(3)
   version                Int                     @default(1)
   storageKey             String?
   fileName               String?
@@ -2859,9 +2902,15 @@ model Document {
   checkout               Checkout?               @relation(fields: [checkoutId], references: [id], onDelete: SetNull)
   supplierOrder          SupplierOrder?          @relation(fields: [supplierOrderId], references: [id], onDelete: SetNull)
   shipment               Shipment?               @relation(fields: [shipmentId], references: [id], onDelete: SetNull)
+  paymentIntent          PaymentIntent?           @relation(fields: [paymentIntentId], references: [id], onDelete: SetNull)
+  paymentTransaction     PaymentTransaction?      @relation(fields: [paymentTransactionId], references: [id], onDelete: SetNull)
+  refund                 Refund?                  @relation(fields: [refundId], references: [id], onDelete: SetNull)
+  baseAgreementDocument  Document?                @relation("DocumentAddenda", fields: [baseAgreementDocumentId], references: [id], onDelete: SetNull)
+  addenda                Document[]               @relation("DocumentAddenda")
   previousVersion        Document?               @relation("DocumentVersionChain", fields: [previousVersionId], references: [id], onDelete: SetNull)
   nextVersions           Document[]              @relation("DocumentVersionChain")
   signatures             DocumentSignature[]
+  participants           DocumentParticipant[]
   marketplaceAgreement   MarketplaceAgreement?
   buyerSupplierAgreement BuyerSupplierAgreement?
   createdAt              DateTime                @default(now())
@@ -2871,7 +2920,26 @@ model Document {
   @@index([supplierOrderId, kind, status])
   @@index([checkoutId, status])
   @@index([shipmentId, status])
+  @@index([paymentIntentId, status])
+  @@index([paymentTransactionId])
+  @@index([refundId])
+  @@index([baseAgreementDocumentId, kind])
+  @@index([category, documentDate])
+  @@index([accountingStatus, documentDate])
   @@index([ownerOrganizationId, status, expiresAt])
+}
+
+model DocumentParticipant {
+  documentId     String            @db.Uuid
+  organizationId String            @db.Uuid
+  role           DocumentPartyRole
+  document       Document          @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  createdAt      DateTime          @default(now())
+
+  @@id([documentId, organizationId, role])
+  @@index([organizationId, documentId])
+  @@index([documentId, role])
 }
 
 model BuyerSupplierAgreement {

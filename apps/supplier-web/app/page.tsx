@@ -645,7 +645,10 @@ export default function SupplierWorkspace() {
               ? "Доверие и география"
               : undefined
       }
-      onNavigate={setActive}
+      onNavigate={(item) => {
+        if (item === "documents") window.location.assign("/documents");
+        else setActive(item);
+      }}
       actions={
         <>
           <DmSelect

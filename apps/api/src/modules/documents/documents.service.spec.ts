@@ -57,3 +57,93 @@ describe("DocumentsService signature status", () => {
     }, { actorId: "user-a", organizationId: "organization-a" })).rejects.toThrow("Signer user must be the authenticated user");
   });
 });
+
+describe("DocumentsService archive", () => {
+  it("allows an agreement participant to read a supplier-owned document", async () => {
+    const prisma = {
+      document: { findUnique: vi.fn().mockResolvedValue({
+        id: "document",
+        ownerOrganizationId: "supplier",
+        participants: [{ organizationId: "buyer", role: "RECIPIENT" }],
+        supplierOrder: null,
+        buyerSupplierAgreement: null,
+        marketplaceAgreement: null,
+      }) },
+    };
+    const service = new DocumentsService(prisma as never, {} as never, {} as never, {} as never, {} as never);
+
+    const result = await service.get("document", { actorId: "buyer-user", organizationId: "buyer" });
+
+    expect(result.id).toBe("document");
+  });
+
+  it("applies the tenant graph to archive queries", async () => {
+    const prisma = {
+      organizationCapability: { findUnique: vi.fn().mockResolvedValue(null) },
+      document: { findMany: vi.fn().mockResolvedValue([]) },
+    };
+    const service = new DocumentsService(prisma as never, {} as never, {} as never, {} as never, {} as never);
+
+    await service.listArchive({ limit: 25 }, { actorId: "buyer-user", organizationId: "buyer" });
+
+    expect(prisma.document.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { AND: [expect.objectContaining({ OR: expect.arrayContaining([
+        { ownerOrganizationId: "buyer" },
+        { participants: { some: { organizationId: "buyer" } } },
+      ]) }), expect.any(Object)] },
+      take: 26,
+    }));
+  });
+
+  it("does not create payment evidence before payment is confirmed", async () => {
+    const prisma = {
+      supplierOrder: { findUnique: vi.fn().mockResolvedValue({
+        supplierOrganizationId: "supplier",
+        buyerOrganizationId: "buyer",
+        checkoutId: "checkout",
+        paymentStatus: "UNPAID",
+      }) },
+    };
+    const service = new DocumentsService(prisma as never, {} as never, {} as never, {} as never, {} as never);
+
+    await expect((service as any).assertReferences({
+      ownerOrganizationId: "supplier",
+      kind: "PAYMENT_CONFIRMATION",
+      supplierOrderId: "order",
+    })).rejects.toThrow("Payment confirmation requires a confirmed payment event");
+  });
+
+  it("does not expose a checkout-level document to every supplier in a multi-supplier checkout", async () => {
+    const prisma = {
+      checkout: { findUnique: vi.fn().mockResolvedValue({ buyerOrganizationId: "buyer" }) },
+    };
+    const service = new DocumentsService(prisma as never, {} as never, {} as never, {} as never, {} as never);
+
+    const parties = await (service as any).assertReferences({
+      ownerOrganizationId: "buyer",
+      kind: "OTHER",
+      checkoutId: "checkout",
+    });
+
+    expect(parties).toEqual([{ organizationId: "buyer", role: "RECIPIENT" }]);
+  });
+
+  it("uses optimistic locking for an accounting decision", async () => {
+    const prisma = {
+      document: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
+    };
+    const service = new DocumentsService(prisma as never, {} as never, {} as never, {} as never, {} as never);
+    vi.spyOn(service, "getArchive").mockResolvedValue({
+      id: "document",
+      category: "PAYMENT",
+      accountingStatus: "PENDING_REVIEW",
+      updatedAt: "2026-09-06T12:00:00.000Z",
+    } as never);
+
+    await expect(service.updateAccountingStatus("document", {
+      status: "REVIEWED",
+      reason: "Проверено бухгалтером",
+      expectedUpdatedAt: "2026-09-06T12:00:00.000Z",
+    }, { actorId: "buyer-user", organizationId: "buyer" })).rejects.toThrow("Document was changed by another user");
+  });
+});

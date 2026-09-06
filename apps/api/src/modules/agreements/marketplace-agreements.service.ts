@@ -54,6 +54,10 @@ export class MarketplaceAgreementsService {
     try {
       const agreement = await this.prisma.$transaction(async (tx) => {
         const created = await tx.marketplaceAgreement.create({ data: { agreementNumber, supplierOrganizationId: supplier.id, operatorOrganizationId: operator.id, documentId: document.id, templateId: template.id, templateVersion: template.version, status: "AWAITING_SIGNATURE", renewalMode: input.renewalMode, autoRenew: input.renewalMode === "AUTO_ANNUAL", metadata: { initiatedByOrganizationId: context.organizationId } } });
+        await tx.documentParticipant.createMany({ data: [
+          { documentId: document.id, organizationId: supplier.id, role: "ISSUER" },
+          { documentId: document.id, organizationId: operator.id, role: "PLATFORM" },
+        ], skipDuplicates: true });
         await tx.auditLog.create({ data: { ...context, organizationId: supplier.id, action: "marketplace_agreement.initiated", entityType: "MarketplaceAgreement", entityId: created.id, after: { agreementNumber, operatorOrganizationId: operator.id, templateVersion: template.version, renewalMode: input.renewalMode } } });
         await tx.outboxEvent.create({ data: { aggregateType: "MarketplaceAgreement", aggregateId: created.id, eventType: "MarketplaceAgreementInitiated", payload: { agreementId: created.id, supplierOrganizationId: supplier.id, operatorOrganizationId: operator.id, documentId: document.id } } });
         return created;

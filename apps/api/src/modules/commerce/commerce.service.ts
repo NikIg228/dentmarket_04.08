@@ -915,7 +915,7 @@ export class CommerceService {
             },
             paymentAllocation: true,
             documents: {
-              where: { kind: { in: ["ORDER_SPECIFICATION", "INVOICE", "WAYBILL"] }, shipmentId: { not: null } },
+              where: { kind: { in: ["ORDER_SPECIFICATION", "INVOICE", "WAYBILL"] } },
               orderBy: [{ kind: "asc" }, { version: "desc" }],
             },
           },
@@ -971,7 +971,7 @@ export class CommerceService {
           orderBy: { createdAt: "desc" },
         },
         documents: {
-          where: { kind: { in: ["ORDER_SPECIFICATION", "INVOICE", "WAYBILL"] }, shipmentId: { not: null } },
+          where: { kind: { in: ["ORDER_SPECIFICATION", "INVOICE", "WAYBILL"] } },
           orderBy: [{ kind: "asc" }, { version: "desc" }],
         },
       },
@@ -1008,7 +1008,7 @@ export class CommerceService {
           orderBy: { createdAt: "desc" },
         },
         documents: {
-          where: { kind: { in: ["ORDER_SPECIFICATION", "INVOICE", "WAYBILL"] }, shipmentId: { not: null } },
+          where: { kind: { in: ["ORDER_SPECIFICATION", "INVOICE", "WAYBILL"] } },
           orderBy: [{ kind: "asc" }, { version: "desc" }],
         },
       },

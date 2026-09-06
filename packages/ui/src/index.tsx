@@ -1,5 +1,7 @@
 "use client";
 
+export * from "./document-archive";
+
 import {
   Avatar,
   Button,

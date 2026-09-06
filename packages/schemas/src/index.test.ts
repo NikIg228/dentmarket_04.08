@@ -3,6 +3,7 @@ import { addCartItemSchema, approveProductCandidateSchema, captureMockPaymentSch
 import { createRegistrationIntentSchema, mfaCodeSchema, socialExchangeSchema, updateConnectorReadinessSchema } from "./index.js";
 import { decideProductCorrectionSchema, submitProductCorrectionSchema } from "./index.js";
 import { generateOrderDocumentPackSchema } from "./index.js";
+import { createGeneratedDocumentSchema, documentArchiveQuerySchema, updateDocumentAccountingStatusSchema, uploadDocumentSchema } from "./index.js";
 import { rollbackImportBatchSchema, supplierImportBatchResponseSchema, supplierImportDiagnosticsResponseSchema, supplierImportRollbackResponseSchema } from "./index.js";
 
 describe("createOrganizationSchema", () => {
@@ -24,6 +25,24 @@ describe("createOrganizationSchema", () => {
       capabilities: ["SUPPLIER"],
     });
     expect(result.success).toBe(false);
+  });
+});
+
+describe("document archive schemas", () => {
+  it("normalizes pagination and validates a date range", () => {
+    expect(documentArchiveQuerySchema.parse({ limit: "25" }).limit).toBe(25);
+    expect(documentArchiveQuerySchema.safeParse({ dateFrom: "2026-09-07T00:00:00.000Z", dateTo: "2026-09-06T00:00:00.000Z" }).success).toBe(false);
+  });
+
+  it("requires amount and currency as one immutable snapshot", () => {
+    const generated = { ownerOrganizationId: "00000000-0000-4000-8000-000000000020", templateId: "00000000-0000-4000-8000-000000000021", title: "Счёт", documentNumber: "INV-1", amountMinor: "125000", data: {} };
+    expect(createGeneratedDocumentSchema.safeParse(generated).success).toBe(false);
+    expect(createGeneratedDocumentSchema.safeParse({ ...generated, currency: "KZT" }).success).toBe(true);
+    expect(uploadDocumentSchema.safeParse({ ownerOrganizationId: generated.ownerOrganizationId, kind: "INVOICE", format: "PDF", title: generated.title, documentNumber: generated.documentNumber, fileName: "invoice.pdf", contentBase64: "cGRm", amountMinor: "125000" }).success).toBe(false);
+  });
+
+  it("does not allow clearing an accounting decision to not-applicable", () => {
+    expect(updateDocumentAccountingStatusSchema.safeParse({ status: "NOT_APPLICABLE", reason: "reset", expectedUpdatedAt: "2026-09-06T00:00:00.000Z" }).success).toBe(false);
   });
 });
 
