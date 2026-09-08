@@ -64,6 +64,7 @@ jobs:
       - run: npm run build
       - run: npm run verify:observability
       - run: npm run verify:runtime-split
+      - run: npm run verify:pilot-composition
       - run: npm run verify:core-contract
       - run: npm run verify:production-config
       - run: npm run verify:rate-limit-auth

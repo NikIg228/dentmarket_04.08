@@ -105,7 +105,7 @@ Codex Security Standard scan `be32fbfe-a26c-4db7-834f-fcf406df8b00` выполн
 | --- | --- | --- |
 | Локальная разработка | GO | install/build/unit/contract/PostgreSQL gates воспроизводимы |
 | Controlled demo на pilot fixtures | GO с оговорками | основной procurement flow и 10/10/500 fixture подтверждены; использовать mock/manual providers |
-| Ограниченный пилот без денежных и юридических обещаний | CONDITIONAL GO | локальный B4.6 baseline зелёный; нужны runtime-граница pilot и заранее зафиксированные manual fallbacks |
+| Ограниченный пилот без денежных и юридических обещаний | CONDITIONAL GO | локальный B4.6 baseline и runtime-граница pilot зелёные; нужны заранее зафиксированные manual fallbacks и deployment evidence |
 | Production go-live | NO-GO | CWE-319 закрыт; открыты production B4.6, live PSP/EDS/connectors/notifications и provider-managed infrastructure gates |
 
 ## 7. Неизменённые границы

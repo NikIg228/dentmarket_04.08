@@ -33,7 +33,7 @@ const environmentSchema = z
     NODE_ENV: z
       .enum(["development", "test", "production"])
       .default("development"),
-    DEPLOYMENT_PROFILE: z.enum(["go_live", "pilot"]).default("go_live"),
+    DEPLOYMENT_PROFILE: z.enum(["go_live", "pilot"]).default("pilot"),
     PROCESS_ROLE: z.enum(["api", "worker", "all"]).default("api"),
     DATABASE_URL: z.string().min(1),
     API_HOST: z.string().default("0.0.0.0"),

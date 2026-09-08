@@ -236,10 +236,18 @@ timed restore drill. Сейчас это foundation или локальный ev
 
 #### P1.1. Реальная runtime-граница pilot
 
-`DEPLOYMENT_PROFILE=pilot` почти не меняет composition приложения: `AppModule`
-поднимает все 30 доменных модулей, включая AI, billing, promotions и trust.
-Нужен явный module/feature composition, чтобы неподтверждённый функционал нельзя
-было случайно экспонировать, запускать по scheduler или включить одним seed flag.
+**Статус:** [x] Закрыто 2026-09-08.
+
+`DEPLOYMENT_PROFILE=pilot` теперь исключает из Nest graph AI, billing,
+promotions, trust/reviews и smart recommendations. Смешанный TrustCommerce
+разделён: geo/address остаётся в pilot core, trust и recommendations доступны
+только в `go_live`. Отсутствующая переменная безопасно выбирает `pilot`.
+
+`npm run verify:pilot-composition` подтвердил 36 pilot modules/224 routes без
+out-of-scope surface и 41 go-live modules/257 routes с optional surface. Full
+workspace typecheck/test/build, core contract, PostgreSQL, runtime split,
+production config, pilot backend, multi-instance Redis, outbound security и
+dependency audit прошли. Архитектурное решение закреплено ADR 009.
 
 #### P1.2. Точность manual price override
 
@@ -344,9 +352,9 @@ rewrite сейчас увеличат риск и отбросят проект 
 
 ### Этап 3 — pilot runtime boundary
 
-1. Сформировать явный composition для pilot и go-live.
-2. Отключить out-of-scope controllers, schedulers и features по умолчанию.
-3. Добавить route/module inventory assertion для каждого profile.
+1. [x] Сформировать явный composition для pilot и go-live.
+2. [x] Отключить out-of-scope controllers/providers по безопасному default.
+3. [x] Добавить route/module inventory assertion для каждого profile и CI.
 
 ### Этап 4 — contracts и maintainability
 

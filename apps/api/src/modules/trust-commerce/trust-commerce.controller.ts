@@ -1,17 +1,15 @@
 import { BadRequestException, Body, Controller, Get, Headers, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
-import { createOrderCommentSchema, createProductGapSchema, createTrustAppealSchema, createVerifiedReviewSchema, decideTrustAppealSchema, moderateVerifiedReviewSchema, recordTrustMetricSchema, respondVerifiedReviewSchema, smartRecommendationSchema, updateDeliveryZoneGeoSchema, updateGeoPointSchema, updateOrderCommentSchema, updateProductGapSchema, updateVerifiedReviewSchema, verifyGeoPointSchema } from "@marketplace/schemas";
+import { createOrderCommentSchema, createProductGapSchema, createTrustAppealSchema, createVerifiedReviewSchema, decideTrustAppealSchema, moderateVerifiedReviewSchema, recordTrustMetricSchema, respondVerifiedReviewSchema, updateOrderCommentSchema, updateProductGapSchema, updateVerifiedReviewSchema } from "@marketplace/schemas";
 import { PermissionsGuard } from "../access-control/permissions.guard";
 import { RequirePermissions } from "../access-control/require-permissions.decorator";
-import { GeoCommerceService } from "./geo-commerce.service";
-import { SmartRecommendationService } from "./smart-recommendation.service";
 import { TrustCommerceService } from "./trust-commerce.service";
 
 @ApiTags("trust-commerce")
 @UseGuards(PermissionsGuard)
 @Controller()
 export class TrustCommerceController {
-  constructor(private readonly trust: TrustCommerceService, private readonly geo: GeoCommerceService, private readonly recommendations: SmartRecommendationService) {}
+  constructor(private readonly trust: TrustCommerceService) {}
   private context(actorId: string, organizationId: string) { return { actorId, organizationId }; }
   private parse<T>(schema: { safeParse(value: unknown): { success: true; data: T } | { success: false; error: { flatten(): unknown } } }, body: unknown) { const parsed = schema.safeParse(body); if (!parsed.success) throw new BadRequestException(parsed.error.flatten()); return parsed.data; }
 
@@ -59,19 +57,4 @@ export class TrustCommerceController {
   @Post("trust/rating-appeals/:appealId/decision") @RequirePermissions("trust.rating.manage")
   decideRatingAppeal(@Param("appealId") appealId: string, @Body() body: unknown, @Headers("x-user-id") actorId: string, @Headers("x-organization-id") organizationId: string) { return this.trust.decideRatingAppeal(appealId, this.parse(decideTrustAppealSchema, body), this.context(actorId, organizationId)); }
 
-  @Get("geo/addresses") @RequirePermissions("geo.view")
-  addresses(@Headers("x-user-id") actorId: string, @Headers("x-organization-id") organizationId: string) { return this.geo.organizationAddresses(this.context(actorId, organizationId)); }
-  @Patch("geo/addresses/:addressId") @RequirePermissions("geo.manage")
-  updateAddress(@Param("addressId") addressId: string, @Body() body: unknown, @Headers("x-user-id") actorId: string, @Headers("x-organization-id") organizationId: string) { return this.geo.updateAddress(addressId, this.parse(updateGeoPointSchema, body), this.context(actorId, organizationId)); }
-  @Post("geo/addresses/:addressId/verification") @RequirePermissions("geo.verify")
-  verifyAddress(@Param("addressId") addressId: string, @Body() body: unknown, @Headers("x-user-id") actorId: string, @Headers("x-organization-id") organizationId: string) { return this.geo.verifyAddress(addressId, this.parse(verifyGeoPointSchema, body), this.context(actorId, organizationId)); }
-  @Patch("geo/warehouses/:warehouseId") @RequirePermissions("geo.manage")
-  updateWarehouse(@Param("warehouseId") warehouseId: string, @Body() body: unknown, @Headers("x-user-id") actorId: string, @Headers("x-organization-id") organizationId: string) { const parsed = this.parse(updateGeoPointSchema, body); return this.geo.updateWarehouse(warehouseId, parsed, this.context(actorId, organizationId)); }
-  @Post("geo/warehouses/:warehouseId/verification") @RequirePermissions("geo.verify")
-  verifyWarehouse(@Param("warehouseId") warehouseId: string, @Body() body: unknown, @Headers("x-user-id") actorId: string, @Headers("x-organization-id") organizationId: string) { return this.geo.verifyWarehouse(warehouseId, this.parse(verifyGeoPointSchema, body), this.context(actorId, organizationId)); }
-  @Patch("geo/delivery-zones/:zoneId") @RequirePermissions("geo.manage")
-  updateZone(@Param("zoneId") zoneId: string, @Body() body: unknown, @Headers("x-user-id") actorId: string, @Headers("x-organization-id") organizationId: string) { return this.geo.updateZone(zoneId, this.parse(updateDeliveryZoneGeoSchema, body), this.context(actorId, organizationId)); }
-
-  @Post("recommendations/smart") @RequirePermissions("recommendation.use")
-  recommend(@Body() body: unknown, @Headers("x-user-id") actorId: string, @Headers("x-organization-id") organizationId: string) { return this.recommendations.recommend(this.parse(smartRecommendationSchema, body), this.context(actorId, organizationId)); }
 }

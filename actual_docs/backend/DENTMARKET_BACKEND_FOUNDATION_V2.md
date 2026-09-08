@@ -123,19 +123,22 @@ DentMarket — B2B-маркетплейс стоматологических т�
 
 ## 5. Главные технические проблемы
 
-### P0. Нет реальной границы пилота
+### P0. Реальная граница пилота
 
-`DEPLOYMENT_PROFILE=pilot` валидируется, но почти не меняет состав приложения. `AppModule` поднимает все 29 доменных модулей. Вместе с HTTP API запускаются плановые процессы agreements, compliance, integrations, notifications, payment retry и search projection.
+- [x] `DEPLOYMENT_PROFILE=pilot` формирует отдельный Nest module graph и не
+      импортирует AI, billing, promotions, trust/reviews и smart
+      recommendations.
+- [x] Geo/address routes отделены от прежнего смешанного TrustCommerce module и
+      остаются в procurement core.
+- [x] Отсутствующая переменная fail-safe выбирает `pilot`; production явно
+      указывает `go_live`.
+- [x] `npm run verify:pilot-composition` проверяет фактические modules и OpenAPI
+      routes для default/pilot/go_live; gate включён в CI.
 
-Последствия:
-
-- невозможно доказать, что пилот зависит только от согласованного ядра;
-- ошибка во второстепенной enterprise-функции может уронить основной API;
-- запуск и диагностика сложнее;
-- несколько экземпляров API одновременно запускают фоновые циклы;
-- партнёр может случайно расширять scope вместо завершения покупки.
-
-Решение: ввести явные `CoreMarketplaceModule`, `OperationsModule`, `EnterpriseModule` и runtime-role `api | worker | all`. На первом этапе не удалять код — отключить необязательные runtime-функции в пилоте и заморозить их развитие.
+Решение и последствия закреплены ADR 009 и
+`actual_docs/operations/deployment-profiles.md`. Runtime-role `api | worker |
+all` остаётся отдельной осью process composition и уже проверяется
+`verify:runtime-split`.
 
 ### P0. OpenAPI не является контрактом frontend/backend
 

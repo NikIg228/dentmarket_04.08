@@ -31,18 +31,16 @@ import { BackgroundJobsModule } from "./platform/jobs/background-jobs.module";
 import { SecurityModule } from "./platform/security/security.module";
 import { MfaModule } from "./modules/identity/mfa.module";
 import { AuthSessionsModule } from "./modules/identity/auth-sessions.module";
-import { PromotionsModule } from "./modules/promotions/promotions.module";
 import { SupportModule } from "./modules/support/support.module";
 import { OwnersModule } from "./modules/owners/owners.module";
-import { BillingModule } from "./modules/billing/billing.module";
-import { AiModule } from "./modules/ai/ai.module";
 import { MarketplaceAgreementsModule } from "./modules/agreements/marketplace-agreements.module";
-import { TrustCommerceModule } from "./modules/trust-commerce/trust-commerce.module";
 import { OnboardingModule } from "./modules/onboarding/onboarding.module";
 import { BuyerSupplierAgreementsModule } from "./modules/buyer-supplier-agreements/buyer-supplier-agreements.module";
 import { OperationsModule } from "./modules/operations/operations.module";
+import { GeoCommerceModule } from "./modules/trust-commerce/geo-commerce.module";
 import { runtimeCapabilities } from "./platform/runtime/process-role";
 import { RuntimeReadinessService } from "./platform/runtime/runtime-readiness.service";
+import { deploymentProfileModules } from "./platform/runtime/deployment-profile.modules";
 import { OutboxModule } from "./platform/outbox/outbox.module";
 import { ObservabilityModule } from "./platform/observability/observability.module";
 import { RedisThrottlerStorage } from "./platform/security/rate-limit.storage";
@@ -112,13 +110,11 @@ const runtime = runtimeCapabilities(config.PROCESS_ROLE);
     BuyerSupplierAgreementsModule,
     NotificationsModule,
     SearchModule,
-    PromotionsModule,
+    GeoCommerceModule,
     SupportModule,
     OwnersModule,
-    BillingModule,
-    AiModule,
-    TrustCommerceModule,
     OperationsModule,
+    ...deploymentProfileModules(config.DEPLOYMENT_PROFILE),
   ],
   controllers: [HealthController],
   providers: [

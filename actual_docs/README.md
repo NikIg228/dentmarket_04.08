@@ -78,6 +78,7 @@
 ### `operations/` — эксплуатация и production
 
 - [Operations](operations/operations.md)
+- [Deployment profiles](operations/deployment-profiles.md)
 - [Production deployment](operations/production-deployment.md)
 - [Production go-live checklist](operations/production-go-live-checklist.md)
 - [SLA и incident response](operations/sla-incident-response.md)

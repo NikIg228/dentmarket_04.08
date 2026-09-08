@@ -54,6 +54,7 @@
     "verify:search-commerce": "node scripts/verify-search-commerce.mjs",
     "verify:core-contract": "npm run build --workspace=@marketplace/schemas && npm run build --workspace=@marketplace/api && node scripts/verify-pilot-backend.mjs --contract-only",
     "verify:runtime-split": "npm run build --workspace=@marketplace/api && node scripts/verify-runtime-split.mjs",
+    "verify:pilot-composition": "npm run build --workspace=@marketplace/api && node scripts/verify-pilot-composition.mjs",
     "verify:outbox": "npm exec --workspace=@marketplace/api -- vitest run src/platform/outbox/outbox-dispatcher.service.spec.ts src/modules/integrations/payment-captured.outbox-handler.spec.ts src/modules/operations/operations.service.spec.ts",
     "verify:seed-profiles": "npm run db:seed:reference && npm run db:seed:operator && npm run db:seed:test && npm run db:seed:pilot",
     "verify:postgres": "npm run build --workspace=@marketplace/schemas && npm run build --workspace=@marketplace/api && node scripts/verify-postgres-integration.mjs",

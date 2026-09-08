@@ -13,6 +13,7 @@ const requiredFiles = [
   "scripts/verify-restore-drill.sh",
   "actual_docs/operations/backup-restore-runbook.md",
   "actual_docs/operations/production-deployment.md",
+  "actual_docs/operations/deployment-profiles.md",
   "actual_docs/operations/production-auth-runbook.md",
   ".github/workflows/release.yml",
   ".github/workflows/security.yml",
@@ -31,6 +32,7 @@ for (const file of requiredFiles) {
 const valid = {
   ...process.env,
   NODE_ENV: "production",
+  DEPLOYMENT_PROFILE: "go_live",
   DATABASE_URL:
     "postgresql://user:password@db.example.kz:5432/marketplace?sslmode=require",
   REDIS_URL: "rediss://default:password@redis.example.kz:6379",

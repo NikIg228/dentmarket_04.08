@@ -2,6 +2,8 @@
 
 Нагрузочный профиль controlled pilot, фиксированные SLO и multi-instance Redis
 correctness gate описаны в [`b4-6-load-profile.md`](b4-6-load-profile.md).
+Runtime-состав `pilot`/`go_live` и fail-safe default описаны в
+[`deployment-profiles.md`](deployment-profiles.md).
 
 ## Компоненты
 
