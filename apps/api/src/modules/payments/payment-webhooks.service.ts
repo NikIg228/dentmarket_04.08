@@ -5,6 +5,11 @@ import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../platform/prisma/prisma.service";
 import { PaymentSettlementService } from "./payment-settlement.service";
 
+export function paymentWebhookSecret(providerCode: string) {
+  if (providerCode !== "MOCK" && process.env.PAYMENT_PROVIDER_MODE === "external") return process.env.PAYMENT_WEBHOOK_SECRET_EXTERNAL;
+  return process.env[`PAYMENT_WEBHOOK_SECRET_${providerCode}`];
+}
+
 @Injectable()
 export class PaymentWebhooksService {
   private running = false;
@@ -17,7 +22,7 @@ export class PaymentWebhooksService {
     const payload = this.parse(rawBody);
     const signature = this.header(headers, "x-payment-signature");
     const timestamp = this.header(headers, "x-payment-timestamp");
-    const secret = process.env[`PAYMENT_WEBHOOK_SECRET_${provider.code}`];
+    const secret = paymentWebhookSecret(provider.code);
     const verified = secret ? this.verify(rawBody, signature, secret, timestamp) : provider.code === "MOCK" && process.env.NODE_ENV !== "production";
     if (!verified) throw new UnauthorizedException("Invalid payment webhook signature");
     const externalEventId = typeof payload.id === "string" && payload.id.length > 0 ? payload.id : createHash("sha256").update(rawBody).digest("hex");

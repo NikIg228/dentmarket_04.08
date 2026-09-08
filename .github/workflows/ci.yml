@@ -67,6 +67,7 @@ jobs:
       - run: npm run verify:pilot-composition
       - run: npm run verify:core-contract
       - run: npm run verify:production-config
+      - run: npm run verify:production-readiness-contract
       - run: npm run verify:rate-limit-auth
       - run: npm audit --omit=dev --audit-level=high
       - run: docker compose config --quiet

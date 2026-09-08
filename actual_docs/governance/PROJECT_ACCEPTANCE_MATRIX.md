@@ -368,3 +368,19 @@ tracked files with `0` reportable findings. Application security is now
       module и OpenAPI route inventory; gate включён в CI.
 - [x] Full workspace, core/PostgreSQL/runtime/config/pilot, multi-instance Redis,
       outbound security и dependency gates прошли.
+
+## Current production readiness contract update (2026-09-08)
+
+- [x] Production config запрещает неподписанные PSP webhooks,
+      неаутентифицированный ЭЦП gateway, отсутствующий email/SMS, PostgreSQL без
+      обязательного TLS и Redis без `rediss://`.
+- [x] Configuration/reachability preflight не раскрывает secrets, запрещает
+      redirects и cross-origin bearer token delivery.
+- [x] Evidence gate требует 20 provider/infrastructure checks, approvals
+      engineering/security/product operations/legal и immutable revision.
+- [x] `npm run typecheck` 15/15, `npm test` 14/14 (API 200/200), build 10/10,
+      production config/readiness/auth, core, PostgreSQL, runtime, pilot и
+      outbound security gates прошли.
+- [ ] Реальные credentials, provider tenants и managed deployment contour не
+      предоставлены; preflight и evidence template корректно завершились
+      ненулевым кодом, поэтому `LIVE_VERIFIED` не заявлен.

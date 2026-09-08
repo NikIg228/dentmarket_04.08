@@ -466,7 +466,7 @@ Gate: одна клиника оформляет заказы у одного и
 | [x]    | B2.1 | Полное/частичное подтверждение supplier order      | `pnpm verify:flow-b2`   |
 | [x]    | B2.2 | Статус отгрузки, уведомление клиники и audit trail | `pnpm verify:flow-b2`   |
 | [x]    | B2.3 | Минимальные документы заказа и отгрузки            | PostgreSQL + Playwright |
-| [x]    | B2.4 | Единый архив документов Buyer/Supplier              | PostgreSQL + Playwright |
+| [x]    | B2.4 | Единый архив документов Buyer/Supplier             | PostgreSQL + Playwright |
 
 1. список новых заказов;
 2. подтверждение полного или частичного количества;
@@ -749,6 +749,24 @@ production connectors не входят в фазу; compensating rollback за�
 Команды, thresholds, ограничения и raw evidence описаны в
 `actual_docs/operations/b4-6-load-profile.md`.
 
+Production provider/infrastructure readiness:
+
+- [x] `npm run verify:production-config` требует внешний PSP с подписанным
+      webhook, аутентифицированный ЭЦП gateway, email/SMS, PostgreSQL TLS,
+      `rediss://`, encrypted S3 и observability.
+- [x] `npm run verify:production-readiness-contract` покрывает configuration,
+      placeholder rejection, health-origin binding и evidence validation.
+- [x] `npm run verify:production-connectors` имеет раздельные configuration и
+      reachability результаты и никогда не заявляет business `LIVE_VERIFIED`.
+- [x] `npm run verify:live-evidence` требует 20 реальных сценариев, четыре
+      approvals, свежесть и совпадение полного git SHA.
+- [ ] PSP/ЭЦП/supplier/email/SMS и managed infrastructure остаются внешними
+      gates до появления credentials, deployment contour и receipts.
+
+Runbook и незаполненный template находятся в
+`actual_docs/operations/live-provider-readiness.md` и
+`actual_docs/operations/live-evidence.template.json`.
+
 Выполнено в B4.1:
 
 - [x] Защищённый отдельным `METRICS_BEARER_TOKEN` endpoint `GET /api/metrics`
@@ -879,7 +897,7 @@ deployment evidence; политика сохраняет RPO 15 минут и RT
       runtime split, core contract, platform authority и browser 17/17.
 
 - [x] B4.5-R2A закрывает organization enumeration/capability disclosure: `GET
-      /organizations` передаёт actor/tenant context в `OrganizationsService`,
+    /organizations` передаёт actor/tenant context в `OrganizationsService`,
       а `PlatformAuthorityPolicy` разрешает unscoped capability projection только
       активному marketplace operator.
 - [x] Supplier/buyer с обычным `organization.view` получает `403` до Prisma

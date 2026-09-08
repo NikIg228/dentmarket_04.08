@@ -1,0 +1,173 @@
+{
+  "schemaVersion": 1,
+  "environment": "staging",
+  "revision": "REPLACE_WITH_FULL_GIT_SHA",
+  "release": "REPLACE_WITH_IMMUTABLE_RELEASE",
+  "window": {
+    "startedAt": "REPLACE_WITH_ISO_TIMESTAMP",
+    "endedAt": "REPLACE_WITH_ISO_TIMESTAMP"
+  },
+  "checks": [
+    {
+      "id": "psp.capture",
+      "status": "pending",
+      "observedAt": null,
+      "reference": null,
+      "actor": null
+    },
+    {
+      "id": "psp.refund",
+      "status": "pending",
+      "observedAt": null,
+      "reference": null,
+      "actor": null
+    },
+    {
+      "id": "psp.webhook",
+      "status": "pending",
+      "observedAt": null,
+      "reference": null,
+      "actor": null
+    },
+    {
+      "id": "eds.session",
+      "status": "pending",
+      "observedAt": null,
+      "reference": null,
+      "actor": null
+    },
+    {
+      "id": "eds.callback",
+      "status": "pending",
+      "observedAt": null,
+      "reference": null,
+      "actor": null
+    },
+    {
+      "id": "eds.legal_signoff",
+      "status": "pending",
+      "observedAt": null,
+      "reference": null,
+      "actor": null
+    },
+    {
+      "id": "supplier.test_connection",
+      "status": "pending",
+      "observedAt": null,
+      "reference": null,
+      "actor": null
+    },
+    {
+      "id": "supplier.catalog_sync",
+      "status": "pending",
+      "observedAt": null,
+      "reference": null,
+      "actor": null
+    },
+    {
+      "id": "supplier.price_sync",
+      "status": "pending",
+      "observedAt": null,
+      "reference": null,
+      "actor": null
+    },
+    {
+      "id": "supplier.stock_sync",
+      "status": "pending",
+      "observedAt": null,
+      "reference": null,
+      "actor": null
+    },
+    {
+      "id": "supplier.order_export",
+      "status": "pending",
+      "observedAt": null,
+      "reference": null,
+      "actor": null
+    },
+    {
+      "id": "notification.email_delivery",
+      "status": "pending",
+      "observedAt": null,
+      "reference": null,
+      "actor": null
+    },
+    {
+      "id": "notification.sms_delivery",
+      "status": "pending",
+      "observedAt": null,
+      "reference": null,
+      "actor": null
+    },
+    {
+      "id": "infrastructure.postgresql_pitr_restore",
+      "status": "pending",
+      "observedAt": null,
+      "reference": null,
+      "actor": null
+    },
+    {
+      "id": "infrastructure.redis_ha_failover",
+      "status": "pending",
+      "observedAt": null,
+      "reference": null,
+      "actor": null
+    },
+    {
+      "id": "infrastructure.object_storage_versioning_restore",
+      "status": "pending",
+      "observedAt": null,
+      "reference": null,
+      "actor": null
+    },
+    {
+      "id": "infrastructure.dns_tls",
+      "status": "pending",
+      "observedAt": null,
+      "reference": null,
+      "actor": null
+    },
+    {
+      "id": "infrastructure.monitoring_alert_delivery",
+      "status": "pending",
+      "observedAt": null,
+      "reference": null,
+      "actor": null
+    },
+    {
+      "id": "infrastructure.timed_restore_drill",
+      "status": "pending",
+      "observedAt": null,
+      "reference": null,
+      "actor": null
+    },
+    {
+      "id": "performance.staging_soak",
+      "status": "pending",
+      "observedAt": null,
+      "reference": null,
+      "actor": null
+    }
+  ],
+  "approvals": [
+    {
+      "role": "engineering",
+      "approver": null,
+      "approvedAt": null,
+      "reference": null
+    },
+    {
+      "role": "security",
+      "approver": null,
+      "approvedAt": null,
+      "reference": null
+    },
+    {
+      "role": "product_operations",
+      "approver": null,
+      "approvedAt": null,
+      "reference": null
+    },
+    { "role": "legal", "approver": null, "approvedAt": null, "reference": null }
+  ]
+}

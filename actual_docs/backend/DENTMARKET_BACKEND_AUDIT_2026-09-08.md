@@ -227,10 +227,18 @@ Redis-compatible runtime и проверяет общий rate-limit state.
 
 #### P0.3. Внешние и эксплуатационные gates
 
-До production нужны реальные PSP capture/refund/webhook, квалифицированная ЭЦП
-и legal sign-off, один supplier connector, email/SMS, managed PostgreSQL PITR,
-Redis HA, object-storage versioning/retention, DNS/TLS, external monitoring и
-timed restore drill. Сейчас это foundation или локальный evidence, не live.
+- [x] Production config теперь fail-closed требует PSP webhook secret,
+      аутентифицированный ЭЦП gateway, email/SMS, PostgreSQL TLS и `rediss://`.
+- [x] `verify:production-connectors` разделяет configuration и reachability,
+      запрещает redirects и передачу bearer token на другой origin.
+- [x] `verify:live-evidence` проверяет 20 provider/infrastructure сценариев,
+      четыре approvals, freshness и immutable git SHA; template намеренно
+      красный до появления реальных receipts.
+- [ ] Реальные PSP capture/refund/webhook, квалифицированная ЭЦП и legal
+      sign-off, один supplier connector, email/SMS delivery receipts, managed
+      PostgreSQL PITR, Redis HA, object-storage versioning/retention, DNS/TLS,
+      external monitoring, timed restore и staging soak не выполнены: credentials
+      и deployment contour на текущей машине отсутствуют.
 
 ### P1 — закрыть до расширения пилота
 
@@ -365,11 +373,12 @@ rewrite сейчас увеличат риск и отбросят проект 
 
 ### Этап 5 — live pilot evidence
 
-1. Один реальный supplier connector; остальные поставщики используют file flow.
-2. Выбранный PSP или явно утверждённый off-platform payment process.
-3. Реальный EDS/legal/document path либо утверждённый manual fallback.
-4. Live email/notification и production storage.
-5. Provider-managed backup/restore, monitoring и incident rehearsal.
+1. [x] Зафиксировать fail-closed configuration/reachability/evidence contract.
+2. [ ] Один реальный supplier connector; остальные поставщики используют file flow.
+3. [ ] Выбранный PSP или явно утверждённый off-platform payment process.
+4. [ ] Реальный EDS/legal/document path либо утверждённый manual fallback.
+5. [ ] Live email/SMS notification и production storage.
+6. [ ] Provider-managed backup/restore, monitoring и incident rehearsal.
 
 ## 7. Обязательные gates для следующего backend change set
 

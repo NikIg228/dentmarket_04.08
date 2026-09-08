@@ -14,9 +14,15 @@ const requiredFiles = [
   "actual_docs/operations/backup-restore-runbook.md",
   "actual_docs/operations/production-deployment.md",
   "actual_docs/operations/deployment-profiles.md",
+  "actual_docs/operations/live-provider-readiness.md",
+  "actual_docs/operations/live-evidence.template.json",
   "actual_docs/operations/production-auth-runbook.md",
   ".github/workflows/release.yml",
   ".github/workflows/security.yml",
+  "scripts/lib/production-readiness.mjs",
+  "scripts/production-readiness.test.mjs",
+  "scripts/verify-production-connectors.mjs",
+  "scripts/verify-live-evidence.mjs",
 ];
 for (const file of requiredFiles) {
   let nonEmpty = false;
@@ -57,10 +63,12 @@ const valid = {
   SUPABASE_URL: "https://storage.example.kz",
   SUPABASE_SERVICE_ROLE_KEY: "u".repeat(32),
   SIGNATURE_GATEWAY_URL: "https://eds.example.kz",
+  SIGNATURE_GATEWAY_TOKEN: "g".repeat(32),
   SIGNATURE_CALLBACK_SECRET: "e".repeat(48),
   PAYMENT_PROVIDER_MODE: "external",
   PAYMENT_GATEWAY_URL: "https://pay.example.kz",
   PAYMENT_GATEWAY_TOKEN: "p".repeat(32),
+  PAYMENT_WEBHOOK_SECRET_EXTERNAL: "w".repeat(48),
   EMAIL_PROVIDER_URL: "https://mail.example.kz/send",
   EMAIL_PROVIDER_TOKEN: "m".repeat(32),
   AUTH_EMAIL_BASE_URL: "https://example.kz",
@@ -97,6 +105,37 @@ if (mockPayment.status === 0)
 const unprotectedMetrics = run({ ...valid, METRICS_BEARER_TOKEN: "" });
 if (unprotectedMetrics.status === 0)
   throw new Error("Production accepted an unprotected metrics endpoint");
+const unsignedPaymentWebhook = run({
+  ...valid,
+  PAYMENT_WEBHOOK_SECRET_EXTERNAL: "",
+});
+if (unsignedPaymentWebhook.status === 0)
+  throw new Error("Production accepted unsigned external payment webhooks");
+const anonymousSignatureGateway = run({
+  ...valid,
+  SIGNATURE_GATEWAY_TOKEN: "",
+});
+if (anonymousSignatureGateway.status === 0)
+  throw new Error("Production accepted an unauthenticated signature gateway");
+const missingSms = run({
+  ...valid,
+  SMS_PROVIDER_URL: "",
+  SMS_PROVIDER_TOKEN: "",
+});
+if (missingSms.status === 0)
+  throw new Error("Production accepted a missing SMS provider");
+const cleartextRedis = run({
+  ...valid,
+  REDIS_URL: "redis://default:password@redis.example.kz:6379",
+});
+if (cleartextRedis.status === 0)
+  throw new Error("Production accepted cleartext Redis");
+const cleartextPostgres = run({
+  ...valid,
+  DATABASE_URL: "postgresql://user:password@db.example.kz:5432/marketplace",
+});
+if (cleartextPostgres.status === 0)
+  throw new Error("Production accepted PostgreSQL without required TLS mode");
 
 const secretBearingHttpsUrls = {
   OPENAI_BASE_URL: "http://openai.example.test/v1",
@@ -109,6 +148,10 @@ const secretBearingHttpsUrls = {
   SMS_PROVIDER_URL: "http://sms.example.test/send",
   OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel.example.test/v1/traces",
   SENTRY_DSN: "http://public@sentry.example.test/1",
+  SIGNATURE_GATEWAY_HEALTHCHECK_URL: "http://eds.example.test/health",
+  PAYMENT_GATEWAY_HEALTHCHECK_URL: "http://pay.example.test/health",
+  EMAIL_PROVIDER_HEALTHCHECK_URL: "http://mail.example.test/health",
+  SMS_PROVIDER_HEALTHCHECK_URL: "http://sms.example.test/health",
 };
 const insecureTransportAccepted = [];
 for (const [key, insecureUrl] of Object.entries(secretBearingHttpsUrls)) {
@@ -140,6 +183,11 @@ console.log(
       insecureCorsRejected: true,
       mockPaymentsRejected: true,
       unprotectedMetricsRejected: true,
+      unsignedPaymentWebhookRejected: true,
+      anonymousSignatureGatewayRejected: true,
+      missingSmsRejected: true,
+      cleartextRedisRejected: true,
+      cleartextPostgresRejected: true,
       insecureTransportRejected: Object.keys(secretBearingHttpsUrls),
       developmentHttpAccepted: true,
       artifacts: requiredFiles,

@@ -9,7 +9,7 @@ does not prove production auth or shared rate limiting.
 
 Production is deployed only from an immutable `v*` image tag built by `.github/workflows/release.yml`. Configure GitHub repository variables `PUBLIC_API_URL`, `BUYER_APP_URL`, `SUPPLIER_APP_URL`, `GOOGLE_CLIENT_ID`, `APPLE_CLIENT_ID`, and `APPLE_REDIRECT_URI`. Copy `.env.production.example` to `.env.production` on the host and replace every `CHANGE_ME` value through the secret manager.
 
-The API refuses to start when production would use development auth, localhost CORS, mock payments, local object storage, optional antivirus, unencrypted storage, missing EDS/payment/email endpoints, missing MFA, missing Redis, missing observability exporters, or cleartext HTTP for a secret-bearing provider endpoint. Development and test environments may continue to use explicit localhost HTTP endpoints.
+The API refuses to start when production would use development auth, localhost CORS, mock payments, local object storage, optional antivirus, unencrypted storage, missing EDS/payment/email/SMS endpoints, missing signed PSP webhooks, missing MFA, PostgreSQL/Redis without required TLS, missing observability exporters, or cleartext HTTP for a secret-bearing provider endpoint. Development and test environments may continue to use explicit localhost HTTP endpoints.
 
 `compose.production.yaml` starts two processes from the same API image: `PROCESS_ROLE=api` serves HTTP and produces queue jobs without cron/consumers; `PROCESS_ROLE=worker` runs cron and BullMQ consumers without an HTTP listener. `PROCESS_ROLE=all` is rejected in production. The worker performs role-aware dependency readiness before announcing startup and exits when its required database, storage, or queue dependency is unavailable.
 
@@ -17,7 +17,7 @@ The API refuses to start when production would use development auth, localhost C
 
 1. Create managed PostgreSQL with PITR, managed Redis with TLS, an encrypted S3-compatible private bucket, DNS records, EDS gateway credentials, PSP credentials, transactional email credentials, Sentry and OTLP projects.
 2. Pre-provision at least two corporate operator users as active members of the `MARKETPLACE_OPERATOR` organization. Their Google/Apple verified emails must match the users. Both must enroll TOTP at `/login`.
-3. Validate configuration with `npm run build && npm run verify:production-config && npm run verify:rate-limit-auth` and `docker compose --env-file .env.production -f compose.production.yaml config --quiet`.
+3. Validate configuration with `npm run build && npm run verify:production-config && npm run verify:production-readiness-contract && npm run verify:production-connectors && npm run verify:rate-limit-auth` and `docker compose --env-file .env.production -f compose.production.yaml config --quiet`.
 4. Take a backup, set `REGISTRY` and immutable `APP_RELEASE`, then run `docker compose --env-file .env.production -f compose.production.yaml pull` and `docker compose --env-file .env.production -f compose.production.yaml up -d`.
 5. Check `/api/health`, `/api/health/ready`, social login + MFA, supplier onboarding, two-party EDS callback, search, checkout against PSP sandbox, document download, notification delivery and operator queues.
 
@@ -40,4 +40,10 @@ Application rollback changes `APP_RELEASE` to the previous immutable tag and run
 
 The repository cannot manufacture third-party acceptance. Production remains blocked until real tenant evidence exists for MySklad, a signed 1C agent build and customer database, qualified Kazakhstan EDS, the selected PSP, transactional email/SMS, DNS/TLS, managed PostgreSQL/Redis/S3, monitoring alerts and a timed restore drill. Connector status stays `CONNECTOR_NEEDED` or `PILOT` until evidence is attached; it must never be marked `LIVE_VERIFIED` from mocks.
 
-Run `NODE_ENV=production CHECK_EXTERNAL_CONNECTORS=1 scripts/verify-production-connectors.mjs` after injecting production environment variables. The command never prints secret values and exits non-zero when EDS/PSP/telemetry credentials are missing or their `/health` endpoints are not reachable.
+Follow [`live-provider-readiness.md`](live-provider-readiness.md). After
+injecting production environment variables and explicit provider healthcheck
+URLs, set `NODE_ENV=production`, `CHECK_EXTERNAL_CONNECTORS=1` and run
+`npm run verify:production-connectors`. The command never prints secret values,
+does not guess `/health` paths and exits non-zero when the production contract or
+reachability check fails. Then run `npm run verify:live-evidence` against an
+external evidence manifest; reachability alone never becomes `LIVE_VERIFIED`.

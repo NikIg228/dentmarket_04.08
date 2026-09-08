@@ -1,47 +1,39 @@
-const required = [
-  ["SIGNATURE_GATEWAY_URL", process.env.SIGNATURE_GATEWAY_URL],
-  ["SIGNATURE_CALLBACK_SECRET", process.env.SIGNATURE_CALLBACK_SECRET],
-  [
-    "PAYMENT_PROVIDER_MODE=external",
-    process.env.PAYMENT_PROVIDER_MODE === "external" ? "configured" : "",
-  ],
-  ["PAYMENT_GATEWAY_URL", process.env.PAYMENT_GATEWAY_URL],
-  ["PAYMENT_GATEWAY_TOKEN", process.env.PAYMENT_GATEWAY_TOKEN],
-  ["SENTRY_DSN", process.env.SENTRY_DSN],
-  ["OTEL_EXPORTER_OTLP_ENDPOINT", process.env.OTEL_EXPORTER_OTLP_ENDPOINT],
-];
-const missing = required.filter(([, value]) => !value).map(([name]) => name);
-const result = {
-  profile: process.env.DEPLOYMENT_PROFILE ?? "go_live",
-  configured: missing.length === 0,
-  missing,
-  liveVerified: false,
-  checks: [],
-};
+import {
+  evaluateHealthProbeConfiguration,
+  evaluateProductionConfiguration,
+} from "./lib/production-readiness.mjs";
 
-if (process.env.CHECK_EXTERNAL_CONNECTORS === "1" && missing.length === 0) {
-  for (const [name, value] of [
-    ["SIGNATURE_GATEWAY_URL", process.env.SIGNATURE_GATEWAY_URL],
-    ["PAYMENT_GATEWAY_URL", process.env.PAYMENT_GATEWAY_URL],
-  ]) {
+const configuration = evaluateProductionConfiguration(process.env);
+const probeConfiguration = evaluateHealthProbeConfiguration(process.env);
+const shouldProbe = process.env.CHECK_EXTERNAL_CONNECTORS === "1";
+const checks = [];
+
+if (shouldProbe && configuration.configured) {
+  for (const probe of probeConfiguration) {
+    if (!probe.configured) {
+      checks.push({ id: probe.id, reachable: false, issues: probe.issues });
+      continue;
+    }
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 5000);
+    const timer = setTimeout(() => controller.abort(), 5_000);
     try {
-      const response = await fetch(`${value.replace(/\/$/, "")}/health`, {
+      const response = await fetch(process.env[probe.urlKey], {
+        method: "GET",
+        redirect: "error",
         signal: controller.signal,
-        headers:
-          name === "PAYMENT_GATEWAY_URL"
-            ? { authorization: `Bearer ${process.env.PAYMENT_GATEWAY_TOKEN}` }
-            : {},
+        headers: {
+          accept: "application/json",
+          authorization: `Bearer ${process.env[probe.tokenKey]}`,
+        },
       });
-      result.checks.push({
-        name,
+      checks.push({
+        id: probe.id,
         status: response.status,
         reachable: response.ok,
       });
     } catch (error) {
-      result.checks.push({
-        name,
+      checks.push({
+        id: probe.id,
         reachable: false,
         error: error instanceof Error ? error.name : "unknown",
       });
@@ -49,14 +41,24 @@ if (process.env.CHECK_EXTERNAL_CONNECTORS === "1" && missing.length === 0) {
       clearTimeout(timer);
     }
   }
-  result.liveVerified =
-    result.checks.length === 2 &&
-    result.checks.every((check) => check.reachable);
 }
 
-console.log(JSON.stringify(result));
-if (
-  missing.length > 0 ||
-  (process.env.CHECK_EXTERNAL_CONNECTORS === "1" && !result.liveVerified)
-)
+const reachabilityVerified =
+  shouldProbe &&
+  checks.length === probeConfiguration.length &&
+  checks.every((check) => check.reachable);
+const result = {
+  profile: process.env.DEPLOYMENT_PROFILE ?? "pilot",
+  configured: configuration.configured,
+  configurationChecks: configuration.checks,
+  reachabilityRequested: shouldProbe,
+  reachabilityVerified,
+  checks,
+  liveVerified: false,
+  liveEvidenceRequired: true,
+  note: "Endpoint reachability is not PSP capture/refund/webhook, EDS signing, supplier sync, notification delivery or infrastructure evidence.",
+};
+
+console.log(JSON.stringify(result, null, 2));
+if (!configuration.configured || (shouldProbe && !reachabilityVerified))
   process.exitCode = 1;

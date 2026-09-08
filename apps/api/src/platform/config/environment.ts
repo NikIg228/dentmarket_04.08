@@ -26,7 +26,23 @@ export const PRODUCTION_HTTPS_URL_KEYS = [
   "SMS_PROVIDER_URL",
   "OTEL_EXPORTER_OTLP_ENDPOINT",
   "SENTRY_DSN",
+  "SIGNATURE_GATEWAY_HEALTHCHECK_URL",
+  "PAYMENT_GATEWAY_HEALTHCHECK_URL",
+  "EMAIL_PROVIDER_HEALTHCHECK_URL",
+  "SMS_PROVIDER_HEALTHCHECK_URL",
 ] as const;
+
+function productionDatabaseUsesTls(value: string) {
+  try {
+    const url = new URL(value);
+    if (!["postgres:", "postgresql:"].includes(url.protocol)) return false;
+    return ["require", "verify-ca", "verify-full"].includes(
+      url.searchParams.get("sslmode") ?? "",
+    );
+  } catch {
+    return false;
+  }
+}
 
 const environmentSchema = z
   .object({
@@ -124,11 +140,15 @@ const environmentSchema = z
     S3_SERVER_SIDE_ENCRYPTION: z.enum(["AES256", "aws:kms"]).optional(),
     SIGNATURE_GATEWAY_URL: z.string().url().optional(),
     SIGNATURE_GATEWAY_TOKEN: z.string().min(16).optional(),
+    SIGNATURE_GATEWAY_HEALTHCHECK_URL: z.string().url().optional(),
     PAYMENT_PROVIDER_MODE: z.enum(["mock", "external"]).default("mock"),
     PAYMENT_GATEWAY_URL: z.string().url().optional(),
     PAYMENT_GATEWAY_TOKEN: z.string().min(16).optional(),
+    PAYMENT_GATEWAY_HEALTHCHECK_URL: z.string().url().optional(),
+    PAYMENT_WEBHOOK_SECRET_EXTERNAL: z.string().min(32).optional(),
     EMAIL_PROVIDER_URL: z.string().url().optional(),
     EMAIL_PROVIDER_TOKEN: z.string().min(16).optional(),
+    EMAIL_PROVIDER_HEALTHCHECK_URL: z.string().url().optional(),
     AUTH_EMAIL_BASE_URL: z.string().url().default("http://localhost:3000"),
     AUTH_EMAIL_VERIFICATION_TTL_HOURS: z.coerce
       .number()
@@ -144,6 +164,7 @@ const environmentSchema = z
       .default(30),
     SMS_PROVIDER_URL: z.string().url().optional(),
     SMS_PROVIDER_TOKEN: z.string().min(16).optional(),
+    SMS_PROVIDER_HEALTHCHECK_URL: z.string().url().optional(),
     NOTIFICATION_WEBHOOK_SECRET: z.string().min(32).optional(),
     LOG_LEVEL: z
       .enum(["trace", "debug", "info", "warn", "error", "fatal"])
@@ -274,6 +295,19 @@ const environmentSchema = z
           path: ["JWT_REQUIRE_MFA"],
           message: "MFA must be required in production",
         });
+      if (!productionDatabaseUsesTls(value.DATABASE_URL))
+        context.addIssue({
+          code: "custom",
+          path: ["DATABASE_URL"],
+          message:
+            "Production PostgreSQL must use sslmode=require, verify-ca or verify-full",
+        });
+      if (!value.REDIS_URL || new URL(value.REDIS_URL).protocol !== "rediss:")
+        context.addIssue({
+          code: "custom",
+          path: ["REDIS_URL"],
+          message: "Production Redis must use TLS via rediss://",
+        });
       if (
         !value.INTEGRATION_ENCRYPTION_KEY ||
         !value.APP_SECURITY_ENCRYPTION_KEY
@@ -303,28 +337,40 @@ const environmentSchema = z
           message:
             "Encrypted S3-compatible object storage is required in production",
         });
-      if (!value.SIGNATURE_GATEWAY_URL || !value.SIGNATURE_CALLBACK_SECRET)
+      if (
+        !value.SIGNATURE_GATEWAY_URL ||
+        !value.SIGNATURE_GATEWAY_TOKEN ||
+        !value.SIGNATURE_CALLBACK_SECRET
+      )
         context.addIssue({
           code: "custom",
           path: ["SIGNATURE_GATEWAY_URL"],
           message:
-            "External EDS gateway and signed callbacks are required in production",
+            "Authenticated external EDS gateway and signed callbacks are required in production",
         });
       if (
         value.PAYMENT_PROVIDER_MODE !== "external" ||
         !value.PAYMENT_GATEWAY_URL ||
-        !value.PAYMENT_GATEWAY_TOKEN
+        !value.PAYMENT_GATEWAY_TOKEN ||
+        !value.PAYMENT_WEBHOOK_SECRET_EXTERNAL
       )
         context.addIssue({
           code: "custom",
           path: ["PAYMENT_GATEWAY_URL"],
-          message: "External payment gateway is required in production",
+          message:
+            "External payment gateway and signed provider webhooks are required in production",
         });
       if (!value.EMAIL_PROVIDER_URL || !value.EMAIL_PROVIDER_TOKEN)
         context.addIssue({
           code: "custom",
           path: ["EMAIL_PROVIDER_URL"],
           message: "Transactional email provider is required in production",
+        });
+      if (!value.SMS_PROVIDER_URL || !value.SMS_PROVIDER_TOKEN)
+        context.addIssue({
+          code: "custom",
+          path: ["SMS_PROVIDER_URL"],
+          message: "Transactional SMS provider is required in production",
         });
       if (!value.NOTIFICATION_WEBHOOK_SECRET)
         context.addIssue({

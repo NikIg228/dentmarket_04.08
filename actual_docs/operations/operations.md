@@ -4,6 +4,8 @@
 correctness gate описаны в [`b4-6-load-profile.md`](b4-6-load-profile.md).
 Runtime-состав `pilot`/`go_live` и fail-safe default описаны в
 [`deployment-profiles.md`](deployment-profiles.md).
+Production readiness PSP/ЭЦП/supplier/email/SMS/infrastructure описан в
+[`live-provider-readiness.md`](live-provider-readiness.md).
 
 ## Компоненты
 

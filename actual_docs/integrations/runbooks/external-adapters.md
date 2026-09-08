@@ -32,11 +32,23 @@ Use `provider: "MOYSKLAD"` and encrypted `credentials.accessToken`. The default 
 
 ## EDS gateway
 
-Set `SIGNATURE_GATEWAY_URL` and, when required by the gateway, `SIGNATURE_GATEWAY_TOKEN`. The adapter POSTs only document identity, SHA-256 checksum, signing method, signer name, and expiry to `${SIGNATURE_GATEWAY_URL}/sessions`. The gateway must return `externalSessionId` or `sessionId` and may return `signingUrl` or `url`. Production still requires signed callbacks via `SIGNATURE_CALLBACK_SECRET`; a local/mock adapter is never a production substitute.
+Set `SIGNATURE_GATEWAY_URL` and `SIGNATURE_GATEWAY_TOKEN`. The token is
+mandatory in production because the current adapter does not implement a
+separate mTLS client identity. The adapter POSTs only document identity,
+SHA-256 checksum, signing method, signer name, and expiry to
+`${SIGNATURE_GATEWAY_URL}/sessions`. The gateway must return
+`externalSessionId` or `sessionId` and may return `signingUrl` or `url`.
+Production also requires signed callbacks via `SIGNATURE_CALLBACK_SECRET`; a
+local/mock adapter is never a production substitute.
 
 ## PSP
 
-Set `PAYMENT_PROVIDER_MODE=external`, `PAYMENT_GATEWAY_URL`, and `PAYMENT_GATEWAY_TOKEN`. The existing payment adapter uses bearer authentication, operation paths, and `idempotency-key`. Validate the provider in sandbox with authorize, capture, refund, and webhook replay tests before switching a tenant to live mode.
+Set `PAYMENT_PROVIDER_MODE=external`, `PAYMENT_GATEWAY_URL`,
+`PAYMENT_GATEWAY_TOKEN` and `PAYMENT_WEBHOOK_SECRET_EXTERNAL`. The existing
+payment adapter uses bearer authentication, operation paths, and
+`idempotency-key`; incoming external events require HMAC and timestamp.
+Validate the provider in sandbox with authorize, capture, refund, and webhook
+replay tests before switching a tenant to live mode.
 
 ## 1C
 

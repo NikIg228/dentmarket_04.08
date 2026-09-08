@@ -12,7 +12,8 @@ const notificationAdapterPath =
 const environmentPath = "apps/api/src/platform/config/environment.ts";
 const credentialBearingAdapters = [
   {
-    relativePath: "apps/api/src/modules/payments/adapters/http-payment.adapter.ts",
+    relativePath:
+      "apps/api/src/modules/payments/adapters/http-payment.adapter.ts",
     urlKeys: ["PAYMENT_GATEWAY_URL"],
   },
   {
@@ -41,6 +42,15 @@ const credentialBearingAdapters = [
     relativePath: "apps/api/src/instrumentation.ts",
     urlKeys: ["SENTRY_DSN", "OTEL_EXPORTER_OTLP_ENDPOINT"],
   },
+  {
+    relativePath: "scripts/lib/production-readiness.mjs",
+    urlKeys: [
+      "SIGNATURE_GATEWAY_HEALTHCHECK_URL",
+      "PAYMENT_GATEWAY_HEALTHCHECK_URL",
+      "EMAIL_PROVIDER_HEALTHCHECK_URL",
+      "SMS_PROVIDER_HEALTHCHECK_URL",
+    ],
+  },
 ];
 const requiredProductionHttpsKeys = [
   "OPENAI_BASE_URL",
@@ -53,6 +63,10 @@ const requiredProductionHttpsKeys = [
   "SMS_PROVIDER_URL",
   "OTEL_EXPORTER_OTLP_ENDPOINT",
   "SENTRY_DSN",
+  "SIGNATURE_GATEWAY_HEALTHCHECK_URL",
+  "PAYMENT_GATEWAY_HEALTHCHECK_URL",
+  "EMAIL_PROVIDER_HEALTHCHECK_URL",
+  "SMS_PROVIDER_HEALTHCHECK_URL",
 ];
 
 function assert(condition, message) {
@@ -71,6 +85,14 @@ const notificationSource = await readFile(
 );
 const environmentSource = await readFile(
   path.join(root, environmentPath),
+  "utf8",
+);
+const productionConnectorSource = await readFile(
+  path.join(root, "scripts/verify-production-connectors.mjs"),
+  "utf8",
+);
+const productionReadinessSource = await readFile(
+  path.join(root, "scripts/lib/production-readiness.mjs"),
   "utf8",
 );
 const webhookSource = notificationSource.slice(
@@ -99,6 +121,14 @@ for (const { relativePath, urlKeys } of credentialBearingAdapters) {
 assert(
   !/\bfetch\s*\(/.test(webhookSource),
   `${notificationAdapterPath} webhook contains a direct fetch bypass`,
+);
+assert(
+  productionConnectorSource.includes('redirect: "error"'),
+  "Production provider health probes must reject redirects before sending credentials",
+);
+assert(
+  productionReadinessSource.includes("baseOrigin !== healthOrigin"),
+  "Production provider health probes must bind credentials to the business endpoint origin",
 );
 
 for (const { relativePath, source } of sources) {

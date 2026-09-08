@@ -79,6 +79,7 @@
 
 - [Operations](operations/operations.md)
 - [Deployment profiles](operations/deployment-profiles.md)
+- [Live provider and infrastructure readiness](operations/live-provider-readiness.md)
 - [Production deployment](operations/production-deployment.md)
 - [Production go-live checklist](operations/production-go-live-checklist.md)
 - [SLA и incident response](operations/sla-incident-response.md)
