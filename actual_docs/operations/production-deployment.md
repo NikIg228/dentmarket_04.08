@@ -9,7 +9,7 @@ does not prove production auth or shared rate limiting.
 
 Production is deployed only from an immutable `v*` image tag built by `.github/workflows/release.yml`. Configure GitHub repository variables `PUBLIC_API_URL`, `BUYER_APP_URL`, `SUPPLIER_APP_URL`, `GOOGLE_CLIENT_ID`, `APPLE_CLIENT_ID`, and `APPLE_REDIRECT_URI`. Copy `.env.production.example` to `.env.production` on the host and replace every `CHANGE_ME` value through the secret manager.
 
-The API refuses to start when production would use development auth, localhost CORS, mock payments, local object storage, optional antivirus, unencrypted storage, missing EDS/payment/email endpoints, missing MFA, missing Redis, or missing observability exporters.
+The API refuses to start when production would use development auth, localhost CORS, mock payments, local object storage, optional antivirus, unencrypted storage, missing EDS/payment/email endpoints, missing MFA, missing Redis, missing observability exporters, or cleartext HTTP for a secret-bearing provider endpoint. Development and test environments may continue to use explicit localhost HTTP endpoints.
 
 `compose.production.yaml` starts two processes from the same API image: `PROCESS_ROLE=api` serves HTTP and produces queue jobs without cron/consumers; `PROCESS_ROLE=worker` runs cron and BullMQ consumers without an HTTP listener. `PROCESS_ROLE=all` is rejected in production. The worker performs role-aware dependency readiness before announcing startup and exits when its required database, storage, or queue dependency is unavailable.
 

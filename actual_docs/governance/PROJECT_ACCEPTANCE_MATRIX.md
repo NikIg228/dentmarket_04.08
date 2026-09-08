@@ -1,7 +1,7 @@
 # DentMarket KZ — матрица фактической готовности проекта
 
 **Дата базового среза:** 2026-08-19
-**Последнее точечное обновление:** 2026-09-06, B2.4 — единый архив документов Buyer/Supplier
+**Последнее точечное обновление:** 2026-09-08, B4.5-R3 — production outbound HTTPS policy
 **Продуктовый источник требований:** [`DENTMARKET_PRODUCT_V2.md`](../product/DENTMARKET_PRODUCT_V2.md)
 **Назначение:** отделить написанное ТЗ, демонстрационный UI и существующий код от реально проверенной и готовой к пилоту функции.
 
@@ -74,7 +74,7 @@
 | Backup/restore            | `INTEGRATION_VERIFIED` | `pnpm verify:backup-restore`: 149 таблиц с content hash, 2 object files, 31 migration и API health/readiness; source неизменен, target удалён                                                                  | Managed WAL/PITR, S3 versioning/retention и restore production snapshot не имеют `LIVE_VERIFIED`          | Выполнить provider-level timed drill перед go-live; локальный gate сохранять в CI                       |
 | Observability и alerts    | `INTEGRATION_VERIFIED` | `pnpm verify:observability`: 4/4 unit, 7 rules/14 synthetic vectors, metrics auth `401/200`, PostgreSQL outbox/checkout/import gauges; production config запрещает endpoint без token                          | Нет evidence внешнего monitoring deployment, notification route и live synthetic alert                    | При deployment подключить versioned PromQL rules и сохранить live evidence                              |
 | Dependency security       | `INTEGRATION_VERIFIED` | B4.5: production audit изменён с 15 high/6 moderate на `No known vulnerabilities found`; Next 16.2.11, Sharp 0.35.3, PostCSS 8.5.26 и pdfjs-dist 6.2.108 прошли build, PDF/import, PostgreSQL и web regression | Registry state меняется; production network и runtime exposure отдельных advisories не измерялись         | Сохранять `pnpm audit --prod --audit-level high` в CI и обновлять lockfile только с compatibility gates |
-| Application security      | `E2E_VERIFIED`         | Dependency finding и все source findings закрыты; R2A–R2E regressions, B4.4 rate-limit/auth regressions, полный gate stack и complete-coverage scan `64b65075-d7f3-4c23-b6e2-1535e6067b80` зелёные | TAC не выдан и production infrastructure evidence ещё не имеют `LIVE_VERIFIED` | Сохранить R2E и B4.4 gates в CI; перейти к B4.6 |
+| Application security      | `E2E_VERIFIED`         | R2A–R2E regressions и scan `64b65075-d7f3-4c23-b6e2-1535e6067b80`; B4.5-R3 дополнительно закрывает validated CWE-319 fail-closed HTTPS policy для 10 secret-bearing URL, проходит full workspace/config/outbound/runtime/auth gates и независимый security review | TAC не выдан и production infrastructure evidence ещё не имеют `LIVE_VERIFIED` | Сохранять B4.5-R3 gates в CI; перейти к B4.6 после monetary integrity fix |
 | Transactional outbox      | `E2E_VERIFIED`         | ADR 005, status/lease/retry/DLQ; B4.3 protected list/replay, dedicated permissions, Serializable idempotency и audit trail; `pnpm verify:outbox` включает replay regressions | Production dashboard не развёрнут; live operator drill не проведён | Сохранять B4.1 metrics и B4.4 shared rate-limit guard; следующий hardening — B4.6 |
 | Автоматические тесты      | `E2E_VERIFIED`         | 2026-09-06: `npm test` — 14/14 Turbo-задач; API 194, schemas 48, api-client 7, Buyer 24, Supplier 21, shared UI 3, Admin 21 и Landing 3 unit-теста. `npm run verify:flow-b2` проходит 4/4, целевой archive-flow — 1/1 с локальными PostgreSQL/API и production web bundles | Live Google/Apple, реальная ЭЦП, внешний ЭДО и ручная accessibility matrix не входят в этот suite | Сохранять Flow B2 и целевой archive-flow как regression gates документолога |
 | Typecheck и build         | `UNIT_VERIFIED`        | 2026-09-06: `npm run typecheck` — 15/15 Turbo-задач; production builds Buyer и Supplier проходят на Next 16.2.11, содержат `/documents` и укладываются в initial JS budgets | Полный root build не повторялся; Next предупреждает о deprecated middleware convention | Сохранять bundle budgets как merge-gate; следующим отдельным срезом профилировать Landing и вторичные Buyer routes |
@@ -323,3 +323,13 @@ and inventory residuals from the prior scan were remediated, all affected
 regressions and workspace gates passed, and the new scan reviewed `1055/1055`
 tracked files with `0` reportable findings. Application security is now
 `E2E_VERIFIED`; B4.5-R2E, B4.3 and B4.4 are closed, and B4.6 is next.
+
+## Current security gate override (2026-09-08)
+
+- [x] Последующий scan `be32fbfe-a26c-4db7-834f-fcf406df8b00` выявил
+      CWE-319: production принимал `http://` для privileged outbound endpoints.
+- [x] B4.5-R3 ввёл общий fail-closed HTTPS inventory для 10 secret-bearing URL,
+      сохранил localhost HTTP только в development/test и закрепил решение ADR 008.
+- [x] Workspace typecheck/test/build, production config, outbound security,
+      runtime split, rate-limit/auth, dependency audit и независимый verify-fix
+      review прошли. Следующая задача перед B4.6 — exact manual price override.

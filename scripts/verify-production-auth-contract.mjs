@@ -32,6 +32,7 @@ const base = {
   PAYMENT_GATEWAY_TOKEN: "p".repeat(32),
   EMAIL_PROVIDER_URL: "https://mail.example.kz/send",
   EMAIL_PROVIDER_TOKEN: "m".repeat(32),
+  AUTH_EMAIL_BASE_URL: "https://example.kz",
   NOTIFICATION_WEBHOOK_SECRET: "n".repeat(48),
   SENTRY_DSN: "https://public@sentry.example.kz/1",
   OTEL_EXPORTER_OTLP_ENDPOINT: "https://otel.example.kz/v1/traces",

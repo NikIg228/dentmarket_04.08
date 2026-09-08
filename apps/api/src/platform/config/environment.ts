@@ -15,6 +15,19 @@ const encryptionKeySchema = z.string().refine((value) => {
   }
 }, "must be a base64-encoded 32-byte key");
 
+export const PRODUCTION_HTTPS_URL_KEYS = [
+  "OPENAI_BASE_URL",
+  "SUPABASE_URL",
+  "S3_ENDPOINT",
+  "SIGNATURE_GATEWAY_URL",
+  "PAYMENT_GATEWAY_URL",
+  "EMAIL_PROVIDER_URL",
+  "AUTH_EMAIL_BASE_URL",
+  "SMS_PROVIDER_URL",
+  "OTEL_EXPORTER_OTLP_ENDPOINT",
+  "SENTRY_DSN",
+] as const;
+
 const environmentSchema = z
   .object({
     NODE_ENV: z
@@ -137,6 +150,17 @@ const environmentSchema = z
       .default("info"),
   })
   .superRefine((value, context) => {
+    if (value.NODE_ENV === "production") {
+      for (const key of PRODUCTION_HTTPS_URL_KEYS) {
+        const configuredUrl = value[key];
+        if (configuredUrl && new URL(configuredUrl).protocol !== "https:")
+          context.addIssue({
+            code: "custom",
+            path: [key],
+            message: `${key} must use HTTPS in production`,
+          });
+      }
+    }
     if (value.NODE_ENV === "production" && value.PROCESS_ROLE === "all")
       context.addIssue({
         code: "custom",

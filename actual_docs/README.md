@@ -56,6 +56,7 @@
 - [ADR 005: transactional outbox delivery](architecture/adr/005-transactional-outbox-delivery.md)
 - [ADR 006: platform authority policy](architecture/adr/006-platform-authority-policy.md)
 - [ADR 007: outbound request gateway](architecture/adr/007-outbound-request-gateway.md)
+- [ADR 008: production outbound transport policy](architecture/adr/008-production-outbound-transport-policy.md)
 
 ### `product-cards/` — карточки товаров и каталог
 

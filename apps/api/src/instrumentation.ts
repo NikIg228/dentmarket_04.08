@@ -3,11 +3,13 @@ import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentation
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { NodeSDK } from "@opentelemetry/sdk-node";
 import { traceExporterUrl } from "./platform/observability/otlp-endpoint";
+import { environment } from "./platform/config/environment";
 
-const sentryDsn = process.env.SENTRY_DSN;
-if (sentryDsn) Sentry.init({ dsn: sentryDsn, environment: process.env.NODE_ENV ?? "development", release: process.env.APP_RELEASE, tracesSampleRate: Number(process.env.SENTRY_TRACES_SAMPLE_RATE ?? "0.1"), sendDefaultPii: false });
+const config = environment();
+const sentryDsn = config.SENTRY_DSN;
+if (sentryDsn) Sentry.init({ dsn: sentryDsn, environment: config.NODE_ENV, release: process.env.APP_RELEASE, tracesSampleRate: Number(process.env.SENTRY_TRACES_SAMPLE_RATE ?? "0.1"), sendDefaultPii: false });
 
-const otlpEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
+const otlpEndpoint = config.OTEL_EXPORTER_OTLP_ENDPOINT;
 if (otlpEndpoint) {
   const sdk = new NodeSDK({
     serviceName: process.env.OTEL_SERVICE_NAME ?? "marketplace-api",

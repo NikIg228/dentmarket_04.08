@@ -400,7 +400,7 @@ Gate намеренно разрешён только для локальной 
       dispatcher tests, PostgreSQL regression и runtime split прошли.
 
 Текущий статус: **B0.1–B0.6, B1.1–B1.2, B2.1–B2.4, B3.1–B3.3,
-B4.1–B4.3 и B4.5-R2E реализованы и проходят**.
+B4.1–B4.4 и B4.5-R3 реализованы и проходят**.
 High source-code backlog B4.5-R1 закрыт фазами R1A и R1B. B4.5-R2A–R2E
 закрыли organization enumeration, XLSX decompression exhaustion, delayed
 session revocation, notification webhook SSRF, payment side-effect claims,
@@ -910,6 +910,15 @@ patches, focused regressions, полный gate stack и complete-coverage R2E.
 - [x] B4.3 — dead-letter operations и защищённый replay завершены:
       защищённый operator list/replay, отдельные permissions, Serializable
       idempotency, audit trail и payload-preserving reset в `PENDING`.
+- [x] B4.5-R3 — production fail-closed HTTPS policy закрывает CWE-319 для
+      `OPENAI_BASE_URL`, `SUPABASE_URL`, `S3_ENDPOINT`, EDS/payment/email/SMS,
+      auth-link, Sentry и OTLP endpoints; instrumentation валидирует environment
+      до инициализации exporters, а development/test HTTP остаётся доступным.
+- [x] B4.5-R3 подтверждён `npm run typecheck`, `npm test`, `npm run build`,
+      `npm run verify:production-config`, `npm run verify:outbound-security`,
+      `npm run verify:runtime-split`, `npm run verify:rate-limit-auth`,
+      production dependency audit и независимым security review. ADR 008
+      фиксирует отсутствие неутверждённого cleartext/mTLS исключения.
 
 ### B4.4 — rate limiting и production auth runbook
 

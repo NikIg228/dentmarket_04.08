@@ -21,7 +21,7 @@ tenant isolation, typed contracts и автоматизированными Post
 | Доменный procurement core | 85% | Cart/reprice/checkout/split orders/reservations/supplier flow доказаны локально |
 | Catalog/import operations | 80% | CSV и operator workflow сильные; live feed и нагрузка не доказаны |
 | Документы и бухгалтерский архив | 80% | Buyer/Supplier archive реализован; legal/EDS/EDO live gates открыты |
-| Security controls | 75% | Сильные auth/tenant/webhook/outbox controls; один validated transport finding открыт |
+| Security controls | 85% | Сильные auth/tenant/webhook/outbox controls; validated CWE-319 закрыт B4.5-R3 и зелёными gates |
 | Operations/readiness | 60% | Локальные gates есть; B4.6 и managed infrastructure evidence отсутствуют |
 | Внешние интеграции | 35% | Provider-independent foundation есть; `LIVE_VERIFIED` коннекторов нет |
 | Production readiness целиком | 55% | Controlled demo возможен, production go-live пока нельзя заявлять |
@@ -171,6 +171,8 @@ Product V2 pilot и не означает production acceptance. Сейчас в
 
 #### P0.1. Fail-closed HTTPS для secret-bearing outbound URL
 
+**Статус B4.5-R3:** [x] CWE-319 закрыт 2026-09-08.
+
 Codex Security scan `be32fbfe-a26c-4db7-834f-fcf406df8b00` подтвердил CWE-319
 medium/high-confidence. `environment.ts` использует общий `z.string().url()`
 для `PAYMENT_GATEWAY_URL`, `SIGNATURE_GATEWAY_URL`, `EMAIL_PROVIDER_URL`,
@@ -178,14 +180,19 @@ medium/high-confidence. `environment.ts` использует общий `z.stri
 `http://`. Несколько adapters затем напрямую отправляют bearer/service-role
 credentials через `fetch`.
 
-Нужно:
+Реализовано:
 
-1. Ввести общий production URL schema с обязательным `https:`.
-2. Не разрешать internal HTTP/mTLS exception без отдельного ADR/source-of-truth.
-3. Перевести secret-bearing adapters на центральный `OutboundRequestGateway`
-   либо эквивалентный typed client с host allowlist, timeout и response-size cap.
-4. Расширить `verify:production-config` и static outbound gate на каждый такой
-   endpoint и прямой `fetch`.
+1. Общая production policy требует `https:` для 10 secret-bearing URL.
+2. ADR 008 запрещает internal cleartext/mTLS exception без отдельного решения.
+3. Instrumentation вызывает environment validation до Sentry/OTLP startup.
+4. `verify:production-config` и static outbound gate покрывают каждый такой
+   endpoint и его configuration consumer.
+5. Production/config/outbound/runtime/auth gates и независимый security review
+   прошли; development/test localhost HTTP сохранён.
+
+Дальнейшая унификация privileged provider adapters в typed clients с отдельными
+host allowlists и response-size budgets остаётся hardening-задачей, но не
+является открытым CWE-319 transport finding.
 
 #### P0.2. B4.6 — измеримый нагрузочный профиль catalog и checkout
 
