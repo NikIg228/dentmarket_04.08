@@ -78,8 +78,8 @@ export class SearchService {
     buyerOrganizationId: string,
     context: SupplierActorContext,
   ) {
-    const operator = Boolean(
-      await this.prisma.organizationCapability.findUnique({
+    const [operatorCapability, buyer] = await Promise.all([
+      this.prisma.organizationCapability.findUnique({
         where: {
           organizationId_capability: {
             organizationId: context.organizationId,
@@ -87,15 +87,16 @@ export class SearchService {
           },
         },
       }),
-    );
+      this.prisma.organization.findUnique({
+        where: { id: buyerOrganizationId },
+        include: { capabilities: true },
+      }),
+    ]);
+    const operator = Boolean(operatorCapability);
     if (buyerOrganizationId !== context.organizationId && !operator)
       throw new ForbiddenException(
         "Buyer search belongs to another organization",
       );
-    const buyer = await this.prisma.organization.findUnique({
-      where: { id: buyerOrganizationId },
-      include: { capabilities: true },
-    });
     if (
       !buyer ||
       !buyer.capabilities.some(({ capability }) => capability === "BUYER")
@@ -105,6 +106,7 @@ export class SearchService {
 
   async search(input: SearchCatalogInput, context: SupplierActorContext) {
     await this.assertBuyer(input.buyerOrganizationId, context);
+    const pilotProfile = environment().DEPLOYMENT_PROFILE === "pilot";
     const searchIntent = expandDentalSearchQuery(input.q);
     const q = searchIntent.normalizedQuery;
     const expandedQuery = searchIntent.expandedQuery;
@@ -123,7 +125,7 @@ export class SearchService {
       Prisma.sql`p.status = 'ACTIVE'`,
       Prisma.sql`EXISTS (SELECT 1 FROM "MarketplaceAgreement" ma WHERE ma.status IN ('ACTIVE', 'NON_RENEWING') AND ma."startsAt" <= NOW() AND ma."endsAt" > NOW() AND ma."supplierOrganizationId" = ANY(d."supplierIds"))`,
     ];
-    if (environment().DEPLOYMENT_PROFILE === "pilot")
+    if (pilotProfile)
       where.push(
         Prisma.sql`p."externalMetadata" ->> 'importedAsCanonicalDraft' = 'true'`,
       );
@@ -202,7 +204,7 @@ export class SearchService {
         Prisma.sql`SELECT COUNT(*)::bigint AS count FROM "ProductSearchDocument" d JOIN "Product" p ON p.id = d."productId" WHERE ${condition}`,
       ),
     ]);
-    const products = await this.loadProducts(
+    const products = await this.loadSearchProducts(
       rows.map(({ productId }) => productId),
     );
     const supplierIds = [
@@ -214,32 +216,35 @@ export class SearchService {
         ),
       ),
     ];
-    const promotions: PublicSearchPromotion[] = supplierIds.length
-      ? await this.prisma.promotion.findMany({
-          where: {
-            supplierOrganizationId: { in: supplierIds },
-            status: "ACTIVE",
-            kind: "PERCENTAGE",
-            isPrivate: false,
-            couponCodeHash: null,
-            startsAt: { lte: new Date() },
-            endsAt: { gt: new Date() },
-          },
-          select: {
-            id: true,
-            supplierOrganizationId: true,
-            name: true,
-            percentageBasisPoints: true,
-            scope: true,
-            endsAt: true,
-            sponsorshipLabel: true,
-          },
-          orderBy: [{ percentageBasisPoints: "desc" }, { endsAt: "asc" }],
-        })
-      : [];
-    const reviewSummary = await this.reviewSummaries(
-      products.flatMap((product) => product.variants.map(({ id }) => id)),
-    );
+    const promotions: PublicSearchPromotion[] =
+      !pilotProfile && supplierIds.length
+        ? await this.prisma.promotion.findMany({
+            where: {
+              supplierOrganizationId: { in: supplierIds },
+              status: "ACTIVE",
+              kind: "PERCENTAGE",
+              isPrivate: false,
+              couponCodeHash: null,
+              startsAt: { lte: new Date() },
+              endsAt: { gt: new Date() },
+            },
+            select: {
+              id: true,
+              supplierOrganizationId: true,
+              name: true,
+              percentageBasisPoints: true,
+              scope: true,
+              endsAt: true,
+              sponsorshipLabel: true,
+            },
+            orderBy: [{ percentageBasisPoints: "desc" }, { endsAt: "asc" }],
+          })
+        : [];
+    const reviewSummary = pilotProfile
+      ? new Map<string, { count: number; averageRating: number | null }>()
+      : await this.reviewSummaries(
+          products.flatMap((product) => product.variants.map(({ id }) => id)),
+        );
     const rankById = new Map(
       rows.map((row, index) => [
         row.productId,
@@ -500,6 +505,124 @@ export class SearchService {
     };
   }
 
+  private loadSearchProducts(productIds: string[]) {
+    const now = new Date();
+    return this.prisma.product.findMany({
+      where: { id: { in: productIds }, status: "ACTIVE" },
+      select: {
+        id: true,
+        slug: true,
+        canonicalName: true,
+        description: true,
+        descriptionSources: true,
+        productType: true,
+        regulatoryClass: true,
+        brand: { select: { name: true } },
+        manufacturer: { select: { name: true } },
+        categories: {
+          select: {
+            categoryId: true,
+            category: { select: { id: true, nameRu: true } },
+          },
+        },
+        media: {
+          where: { status: "READY" },
+          orderBy: { sortOrder: "asc" },
+          select: {
+            id: true,
+            sourceUrl: true,
+            normalizedStorageKey: true,
+            altText: true,
+            width: true,
+            height: true,
+            metadata: true,
+          },
+        },
+        searchDocument: {
+          select: {
+            minNormalizedPriceMinor: true,
+            maxNormalizedPriceMinor: true,
+            isAvailable: true,
+          },
+        },
+        variants: {
+          where: { status: "ACTIVE" },
+          select: {
+            id: true,
+            sku: true,
+            gtin: true,
+            externalMetadata: true,
+            supplierOffers: {
+              where: {
+                status: "ACTIVE",
+                publication: {
+                  is: {
+                    status: { in: ["PUBLISHED", "RESTRICTED"] },
+                    marketplaceVisible: true,
+                  },
+                },
+              },
+              select: {
+                id: true,
+                supplierOrganizationId: true,
+                baseUnitsPerSaleUnit: true,
+                confirmationMode: true,
+                supplier: {
+                  select: {
+                    organization: { select: { displayName: true } },
+                  },
+                },
+                publication: {
+                  select: { allowedBuyerIds: true, allowedCityIds: true },
+                },
+                saleUnit: { select: { nameRu: true, symbol: true } },
+                packaging: {
+                  select: {
+                    name: true,
+                    quantityInBaseUnit: true,
+                    unit: { select: { symbol: true } },
+                  },
+                },
+                prices: {
+                  where: {
+                    status: "ACTIVE",
+                    validFrom: { lte: now },
+                    OR: [{ validTo: null }, { validTo: { gte: now } }],
+                    AND: [
+                      {
+                        OR: [
+                          { freshnessExpiresAt: null },
+                          { freshnessExpiresAt: { gte: now } },
+                        ],
+                      },
+                    ],
+                  },
+                  orderBy: { validFrom: "desc" },
+                  take: 1,
+                  select: { amountMinor: true, currency: true },
+                },
+                inventoryBalances: {
+                  select: {
+                    warehouseId: true,
+                    quantityAvailable: true,
+                    freshnessStatus: true,
+                    lastSuccessfulSyncAt: true,
+                    warehouse: { select: { cityId: true } },
+                  },
+                  orderBy: { quantityAvailable: "desc" },
+                },
+                deliveryOptions: {
+                  where: { status: "ACTIVE" },
+                  select: { method: true },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+  }
+
   private loadProducts(
     productIds: string[],
     buyerOrganizationId?: string,
@@ -598,7 +721,7 @@ export class SearchService {
   }
 
   private toSearchItem(
-    product: Awaited<ReturnType<SearchService["loadProducts"]>>[number],
+    product: Awaited<ReturnType<SearchService["loadSearchProducts"]>>[number],
     input: SearchCatalogInput,
     rank: number,
     reviewSummaries: Map<

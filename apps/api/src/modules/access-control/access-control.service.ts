@@ -30,7 +30,26 @@ export class AccessControlService {
   }
 
   async hasAll(userId: string, organizationId: string, required: string[]) {
-    const actual = new Set(await this.permissionsFor(userId, organizationId));
-    return required.every((permission) => actual.has(permission));
+    const permissionCodes = [...new Set(required)];
+    if (permissionCodes.length === 0) return true;
+    const membership = await this.prisma.organizationMembership.findFirst({
+      where: {
+        userId,
+        organizationId,
+        status: "ACTIVE",
+        AND: permissionCodes.map((code) => ({
+          roles: {
+            some: {
+              role: {
+                organizationId,
+                permissions: { some: { permission: { code } } },
+              },
+            },
+          },
+        })),
+      },
+      select: { id: true },
+    });
+    return Boolean(membership);
   }
 }

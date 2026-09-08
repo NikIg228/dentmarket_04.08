@@ -1,5 +1,8 @@
 # Эксплуатация
 
+Нагрузочный профиль controlled pilot, фиксированные SLO и multi-instance Redis
+correctness gate описаны в [`b4-6-load-profile.md`](b4-6-load-profile.md).
+
 ## Компоненты
 
 PostgreSQL остаётся source of truth. Redis/BullMQ выполняет фоновые задания; доменные integration jobs, notification attempts и outbox сохраняются в PostgreSQL, поэтому потеря Redis не приводит к потере бизнес-события. MinIO/S3 хранит исходные и сгенерированные файлы. ClamAV проверяет uploads. OTel Collector принимает OTLP traces.
