@@ -105,8 +105,8 @@ Codex Security Standard scan `be32fbfe-a26c-4db7-834f-fcf406df8b00` выполн
 | --- | --- | --- |
 | Локальная разработка | GO | install/build/unit/contract/PostgreSQL gates воспроизводимы |
 | Controlled demo на pilot fixtures | GO с оговорками | основной procurement flow и 10/10/500 fixture подтверждены; использовать mock/manual providers |
-| Ограниченный пилот без денежных и юридических обещаний | CONDITIONAL GO | нужен чистый observability runtime rerun и заранее зафиксированные manual fallbacks |
-| Production go-live | NO-GO | открыты CWE-319, B4.6, live PSP/EDS/connectors/notifications и provider-managed infrastructure gates |
+| Ограниченный пилот без денежных и юридических обещаний | CONDITIONAL GO | локальный B4.6 baseline зелёный; нужны runtime-граница pilot и заранее зафиксированные manual fallbacks |
+| Production go-live | NO-GO | CWE-319 закрыт; открыты production B4.6, live PSP/EDS/connectors/notifications и provider-managed infrastructure gates |
 
 ## 7. Неизменённые границы
 
@@ -116,4 +116,5 @@ Codex Security Standard scan `be32fbfe-a26c-4db7-834f-fcf406df8b00` выполн
 - Исторические `[x]` в Foundation/Acceptance Matrix не заменяют текущие gates.
 - Реальные PSP, квалифицированная ЭЦП, ЭДО/ЭСФ/СНТ, 1С, email/SMS и production
   storage не объявляются `LIVE_VERIFIED`.
-- Этот аудит не меняет продуктовые чекбоксы и не закрывает B4.6.
+- Локальная часть B4.6 имеет `INTEGRATION_VERIFIED`; production B4.6 не закрыт
+  без managed failover и длительного staging soak.

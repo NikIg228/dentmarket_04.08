@@ -92,7 +92,37 @@ Redis-compatible process через pinned npm dev dependency. Оба readiness 
 
 ## Evidence
 
-Канонические результаты и commit фиксируются в backend audit только после
-повторного зелёного запуска на committed revision. Локальная Windows-машина и
-ephemeral Redis доказывают regression/correctness baseline; staging evidence
-добавляется отдельной датированной записью без перезаписи local results.
+### Local controlled-pilot baseline — 2026-09-08
+
+Повторный запуск выполнен на committed revision `b45a3df2f7be3f0ce1f3dc37209079d243b370c1`.
+
+- [x] `npm run verify:load-profile` прошёл на отдельной PostgreSQL базе с 32
+      migrations, 10 buyer organizations, 10 suppliers и 500 offers; временная
+      база удалена после проверки.
+- [x] Search: 200 requests, 0 errors, p50 `293 ms`, p95 `420 ms`, p99
+      `1114 ms`; compare: 100 requests, 0 errors, p50 `300 ms`, p95 `693 ms`,
+      p99 `1441 ms`.
+- [x] 20 cart-to-checkout flows прошли без ошибок; flow p95 `749 ms`, checkout
+      p95 `435 ms`; повторные idempotency requests вернули один checkout.
+- [x] Scarce-stock concurrency дал `201/409` и финальные available/reserved
+      `1/4`.
+- [x] 60-second soak выполнил 1362 search и 1358 compare requests без ошибок;
+      p95 составил `328 ms` и `275 ms` соответственно.
+- [x] API connection saturation не превысила `26/30`; hot catalog/reservation
+      plans выполнились за `0.769 ms` и `0.052 ms`, shared reads — `0`.
+- [x] `npm run verify:load-multi-instance` поднял два API и общий isolated
+      Redis-compatible runtime: 12 alternating requests получили `200`, 13-й
+      запрос на другом instance получил `429`; оба API и Redis очищены.
+- [ ] Managed Redis failover под нагрузкой проверен в staging/production-like
+      окружении.
+- [ ] Выполнен длительный staging soak на representative hardware.
+
+Raw evidence текущей машины:
+
+- `.tmp/b4-6/20260908121203098_1680_1bc0d0.json`;
+- `.tmp/b4-6/20260908121511727_8552_934659_multi_instance.json`.
+
+Эти файлы намеренно не коммитятся: в документации сохранены точный commit,
+параметры и агрегированные результаты. Локальная Windows-машина и ephemeral
+Redis доказывают `INTEGRATION_VERIFIED` regression/correctness baseline;
+production B4.6 остаётся открытым до двух unchecked deployment gates выше.

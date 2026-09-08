@@ -19,10 +19,10 @@ tenant isolation, typed contracts и автоматизированными Post
 | Область | Оценка | Комментарий |
 | --- | ---: | --- |
 | Доменный procurement core | 85% | Cart/reprice/checkout/split orders/reservations/supplier flow доказаны локально |
-| Catalog/import operations | 80% | CSV и operator workflow сильные; live feed и нагрузка не доказаны |
+| Catalog/import operations | 85% | CSV/operator workflow и локальный 500-offer load profile доказаны; live feed и staging endurance открыты |
 | Документы и бухгалтерский архив | 80% | Buyer/Supplier archive реализован; legal/EDS/EDO live gates открыты |
 | Security controls | 85% | Сильные auth/tenant/webhook/outbox controls; validated CWE-319 закрыт B4.5-R3 и зелёными gates |
-| Operations/readiness | 60% | Локальные gates есть; B4.6 и managed infrastructure evidence отсутствуют |
+| Operations/readiness | 70% | Локальный B4.6 baseline зелёный; managed failover/endurance и production infrastructure evidence отсутствуют |
 | Внешние интеграции | 35% | Provider-independent foundation есть; `LIVE_VERIFIED` коннекторов нет |
 | Production readiness целиком | 55% | Controlled demo возможен, production go-live пока нельзя заявлять |
 
@@ -196,21 +196,34 @@ host allowlists и response-size budgets остаётся hardening-задаче
 
 #### P0.2. B4.6 — измеримый нагрузочный профиль catalog и checkout
 
-В репозитории есть простые search/health/handoff scripts, но нет доказательства
-полного B4.6: authenticated catalog/compare/cart validation/checkout, реальные
-PostgreSQL query plans, конкурентные reservations, multi-instance Redis и
-долговременный soak не измерены.
+**Статус:** [x] Локальный controlled-pilot baseline закрыт 2026-09-08 на commit
+`b45a3df2f7be3f0ce1f3dc37209079d243b370c1`; [ ] production B4.6 остаётся
+открытым до managed Redis failover и длительного staging soak.
 
-Минимальный DoD:
+Реализован отдельный безопасный runner с временной PostgreSQL базой, 32
+migrations, 10 buyer organizations, 10 suppliers и 500 offers. Он измеряет
+authenticated search/compare, cart validation/reprice/checkout, повторный
+idempotency request, конкурентный scarce stock, SQL plans и API connection
+saturation. Второй runner поднимает два API instance с общим isolated
+Redis-compatible runtime и проверяет общий rate-limit state.
 
-- профиль данных и нагрузки зафиксирован отдельно от pilot seed;
-- thresholds для error rate, p50/p95/p99 и saturation;
-- read profile: search → product → compare;
-- write profile: cart → revalidate/accept → checkout с повторными idempotency
-  requests и конкуренцией за малый остаток;
-- `EXPLAIN (ANALYZE, BUFFERS)`/`pg_stat_statements` для горячих запросов;
-- отдельный Redis test для rate limit/queue при нескольких API instances;
-- отчёт с hardware/runtime/config, raw results и stop criteria.
+Локальный DoD и evidence:
+
+- [x] Профиль данных, workload, thresholds и runtime metadata отделены от pilot
+      seed; raw JSON сохранён в `.tmp/b4-6/`.
+- [x] Search: 200 requests, p95 `420 ms`; compare: 100 requests, p95 `693 ms`;
+      0 errors.
+- [x] 20 write flows, flow p95 `749 ms`, checkout p95 `435 ms`; повторные
+      idempotency requests вернули один checkout.
+- [x] Scarce stock дал `201/409` и available/reserved `1/4`.
+- [x] 60-second soak: 1362 search и 1358 compare requests, 0 errors, p95
+      `328 ms` и `275 ms`.
+- [x] API connection saturation `26/30`; hot SQL execution `0.769 ms` и
+      `0.052 ms`, shared reads `0`.
+- [x] Multi-instance Redis correctness: 12 alternating requests — `200`, 13-й
+      на другом API instance — `429`; shared keys обнаружены, cleanup прошёл.
+- [ ] Managed Redis HA/failover проверен под нагрузкой.
+- [ ] Длительный staging soak выполнен на representative hardware.
 
 #### P0.3. Внешние и эксплуатационные gates
 
@@ -319,10 +332,12 @@ rewrite сейчас увеличат риск и отбросят проект 
 
 ### Этап 2 — B4.6
 
-1. Зафиксировать dataset, workload, thresholds и окружение.
-2. Измерить catalog/compare/cart/checkout и concurrent stock.
-3. Оптимизировать только доказанные hotspots.
-4. Повторить профиль и сохранить raw evidence.
+1. [x] Зафиксировать dataset, workload, thresholds и окружение.
+2. [x] Измерить catalog/compare/cart/checkout и concurrent stock.
+3. [x] Оптимизировать только доказанные hotspots.
+4. [x] Повторить профиль на committed revision и сохранить raw evidence.
+5. [ ] Провести managed Redis failover и длительный staging soak перед
+   production go-live.
 
 **Stop criteria:** ошибки данных, нарушенная idempotency/tenant isolation,
 необъяснимые p95/p99 или saturation.

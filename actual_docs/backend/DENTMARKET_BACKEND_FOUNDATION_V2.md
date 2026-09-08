@@ -725,7 +725,26 @@ production connectors не входят в фазу; compensating rollback за�
 - [x] B4.3 — dead-letter operations и защищённый replay;
 - [x] B4.4 — rate limiting и production auth runbook;
 - [x] B4.5 — security/dependency scan;
-- [ ] B4.6 — нагрузочный профиль каталога и checkout.
+- [ ] B4.6 — нагрузочный профиль каталога и checkout: локальный controlled-pilot
+      baseline подтверждён, production deployment gates остаются открыты.
+
+Выполнено локально в B4.6 на commit `b45a3df2f7be3f0ce1f3dc37209079d243b370c1`:
+
+- [x] Изолированная PostgreSQL база, 32 migrations, 10 buyer organizations,
+      10 suppliers и 500 offers; cleanup временной базы подтверждён.
+- [x] Authenticated search/compare и 20 cart-to-checkout flows прошли с нулевым
+      error rate; p95 — `420 ms`, `693 ms` и `749 ms` соответственно.
+- [x] Повторный idempotency checkout и scarce-stock concurrency подтверждены;
+      scarce-stock дал `201/409` и available/reserved `1/4`.
+- [x] 60-second soak, PostgreSQL saturation и два `EXPLAIN (ANALYZE, BUFFERS)`
+      уложились в зафиксированные thresholds.
+- [x] Два API instance разделили rate-limit state через isolated Redis-compatible
+      runtime: 12 запросов `200`, 13-й на другом instance — `429`.
+- [ ] Managed Redis failover под нагрузкой и длительный staging soak на
+      representative hardware имеют production evidence.
+
+Команды, thresholds, ограничения и raw evidence описаны в
+`actual_docs/operations/b4-6-load-profile.md`.
 
 Выполнено в B4.1:
 

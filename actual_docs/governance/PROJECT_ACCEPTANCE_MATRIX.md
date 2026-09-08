@@ -70,7 +70,7 @@
 | Node.js и pnpm            | `INTEGRATION_VERIFIED` | Node `24.18.0`, pnpm `11.9.0`; `pnpm install --frozen-lockfile` успешно восстановил все 10 workspace-проектов                                                                                                  | Offline-store не содержал четыре записи, поэтому полностью автономная установка пока не доказана          | Использовать frozen lockfile; отдельно подготовить CI/cache, если нужен offline build                   |
 | Локальная инфраструктура  | `BLOCKED`              | `compose.yaml` описывает PostgreSQL, Redis, MinIO и ClamAV                                                                                                                                                     | Команда `docker` на текущей машине отсутствует                                                            | Установить Docker Desktop либо явно утвердить локальный режим без Docker                                |
 | PostgreSQL-схема          | `INTEGRATION_VERIFIED` | 32 миграции применены через `prisma migrate deploy`; `20260906120000_document_archive` проверена полным upgrade-path на отдельной чистой БД, `prisma validate` и `npm run verify:postgres` прошли 2026-09-06 | Fresh CI run для новой миграции ожидает push/PR; provider-managed backup/rollback остаётся production gate | Сохранять migration deploy и PostgreSQL gate обязательными                                              |
-| Backend API               | `E2E_VERIFIED`         | B0.1–B0.6, Flow A, B2.1–B2.4 и B3.1–B3.3 проходят; archive contract содержит 301 operation/48 schemas, tenant-safe detail/list, accounting audit и lifecycle gates; B4.1–B4.5-R2E проверены | Внешний alert/dashboard, Redis HA и production infrastructure ещё не имеют `LIVE_VERIFIED` | Следующая задача B4.6 — нагрузочный профиль каталога и checkout |
+| Backend API               | `E2E_VERIFIED`         | B0.1–B0.6, Flow A, B2.1–B2.4 и B3.1–B3.3 проходят; archive contract содержит 301 operation/48 schemas, tenant-safe detail/list, accounting audit и lifecycle gates; B4.1–B4.5-R2E и локальный B4.6 baseline проверены | Длительный staging soak, managed Redis HA/failover и production infrastructure ещё не имеют `LIVE_VERIFIED` | Следующая задача — реальная runtime-граница pilot; production B4.6 закрыть deployment evidence |
 | Backup/restore            | `INTEGRATION_VERIFIED` | `pnpm verify:backup-restore`: 149 таблиц с content hash, 2 object files, 31 migration и API health/readiness; source неизменен, target удалён                                                                  | Managed WAL/PITR, S3 versioning/retention и restore production snapshot не имеют `LIVE_VERIFIED`          | Выполнить provider-level timed drill перед go-live; локальный gate сохранять в CI                       |
 | Observability и alerts    | `INTEGRATION_VERIFIED` | `pnpm verify:observability`: 4/4 unit, 7 rules/14 synthetic vectors, metrics auth `401/200`, PostgreSQL outbox/checkout/import gauges; production config запрещает endpoint без token                          | Нет evidence внешнего monitoring deployment, notification route и live synthetic alert                    | При deployment подключить versioned PromQL rules и сохранить live evidence                              |
 | Dependency security       | `INTEGRATION_VERIFIED` | B4.5: production audit изменён с 15 high/6 moderate на `No known vulnerabilities found`; Next 16.2.11, Sharp 0.35.3, PostCSS 8.5.26 и pdfjs-dist 6.2.108 прошли build, PDF/import, PostgreSQL и web regression | Registry state меняется; production network и runtime exposure отдельных advisories не измерялись         | Сохранять `pnpm audit --prod --audit-level high` в CI и обновлять lockfile только с compatibility gates |
@@ -311,8 +311,14 @@ R2E завершён на commit `8f450ea`: complete-coverage scan
 - [x] B4.4 — rate limiting и production auth runbook: Redis-backed throttler,
       fail-closed production behavior, stable 429/Retry-After и auth contract
       подтверждены targeted/full gates.
-- [ ] B4.6 — нагрузочный профиль каталога и checkout — следующая
-      реализационная задача.
+- [ ] B4.6 — production нагрузочный профиль каталога и checkout.
+  - [x] Локальный controlled-pilot baseline на commit `b45a3df`: отдельная
+        PostgreSQL база, 10/10/500, authenticated read/write profile,
+        idempotency, scarce stock, SQL plans и cleanup прошли thresholds.
+  - [x] Два API instance подтвердили общий rate-limit state через isolated
+        Redis-compatible runtime (`12 x 200`, затем `429` на другом instance).
+  - [ ] Managed Redis failover и длительный staging soak имеют deployment
+        evidence.
 
 ## Current security gate override (2026-08-20)
 
@@ -341,4 +347,14 @@ tracked files with `0` reportable findings. Application security is now
       отвергается до service boundary.
 - [x] `9007199254740993` сохраняется в active price/history как Prisma Decimal
       без `Number`; full workspace, core contract, PostgreSQL и pilot backend
-      gates прошли. Следующая задача — B4.6.
+      gates прошли.
+
+## Current B4.6 local load update (2026-09-08)
+
+- [x] `npm run verify:load-profile` прошёл на immutable commit `b45a3df` с
+      нулевым error rate, p95 search/compare/write-flow `420/693/749 ms`,
+      connection saturation `26/30` и корректным scarce-stock результатом.
+- [x] `npm run verify:load-multi-instance` доказал shared Redis rate-limit state
+      между двумя API processes и корректный cleanup.
+- [ ] Production B4.6 остаётся открытым до managed Redis failover и длительного
+      staging soak на representative hardware.
