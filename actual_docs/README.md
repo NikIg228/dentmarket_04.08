@@ -30,11 +30,13 @@
 ### `backend/` — backend foundation
 
 - [Backend Foundation V2](backend/DENTMARKET_BACKEND_FOUNDATION_V2.md)
+- [Backend-аудит и технический roadmap — 2026-09-08](backend/DENTMARKET_BACKEND_AUDIT_2026-09-08.md)
 
 ### `governance/` — правила разработки и доказательства
 
 - [Development Workflow](governance/DEVELOPMENT_WORKFLOW.md)
 - [Project Acceptance Matrix](governance/PROJECT_ACCEPTANCE_MATRIX.md)
+- [Снимок состояния проекта — 2026-09-08](governance/PROJECT_STATE_SNAPSHOT_2026-09-08.md)
 - [Security R2E — актуальный complete-coverage checkpoint](governance/SECURITY_R2E_2026-08-20.md)
 - [Security audit B4.5 — исторический dependency checkpoint](governance/SECURITY_AUDIT_B4_5_2026-08-19.md)
 
