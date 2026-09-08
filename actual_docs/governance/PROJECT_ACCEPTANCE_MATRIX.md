@@ -1,7 +1,7 @@
 # DentMarket KZ — матрица фактической готовности проекта
 
 **Дата базового среза:** 2026-08-19
-**Последнее точечное обновление:** 2026-09-08, B4.5-R3 — production outbound HTTPS policy
+**Последнее точечное обновление:** 2026-09-08, P1.2 — exact manual price override
 **Продуктовый источник требований:** [`DENTMARKET_PRODUCT_V2.md`](../product/DENTMARKET_PRODUCT_V2.md)
 **Назначение:** отделить написанное ТЗ, демонстрационный UI и существующий код от реально проверенной и готовой к пилоту функции.
 
@@ -332,4 +332,13 @@ tracked files with `0` reportable findings. Application security is now
       сохранил localhost HTTP только в development/test и закрепил решение ADR 008.
 - [x] Workspace typecheck/test/build, production config, outbound security,
       runtime split, rate-limit/auth, dependency audit и независимый verify-fix
-      review прошли. Следующая задача перед B4.6 — exact manual price override.
+      review прошли.
+
+## Current monetary integrity update (2026-09-08)
+
+- [x] Manual price override принимает точный 1–20 digit minor-unit string и
+      канонизирует только безопасный legacy integer; unsafe JavaScript number
+      отвергается до service boundary.
+- [x] `9007199254740993` сохраняется в active price/history как Prisma Decimal
+      без `Number`; full workspace, core contract, PostgreSQL и pilot backend
+      gates прошли. Следующая задача — B4.6.

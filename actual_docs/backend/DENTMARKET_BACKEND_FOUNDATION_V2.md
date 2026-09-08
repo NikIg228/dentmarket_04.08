@@ -410,6 +410,13 @@ Complete-coverage scan `64b65075-d7f3-4c23-b6e2-1535e6067b80` на `8f450ea`
 реализован и подтверждён targeted/full backend gates; следующая задача —
 **B4.6: нагрузочный профиль каталога и checkout**.
 
+- [x] P1.2 monetary integrity — manual price override принимает canonical
+      1–20 digit minor-unit string, безопасный legacy integer преобразует в
+      string, отвергает unsafe JavaScript number и пишет Prisma Decimal без
+      преобразования через `Number`.
+- [x] Exact boundary `9007199254740993` подтверждён schema/service regressions,
+      full typecheck/test/build, core contract, PostgreSQL и pilot backend gates.
+
 ### B1 — покупка клиникой
 
 | Готово | ID   | Задача                            | Gate                   |

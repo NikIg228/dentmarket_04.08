@@ -230,14 +230,19 @@ timed restore drill. Сейчас это foundation или локальный ev
 
 #### P1.2. Точность manual price override
 
-`createDataOverrideSchema` принимает `value.amountMinor` как произвольный
-JavaScript integer без `Number.MAX_SAFE_INTEGER`, после чего
-`data-freshness.service.ts` выполняет `Number(value.amountMinor)`. Значение выше
+**Статус:** [x] Закрыто 2026-09-08.
+
+До remediation `createDataOverrideSchema` принимал `value.amountMinor` как
+произвольный JavaScript integer без `Number.MAX_SAFE_INTEGER`, после чего
+`data-freshness.service.ts` выполнял `Number(value.amountMinor)`. Значение выше
 `2^53-1` может потерять точность до записи в Decimal(20,0). Это не основной
 checkout price contract, но нарушает общий monetary invariant.
 
-Нужно заменить поле на decimal string либо safe integer, добавить boundary
-regressions и сохранить API-client/OpenAPI совместимость.
+Контракт теперь канонизирует безопасный legacy integer в string, принимает
+точный 1–20 digit decimal string и отвергает unsafe JavaScript number.
+`DataFreshnessService` создаёт Prisma Decimal прямо из строки. Exact boundary
+`9007199254740993` подтверждён schema/service regressions, full
+typecheck/test/build, core contract, PostgreSQL и pilot backend gates.
 
 #### P1.3. Концентрация сложности
 
@@ -304,10 +309,10 @@ rewrite сейчас увеличат риск и отбросят проект 
 
 ### Этап 1 — security и monetary integrity
 
-1. Закрыть CWE-319 общим HTTPS validator и расширенным outbound coverage gate.
-2. Исправить manual price override на string/safe integer contract.
-3. Прогнать `typecheck`, full test, core contract, production config, outbound
-   security, PostgreSQL и security runtime gates.
+1. [x] Закрыть CWE-319 общим HTTPS validator и outbound coverage gate.
+2. [x] Исправить manual price override на string/safe integer contract.
+3. [x] Прогнать `typecheck`, full test/build, core contract, production config,
+   outbound security, PostgreSQL и security runtime gates.
 
 **Stop criteria:** любой красный security/core/PostgreSQL gate; отсутствие
 явного решения по mTLS exception.

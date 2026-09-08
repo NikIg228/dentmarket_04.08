@@ -58,7 +58,8 @@ export class DataFreshnessService {
       if (current) await tx.dataOverride.update({ where: { id: current.id }, data: { status: "CANCELLED", cancelledAt: now } });
       const override = await tx.dataOverride.create({ data: { supplierOrganizationId, offerId: input.offerId, inventoryBalanceId: input.inventoryBalanceId, previousOverrideId: current?.id, target: input.target, mode: input.mode, value: value as Prisma.InputJsonValue, reason: input.reason, validFrom: now, validUntil, createdById: context.actorId } });
       if (input.target === "PRICE" && offer) {
-        const amountMinor = Number(value.amountMinor);
+        if (typeof value.amountMinor !== "string") throw new BadRequestException("Price override amountMinor must be an exact integer string");
+        const amountMinor = new Prisma.Decimal(value.amountMinor);
         const currency = typeof value.currency === "string" && /^[A-Z]{3}$/.test(value.currency) ? value.currency : "KZT";
         await tx.offerPrice.updateMany({ where: { offerId: offer.id, status: "ACTIVE" }, data: { status: "INACTIVE", validTo: now } });
         await tx.offerPrice.create({ data: { offerId: offer.id, amountMinor, currency, includesVat: value.includesVat !== false, vatRate: typeof value.vatRate === "number" ? value.vatRate : null, source: "MANUAL", lastConfirmedAt: now, freshnessExpiresAt: validUntil } });

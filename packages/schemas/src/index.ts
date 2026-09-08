@@ -619,6 +619,11 @@ export const upsertFreshnessPolicySchema = z.object({
   priority: z.number().int().min(0).max(10_000).default(100),
 });
 
+const manualOverrideAmountMinorSchema = z.union([
+  z.string().regex(/^(0|[1-9]\d{0,19})$/, "amountMinor must be a canonical 1-20 digit integer string"),
+  z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).transform(String),
+]);
+
 export const createDataOverrideSchema = z.object({
   target: z.enum(["PRICE", "INVENTORY"]),
   offerId: z.uuid().nullable().optional(),
@@ -631,9 +636,12 @@ export const createDataOverrideSchema = z.object({
   if (value.target === "PRICE" && (!value.offerId || value.inventoryBalanceId)) context.addIssue({ code: "custom", message: "Price override requires only offerId", path: ["offerId"] });
   if (value.target === "INVENTORY" && !value.inventoryBalanceId) context.addIssue({ code: "custom", message: "Inventory override requires inventoryBalanceId", path: ["inventoryBalanceId"] });
   if (value.mode === "UNTIL_DATE" && !value.validUntil) context.addIssue({ code: "custom", message: "Until-date override requires validUntil", path: ["validUntil"] });
-  if (value.target === "PRICE" && (typeof value.value.amountMinor !== "number" || !Number.isInteger(value.value.amountMinor) || value.value.amountMinor < 0)) context.addIssue({ code: "custom", message: "Price override requires a non-negative integer amountMinor", path: ["value", "amountMinor"] });
+  if (value.target === "PRICE" && !manualOverrideAmountMinorSchema.safeParse(value.value.amountMinor).success) context.addIssue({ code: "custom", message: "Price override requires amountMinor as a canonical integer string or a safe non-negative integer", path: ["value", "amountMinor"] });
   if (value.target === "INVENTORY" && (typeof value.value.quantityOnHand !== "number" || value.value.quantityOnHand < 0)) context.addIssue({ code: "custom", message: "Inventory override requires non-negative quantityOnHand", path: ["value", "quantityOnHand"] });
-});
+}).transform((value) => value.target === "PRICE"
+  ? { ...value, value: { ...value.value, amountMinor: manualOverrideAmountMinorSchema.parse(value.value.amountMinor) } }
+  : value
+);
 
 export const searchCatalogSchema = z.object({
   buyerOrganizationId: z.uuid(),

@@ -339,6 +339,15 @@ describe("iteration 1A schemas", () => {
     expect(createDataOverrideSchema.safeParse({ target: "INVENTORY", inventoryBalanceId: "00000000-0000-4000-8000-000000000152", mode: "UNTIL_NEXT_SYNC", value: { quantityOnHand: 50 }, reason: "Инвентаризация" }).success).toBe(true);
   });
 
+  it("preserves exact minor units in manual price overrides", () => {
+    const base = { target: "PRICE" as const, offerId: "00000000-0000-4000-8000-000000000150", mode: "PERMANENT" as const, reason: "Точная ручная цена" };
+    expect(createDataOverrideSchema.parse({ ...base, value: { amountMinor: 450000 } }).value.amountMinor).toBe("450000");
+    expect(createDataOverrideSchema.parse({ ...base, value: { amountMinor: "9007199254740993" } }).value.amountMinor).toBe("9007199254740993");
+    expect(createDataOverrideSchema.safeParse({ ...base, value: { amountMinor: 9007199254740992 } }).success).toBe(false);
+    expect(createDataOverrideSchema.safeParse({ ...base, value: { amountMinor: "01" } }).success).toBe(false);
+    expect(createDataOverrideSchema.safeParse({ ...base, value: { amountMinor: "100000000000000000000" } }).success).toBe(false);
+  });
+
   it("parses marketplace search filters without float money assumptions", () => {
     const result = searchCatalogSchema.parse({ buyerOrganizationId: "00000000-0000-4000-8000-000000000030", q: "перчатки", inStock: "true", maxNormalizedPriceMinor: "6000", unit: "шт", packaging: "100 шт", deliveryMethod: "CARRIER" });
     expect(result).toMatchObject({ inStock: true, maxNormalizedPriceMinor: 6000, unit: "шт", packaging: "100 шт", deliveryMethod: "CARRIER", sort: "RELEVANCE", limit: 24 });
