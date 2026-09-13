@@ -5,6 +5,7 @@ import { CheckmarkCircle24Regular } from "@fluentui/react-icons/svg/checkmark-ci
 import { ClipboardTaskListLtr24Regular } from "@fluentui/react-icons/svg/clipboard-task-list-ltr";
 import { ShoppingBag24Regular } from "@fluentui/react-icons/svg/shopping-bag";
 import type { MarketplaceApiClient } from "@marketplace/api-client";
+import { frontendFeatures } from "@marketplace/api-client";
 import {
   DmButton,
   DmInput,
@@ -171,7 +172,7 @@ export function BuyerOrders({
                           </td>
                         </tr>
                       ) : null}
-                      {isOrderReviewable(order.status) ? (
+                      {frontendFeatures.trust && isOrderReviewable(order.status) ? (
                         <tr className={styles.detailRow}>
                           <td colSpan={6}>
                             <div className={styles.reviewForm}>

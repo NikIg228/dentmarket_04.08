@@ -10,6 +10,7 @@ import { Search24Regular } from "@fluentui/react-icons/svg/search";
 import { Settings24Regular } from "@fluentui/react-icons/svg/settings";
 import { ShieldLock24Regular } from "@fluentui/react-icons/svg/shield-lock";
 import { AppShell, DmButton, DmInput, DmSelect } from "@marketplace/ui";
+import { frontendFeatures } from "@marketplace/api-client";
 import { useEffect, useState, type ReactNode } from "react";
 import styles from "./page.module.css";
 import {
@@ -51,7 +52,7 @@ const navigation: Array<{ id: SectionId; label: string; icon: ReactNode }> = [
   { id: "catalog", label: "Каталог", icon: <Cube24Regular /> },
   { id: "imports", label: "Загрузка товаров", icon: <Database24Regular /> },
   { id: "orders", label: "Заказы и договоры", icon: <Cart24Regular /> },
-  { id: "security", label: "Контроль и доверие", icon: <ShieldLock24Regular /> },
+  { id: "security", label: frontendFeatures.trust ? "Контроль и доверие" : "Контроль и аудит", icon: <ShieldLock24Regular /> },
   { id: "settings", label: "Настройки", icon: <Settings24Regular /> },
 ];
 
@@ -81,8 +82,10 @@ const sectionMeta: Record<SectionId, { title: string; description: string }> = {
     description: "Исполнение заказов поставщиками, договоры и подписи ЭЦП.",
   },
   security: {
-    title: "Контроль и доверие",
-    description: "Проверки поставщиков, рейтинг и ограничения.",
+    title: frontendFeatures.trust ? "Контроль и доверие" : "Контроль и аудит",
+    description: frontendFeatures.trust
+      ? "Проверки поставщиков, рейтинг и ограничения."
+      : "История действий оператора и изменений в системе.",
   },
   settings: {
     title: "Настройки DentMarket",
@@ -168,7 +171,7 @@ export default function OperationsWorkspace() {
     catalog: <><ProductCorrectionQueue /><CatalogQuality /><CatalogFoundation /></>,
     imports: <><CatalogImportReviewQueue /><SupplierOperations /><IntegrationOperations /><ConnectorReadinessRegistry /></>,
     orders: <><OperationQueue /><AgreementOperations /></>,
-    security: <><TrustOperations /><AuditOperations /></>,
+    security: <>{frontendFeatures.trust && <TrustOperations />}<AuditOperations /></>,
     settings: <PlatformSettings onNavigate={setActive} />,
   };
 

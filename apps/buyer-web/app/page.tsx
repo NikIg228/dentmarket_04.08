@@ -5,17 +5,11 @@ import {
   Checkbox,
   Field,
   Input,
-  Menu,
-  MenuItem,
-  MenuList,
-  MenuPopover,
-  MenuTrigger,
   Select,
   Spinner,
 } from "@fluentui/react-components";
 import { Alert24Regular } from "@fluentui/react-icons/svg/alert";
 import { ArrowSync24Regular } from "@fluentui/react-icons/svg/arrow-sync";
-import { Bot24Regular } from "@fluentui/react-icons/svg/bot";
 import { Box24Regular } from "@fluentui/react-icons/svg/box";
 import { Cart24Regular } from "@fluentui/react-icons/svg/cart";
 import { ClipboardTaskListLtr24Regular } from "@fluentui/react-icons/svg/clipboard-task-list-ltr";
@@ -24,15 +18,13 @@ import { Document24Regular } from "@fluentui/react-icons/svg/document";
 import { Filter24Regular } from "@fluentui/react-icons/svg/filter";
 import { Grid24Regular } from "@fluentui/react-icons/svg/grid";
 import { List24Regular } from "@fluentui/react-icons/svg/list";
-import { Location24Regular } from "@fluentui/react-icons/svg/location";
-import { MoreHorizontal24Regular } from "@fluentui/react-icons/svg/more-horizontal";
-import { PersonSupport24Regular } from "@fluentui/react-icons/svg/person-support";
 import { Search24Regular } from "@fluentui/react-icons/svg/search";
 import { ShoppingBag24Regular } from "@fluentui/react-icons/svg/shopping-bag";
 import { Star16Filled } from "@fluentui/react-icons/svg/star";
 import { Tag24Regular } from "@fluentui/react-icons/svg/tag";
 import {
   MarketplaceApiClient,
+  frontendFeatures,
   parseSessionHandoff,
   type ApiContext,
   type SessionHandoffEnvelope,
@@ -61,6 +53,7 @@ import {
 } from "react";
 import styles from "./page.module.css";
 import { BuyerServicesPanel } from "./buyer-services-panel";
+import { BuyerServicesMenu } from "./buyer-services-menu";
 import { BuyerCart } from "./features/purchasing/buyer-cart";
 import { BuyerOrders } from "./features/purchasing/buyer-orders";
 import type {
@@ -139,10 +132,10 @@ const mediaSource = (media: SearchMedia | undefined) => {
   return media.sourceUrl;
 };
 const bestPromotionPercent = (product: SearchProduct) =>
-  product.offers.reduce(
+  frontendFeatures.promotions ? product.offers.reduce(
     (best, offer) => Math.max(best, offer.promotion?.percentage ?? 0),
     0,
-  );
+  ) : 0;
 const priceDifferencePercent = (product: SearchProduct) => {
   const prices = product.offers
     .map((offer) => Number(offer.priceMinor ?? 0))
@@ -540,7 +533,7 @@ export default function BuyerWorkspace({
     Math.max(0, (search?.total ?? 0) - (search?.items.length ?? 0)),
   );
   const rankedComparisonOffers = useMemo(
-    () => rankCompareOffers(comparison?.offers ?? [], supplierTrust),
+    () => rankCompareOffers(comparison?.offers ?? [], frontendFeatures.trust ? supplierTrust : {}),
     [comparison, supplierTrust],
   );
 
@@ -995,6 +988,7 @@ export default function BuyerWorkspace({
         `${handoff ? "/marketplace" : "/catalog"}/products/${productId}/compare?buyerOrganizationId=${buyerId}&quantity=1${variantId ? `&variantId=${encodeURIComponent(variantId)}` : ""}`,
       );
       setComparison(nextComparison);
+      if (!frontendFeatures.trust) return;
       const [reviews, ...ratings] = await Promise.all([
         api.get<ProductReviews>(`/trust/products/${productId}/reviews`),
         ...nextComparison.offers.map((offer) =>
@@ -1119,6 +1113,7 @@ export default function BuyerWorkspace({
   const reviewDraft = (orderId: string) =>
     reviewDrafts[orderId] ?? { rating: 5, comment: "" };
   const submitReview = async (orderId: string) => {
+    if (!frontendFeatures.trust) return;
     const draft = reviewDraft(orderId);
     setBusy(`review:${orderId}`);
     try {
@@ -1225,7 +1220,7 @@ export default function BuyerWorkspace({
               </a>
             ))}
           </nav>
-          {promotedProducts.length ? (
+          {frontendFeatures.promotions && promotedProducts.length ? (
             <section
               className={styles.dealsSection}
               aria-labelledby="deals-title"
@@ -1805,7 +1800,7 @@ export default function BuyerWorkspace({
                                 : "Проверенная карточка каталога")}
                         </p>
                       ) : null}
-                      {product.reviewSummary?.count ? (
+                      {frontendFeatures.trust && (product.reviewSummary?.count ? (
                         <small className={styles.reviewSummary}>
                           <Star16Filled aria-hidden="true" />
                           {product.reviewSummary.averageRating?.toFixed(
@@ -1822,7 +1817,7 @@ export default function BuyerWorkspace({
                         <small className={styles.reviewSummaryMuted}>
                           Пока без отзывов
                         </small>
-                      )}
+                      ))}
                     </div>
                     <div className={styles.offerSummary}>
                       <strong>
@@ -2232,7 +2227,7 @@ export default function BuyerWorkspace({
                       )}
                     </small>
                   </span>
-                  <span>
+                  {frontendFeatures.trust && <span>
                     <strong>
                       {selectedProduct.reviewSummary?.averageRating?.toFixed(
                         1,
@@ -2248,7 +2243,7 @@ export default function BuyerWorkspace({
                       )}{" "}
                       клиник
                     </small>
-                  </span>
+                  </span>}
                   <span>
                     <strong>
                       {
@@ -2296,7 +2291,7 @@ export default function BuyerWorkspace({
                       <span>Поставщик</span>
                       <span>Цена</span>
                       <span>Доставка и наличие</span>
-                      <span>Надёжность</span>
+                      <span>{frontendFeatures.trust ? "Надёжность" : "Документы"}</span>
                       <span />
                     </div>
                     {rankedComparisonOffers.map((offer, index) => {
@@ -2388,11 +2383,11 @@ export default function BuyerWorkspace({
                             ) : null}
                           </div>
                           <div className={styles.sellerTrust}>
-                            <strong>
+                            {frontendFeatures.trust && <strong>
                               {trustScore != null
                                 ? `${Number(trustScore).toFixed(0)}/100`
                                 : "Нет истории"}
-                            </strong>
+                            </strong>}
                             <small>
                               {offer.markers.verifiedDocuments
                                 ? "Документы актуальны"
@@ -2419,7 +2414,7 @@ export default function BuyerWorkspace({
                   </div>
                 )}
               </section>
-              <section className={styles.productReviews}>
+              {frontendFeatures.trust && <section className={styles.productReviews}>
                 <h4>Отзывы клиник</h4>
                 {!productReviews?.reviews.length ? (
                   <p>
@@ -2439,7 +2434,7 @@ export default function BuyerWorkspace({
                     </article>
                   ))
                 )}
-              </section>
+              </section>}
             </div>
           </section>
         </div>
@@ -2587,14 +2582,14 @@ export default function BuyerWorkspace({
     ) : active === "documents" ? (
       renderDocuments()
     ) : active === "workspace" ||
-      active === "assistant" ||
+      (active === "assistant" && frontendFeatures.ai) ||
       active === "support" ? (
       <BuyerServicesPanel
         mode={active}
         buyerId={buyerId}
         apiContext={apiContext}
       />
-    ) : active === "smart-commerce" ? (
+    ) : active === "smart-commerce" && frontendFeatures.recommendations ? (
       <SmartCommercePanel buyerId={buyerId} apiContext={apiContext} />
     ) : (
       renderNotifications()
@@ -2663,38 +2658,7 @@ export default function BuyerWorkspace({
       actions={
         handoff ? (
           <>
-            <Menu>
-              <MenuTrigger disableButtonEnhancement>
-                <Button appearance="subtle" icon={<MoreHorizontal24Regular />}>
-                  Сервисы
-                </Button>
-              </MenuTrigger>
-              <MenuPopover>
-                <MenuList>
-                  <MenuItem
-                    icon={<Location24Regular />}
-                    onClick={() => setActive("smart-commerce")}
-                  >
-                    Рекомендации по городу
-                  </MenuItem>
-                  <MenuItem
-                    icon={<Bot24Regular />}
-                    onClick={() => setActive("assistant")}
-                  >
-                    AI-помощник
-                  </MenuItem>
-                  <MenuItem
-                    icon={<PersonSupport24Regular />}
-                    onClick={() => setActive("support")}
-                  >
-                    Поддержка
-                  </MenuItem>
-                  <MenuItem onClick={() => window.location.assign("/about")}>
-                    О DentMarket
-                  </MenuItem>
-                </MenuList>
-              </MenuPopover>
-            </Menu>
+            <BuyerServicesMenu onNavigate={setActive} />
             <Button
               appearance="subtle"
               icon={<ArrowSync24Regular />}

@@ -24,6 +24,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Validate public build configuration
         env:
+          DEPLOYMENT_PROFILE: ${{ vars.DEPLOYMENT_PROFILE }}
           PUBLIC_API_URL: ${{ vars.PUBLIC_API_URL }}
           BUYER_APP_URL: ${{ vars.BUYER_APP_URL }}
           SUPPLIER_APP_URL: ${{ vars.SUPPLIER_APP_URL }}
@@ -31,6 +32,7 @@ jobs:
           APPLE_CLIENT_ID: ${{ vars.APPLE_CLIENT_ID }}
           APPLE_REDIRECT_URI: ${{ vars.APPLE_REDIRECT_URI }}
         run: |
+          case "$DEPLOYMENT_PROFILE" in pilot|go_live) ;; *) echo "DEPLOYMENT_PROFILE must be pilot or go_live" >&2; exit 1;; esac
           for name in PUBLIC_API_URL BUYER_APP_URL SUPPLIER_APP_URL GOOGLE_CLIENT_ID APPLE_CLIENT_ID APPLE_REDIRECT_URI; do
             test -n "${!name}" || { echo "Missing repository variable: $name" >&2; exit 1; }
           done
@@ -48,6 +50,7 @@ jobs:
           push: true
           tags: ghcr.io/${{ github.repository_owner }}/marketplace-${{ matrix.target }}:${{ inputs.release || github.ref_name }}
           build-args: |
+            DEPLOYMENT_PROFILE=${{ vars.DEPLOYMENT_PROFILE }}
             NEXT_PUBLIC_API_URL=${{ vars.PUBLIC_API_URL }}
             NEXT_PUBLIC_BUYER_APP_URL=${{ vars.BUYER_APP_URL }}
             NEXT_PUBLIC_SUPPLIER_APP_URL=${{ vars.SUPPLIER_APP_URL }}

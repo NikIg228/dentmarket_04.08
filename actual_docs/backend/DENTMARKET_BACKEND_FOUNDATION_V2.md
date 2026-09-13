@@ -134,8 +134,14 @@ DentMarket — B2B-маркетплейс стоматологических т�
       указывает `go_live`.
 - [x] `npm run verify:pilot-composition` проверяет фактические modules и OpenAPI
       routes для default/pilot/go_live; gate включён в CI.
+- [x] Frontend Pilot Composition Gate (2026-09-13, ADR 010): четыре Next.js
+      сборки получают тот же профиль; optional UI и API requests отключены в
+      pilot, а core commerce, документы, geo и аудит сохранены.
+- [x] `verify:frontend-profile` проверяет build configuration всех кабинетов и
+      Landing; unit regressions и `verify:web` 23/23 доказывают local pilot
+      composition на desktop/390 px. Результаты и ограничения — в ADR 010.
 
-Решение и последствия закреплены ADR 009 и
+Решение и последствия закреплены ADR 009, ADR 010 и
 `actual_docs/operations/deployment-profiles.md`. Runtime-role `api | worker |
 all` остаётся отдельной осью process composition и уже проверяется
 `verify:runtime-split`.

@@ -1,3 +1,10 @@
+import { deploymentFeatures, isDeploymentApiPathEnabled, type DeploymentProfile } from "@marketplace/schemas/deployment-policy";
+
+// Next replaces this literal at build time. Missing/unrecognised values stay pilot.
+export const frontendDeploymentProfile: DeploymentProfile =
+  process.env.NEXT_PUBLIC_DEPLOYMENT_PROFILE === "go_live" ? "go_live" : "pilot";
+export const frontendFeatures = deploymentFeatures(frontendDeploymentProfile);
+
 import type {
   AddCartItemRequest,
   ApproveImportProductCandidateInput,
@@ -125,6 +132,7 @@ export class MarketplaceApiClient {
   }
 
   async request<T>(path: string, init: RequestInit = {}): Promise<T> {
+    this.assertEnabledPath(path);
     const response = await fetch(`${this.baseUrl.replace(/\/$/, "")}${path}`, {
       ...init,
       headers: {
@@ -150,6 +158,7 @@ export class MarketplaceApiClient {
   async download(
     path: string,
   ): Promise<{ blob: Blob; fileName: string | null }> {
+    this.assertEnabledPath(path);
     const response = await fetch(`${this.baseUrl.replace(/\/$/, "")}${path}`, {
       headers: this.headers(),
       cache: "no-store",
@@ -178,6 +187,12 @@ export class MarketplaceApiClient {
       blob,
       fileName: encodedName ? decodeURIComponent(encodedName) : null,
     };
+  }
+
+  private assertEnabledPath(path: string) {
+    if (!isDeploymentApiPathEnabled(frontendDeploymentProfile, `${this.baseUrl.replace(/\/$/, "")}${path}`)) {
+      throw new MarketplaceApiError(404, { code: "FEATURE_UNAVAILABLE", message: "Функция недоступна в текущем профиле", path });
+    }
   }
 
   get<T>(path: string) {

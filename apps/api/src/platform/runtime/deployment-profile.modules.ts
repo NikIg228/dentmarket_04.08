@@ -14,13 +14,7 @@ export const OUT_OF_PILOT_MODULE_NAMES = [
   "SmartRecommendationsModule",
 ] as const;
 
-export const OUT_OF_PILOT_ROUTE_PREFIXES = [
-  "/promotions",
-  "/billing",
-  "/ai",
-  "/trust",
-  "/recommendations",
-] as const;
+export { OUT_OF_PILOT_ROUTE_PREFIXES } from "@marketplace/schemas";
 
 const goLiveOnlyModules: Type<unknown>[] = [
   PromotionsModule,

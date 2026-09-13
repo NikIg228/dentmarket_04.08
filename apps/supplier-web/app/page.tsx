@@ -14,6 +14,7 @@ import { ShieldCheckmark24Regular } from "@fluentui/react-icons/svg/shield-check
 import { Star24Regular } from "@fluentui/react-icons/svg/star";
 import {
   MarketplaceApiClient,
+  frontendFeatures,
   parseSessionHandoff,
   type ApiContext,
   type SessionHandoffEnvelope,
@@ -605,9 +606,9 @@ export default function SupplierWorkspace() {
         onFileChange={setCredentialFile}
         onSubmit={submitCredential}
       />
-    ) : active === "promotions" ? (
+    ) : active === "promotions" && frontendFeatures.promotions ? (
       <PromotionsPanel supplierId={supplierId} apiContext={apiContext} />
-    ) : active === "trust" ? (
+    ) : active === "trust" && frontendFeatures.trust ? (
       <SupplierTrustPanel supplierId={supplierId} apiContext={apiContext} />
     ) : (
       <SupplierDocuments
@@ -668,8 +669,8 @@ export default function SupplierWorkspace() {
             <MenuPopover>
               <MenuList>
                 <MenuItem icon={<ShieldCheckmark24Regular />} onClick={() => setActive("compliance")}>Комплаенс</MenuItem>
-                <MenuItem icon={<Money24Regular />} onClick={() => setActive("promotions")}>Акции</MenuItem>
-                <MenuItem icon={<Star24Regular />} onClick={() => setActive("trust")}>Доверие и география</MenuItem>
+                {frontendFeatures.promotions && <MenuItem icon={<Money24Regular />} onClick={() => setActive("promotions")}>Акции</MenuItem>}
+                {frontendFeatures.trust && <MenuItem icon={<Star24Regular />} onClick={() => setActive("trust")}>Доверие и география</MenuItem>}
               </MenuList>
             </MenuPopover>
           </Menu>

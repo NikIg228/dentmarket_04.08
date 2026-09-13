@@ -67,6 +67,7 @@ Given / When / Then для happy path, ошибки и границы досту
 | Core API contract                  | `npm run verify:core-contract`                       | `npm run verify:pilot-backend` для полного purchase flow              |
 | Prisma/checkout/tenant/idempotency | `npm run verify:postgres`                            | migration на чистой локальной БД                                   |
 | API/worker/config                  | `npm run verify:runtime-split`                       | `npm run verify:production-config`                                    |
+| Deployment profile / frontend composition | `npm run verify:frontend-profile`, `npm run verify:pilot-composition` | Все четыре web build и `npm run verify:web` на согласованном pilot окружении |
 | Buyer/Supplier/Admin critical UI   | typecheck + relevant unit test                    | `npm run verify:web` и ручной keyboard/mobile smoke                   |
 | Landing/public UI                  | typecheck + build приложения                      | Lighthouse/visual review, если меняется performance-critical экран |
 | Security/file/integration          | целевой `verify:*` сценарий                       | `npm audit --omit=dev --audit-level=high`                             |

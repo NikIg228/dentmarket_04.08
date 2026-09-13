@@ -1,5 +1,8 @@
 name: dental-marketplace
 
+x-build-profile: &build-profile
+  DEPLOYMENT_PROFILE: ${DEPLOYMENT_PROFILE:-pilot}
+
 services:
   postgres:
     image: postgres:17-alpine
@@ -91,6 +94,7 @@ services:
 
   api:
     build:
+      args: *build-profile
       context: .
       target: api
     command: ["/bin/sh", "-c", "npm exec --workspace=@marketplace/api -- prisma migrate deploy && exec npm run start --workspace=@marketplace/api"]
@@ -135,6 +139,7 @@ services:
 
   worker:
     build:
+      args: *build-profile
       context: .
       target: api
     command: ["npm", "run", "start:worker", "--workspace=@marketplace/api"]
@@ -170,6 +175,7 @@ services:
 
   seed:
     build:
+      args: *build-profile
       context: .
       target: api
     command: ["npm", "run", "db:seed"]
@@ -183,6 +189,7 @@ services:
 
   admin-web:
     build:
+      args: *build-profile
       context: .
       target: admin-web
     depends_on:
@@ -193,6 +200,7 @@ services:
 
   buyer-web:
     build:
+      args: *build-profile
       context: .
       target: buyer-web
     depends_on:
@@ -203,6 +211,7 @@ services:
 
   supplier-web:
     build:
+      args: *build-profile
       context: .
       target: supplier-web
     depends_on:
@@ -213,6 +222,7 @@ services:
 
   landing-web:
     build:
+      args: *build-profile
       context: .
       target: landing-web
     ports:

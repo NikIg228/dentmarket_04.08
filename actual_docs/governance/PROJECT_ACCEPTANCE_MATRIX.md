@@ -384,3 +384,29 @@ tracked files with `0` reportable findings. Application security is now
 - [ ] Реальные credentials, provider tenants и managed deployment contour не
       предоставлены; preflight и evidence template корректно завершились
       ненулевым кодом, поэтому `LIVE_VERIFIED` не заявлен.
+
+## Current frontend pilot composition update (2026-09-13)
+
+- [x] ADR 010: `DEPLOYMENT_PROFILE` — единый источник для API и всех четырёх
+      frontend builds; default pilot, invalid/conflicting config fail-closed.
+- [x] Buyer/Supplier/Admin не монтируют AI, trust/reviews, promotions и smart
+      recommendations; billing и остальные optional prefixes блокируются
+      общим API client до отправки GET/write/download. Core procurement,
+      документы, compliance, geo и operator audit сохранены.
+- [x] `npm run typecheck` 15/15, `npm test` 14/14 (API 200), `npm run build`
+      10/10 с четырьмя production web builds и зелёными bundle budgets.
+- [x] `verify:frontend-profile` 4/4; backend module inventory, core contract,
+      runtime split и production config scripts после build прошли.
+- [x] `npm run verify:web` 23/23: шесть новых cases проверяют три роли на
+      1280/390 px, отсутствие optional requests и API errors, актуальные build
+      manifests и фактический pilot OpenAPI. Screenshots просмотрены.
+- [x] CI разделяет go_live API regressions и pilot browser gate; YAML и shell
+      syntax проверены локально. Первый web failure из-за внешнего Landing
+      fallback устранён корректной локальной build configuration, не ослаблением
+      CSP или теста; после rebuild весь suite прошёл.
+- [ ] Docker image build и удалённый CI не подтверждаются локальными тестами.
+- [ ] Production B4.6, live providers и infrastructure evidence не входят в
+      этот change set и остаются открытыми.
+
+Точные команды, числа, применённые Agency/Playwright практики и ограничения:
+`actual_docs/architecture/adr/010-frontend-deployment-profile.md`.

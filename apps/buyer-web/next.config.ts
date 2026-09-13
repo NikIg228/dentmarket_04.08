@@ -1,7 +1,9 @@
 import type { NextConfig } from "next";
+import { frontendDeploymentEnvironment } from "@marketplace/schemas";
 import path from "node:path";
 
 const nextConfig: NextConfig = {
+  env: frontendDeploymentEnvironment(process.env),
   outputFileTracingRoot: path.join(process.cwd(), "../.."),
   transpilePackages: ["@marketplace/ui", "@marketplace/api-client"],
   allowedDevOrigins: ["127.0.0.1"],

@@ -1,7 +1,7 @@
 "use client";
 
 import { Button, Field, Input, Select, Spinner, Textarea } from "@fluentui/react-components";
-import { MarketplaceApiClient, type ApiContext } from "@marketplace/api-client";
+import { MarketplaceApiClient, frontendFeatures, type ApiContext } from "@marketplace/api-client";
 import { EmptyState, ErrorState, PageHeader, Section, StatusTag, errorMessage, formatDate, formatMoney, formatStatus } from "@marketplace/ui";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import styles from "./buyer-services-panel.module.css";
@@ -21,7 +21,7 @@ export function BuyerServicesPanel({ mode, buyerId = BUYER_ID, apiContext }: { m
   const api = useMemo(() => new MarketplaceApiClient(process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:4012/api", apiContext ?? { actorId: BUYER_USER_ID, organizationId: buyerId }), [apiContext, buyerId]);
   if (mode === "workspace") return <ProcurementWorkspace api={api} />;
   if (mode === "support") return <SupportWorkspace api={api} />;
-  return <AssistantWorkspace api={api} />;
+  return frontendFeatures.ai ? <AssistantWorkspace api={api} /> : null;
 }
 
 function ProcurementWorkspace({ api }: { api: MarketplaceApiClient }) {

@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { frontendDeploymentEnvironment } from "@marketplace/schemas";
 
 const origin = (value: string | undefined, fallback: string) => {
   try {
@@ -25,6 +26,7 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  env: frontendDeploymentEnvironment(process.env),
   reactStrictMode: true,
   async headers() {
     return [{ source: "/(.*)", headers: securityHeaders }];

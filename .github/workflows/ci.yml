@@ -31,6 +31,9 @@ jobs:
       API_PORT: 4012
       API_URL: http://127.0.0.1:4012/api
       NEXT_PUBLIC_API_URL: http://127.0.0.1:4012/api
+      NEXT_PUBLIC_BUYER_APP_URL: http://127.0.0.1:3001
+      NEXT_PUBLIC_SUPPLIER_APP_URL: http://127.0.0.1:3002
+      DEPLOYMENT_PROFILE: pilot
       AUTH_MODE: development
       INTEGRATION_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
       APP_SECURITY_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
@@ -65,17 +68,20 @@ jobs:
       - run: npm run verify:observability
       - run: npm run verify:runtime-split
       - run: npm run verify:pilot-composition
+      - run: npm run verify:frontend-profile
       - run: npm run verify:core-contract
       - run: npm run verify:production-config
       - run: npm run verify:production-readiness-contract
       - run: npm run verify:rate-limit-auth
       - run: npm audit --omit=dev --audit-level=high
       - run: docker compose config --quiet
-      - name: End-to-end API verification
+      - name: Extended API verification (explicit go_live)
+        env:
+          DEPLOYMENT_PROFILE: go_live
         run: |
-          npm run start --workspace=@marketplace/api > /tmp/marketplace-api.log 2>&1 &
+          (cd apps/api && exec node dist/src/main.js) > /tmp/marketplace-api.log 2>&1 &
           API_PID=$!
-          trap 'kill $API_PID || true; cat /tmp/marketplace-api.log' EXIT
+          trap 'kill "$API_PID" 2>/dev/null || true; wait "$API_PID" 2>/dev/null || true; cat /tmp/marketplace-api.log' EXIT
           for attempt in $(seq 1 30); do
             if curl --fail --silent http://127.0.0.1:4012/api/health > /dev/null; then break; fi
             sleep 1
@@ -86,6 +92,8 @@ jobs:
           npm run verify:security
           npm run verify:onboarding-agreement
           npm run verify:trust-geo
+      - name: Pilot browser verification
+        run: |
           npm run verify:flow-b3
           npm run verify:web
       - name: Upload failure diagnostics

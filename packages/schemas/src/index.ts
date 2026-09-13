@@ -1308,3 +1308,4 @@ export type {
   ConnectorPriceResult,
   ConnectorReservationResult,
 } from "./integration-contracts.js";
+export * from "./deployment-profile";
