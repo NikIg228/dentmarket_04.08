@@ -6,6 +6,9 @@
 или декоративным feature flag. Без переменной приложение запускается в
 fail-safe профиле `pilot`.
 
+Отдельный перечень скрытых функций, различия по ролям и условия включения:
+[свод внепилотных функций](../product/DENTMARKET_OUT_OF_PILOT_FEATURES.md).
+
 | Профиль   | Назначение                            | Runtime surface                                                                                                   |
 | --------- | ------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
 | `pilot`   | Controlled demo/pilot                 | Procurement core, catalog, cart, checkout, supplier orders, logistics, documents, notifications, geo и operations |
