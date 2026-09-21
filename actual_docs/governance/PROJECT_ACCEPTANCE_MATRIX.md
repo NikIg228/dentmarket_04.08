@@ -1,5 +1,10 @@
 # DentMarket KZ — матрица фактической готовности
 
+Операционное дополнение2026-09-21: [устранение трёх CI-блокеров после консолидации](task-state/MARKET-CI-REMEDIATION-2026-09-21.md).
+Локальные dependency/outbound/PostgreSQL и release-equivalent gates проверены;
+remote CI отмечается отдельно в checkpoint. Это не закрывает CORE/POST-BE/
+POST-FULL и не означает готовность к production. Исторические срезы ниже сохранены.
+
 Дата reconciliation: 2026-09-14; audit/remediation checkpoint 2026-09-15 — §9.
 Проверенный Git baseline: 3d644963ed72f99a100e180db2d373bc5abeaef9,
 ветка codex/frontend-pilot-composition. В рабочем дереве есть отдельные

@@ -34,6 +34,9 @@ const fixture = {
   packagingIds: [],
   variantIds: [],
   productId: undefined,
+  supplierId: undefined,
+  agreementId: undefined,
+  agreementDocumentId: undefined,
 };
 const logLines = [];
 let api;
@@ -171,36 +174,64 @@ async function createBuyer(index) {
 }
 
 async function createFixtureCatalog() {
-  const agreement = await prisma.marketplaceAgreement.findFirst({
-    where: {
-      status: "ACTIVE",
-      startsAt: { lte: new Date() },
-      endsAt: { gt: new Date() },
-    },
-    select: { supplierOrganizationId: true },
-    orderBy: { createdAt: "asc" },
-  });
-  assert(agreement, "Seeded active marketplace agreement is missing");
-  const warehouse = await prisma.warehouse.findFirst({
-    where: { supplierOrganizationId: agreement.supplierOrganizationId },
-    orderBy: { createdAt: "asc" },
-  });
-  const referenceOffer = await prisma.supplierOffer.findFirst({
-    where: {
-      supplierOrganizationId: agreement.supplierOrganizationId,
-      saleUnitId: { not: null },
-    },
-    orderBy: { createdAt: "asc" },
-  });
+  // Reference/test seeds intentionally contain no pilot suppliers or offers.
+  // Own the complete commercial fixture; never reuse a live/pilot agreement.
+  const [saleUnit, template, operator] = await Promise.all([
+    prisma.unitOfMeasure.findUnique({ where: { code: "piece" } }),
+    prisma.documentTemplate.findUnique({
+      where: { code_version: { code: "MARKETPLACE_SUPPLIER_AGREEMENT_RU", version: 1 } },
+    }),
+    prisma.organizationCapability.findFirst({ where: { capability: "MARKETPLACE_OPERATOR" } }),
+  ]);
   assert(
-    warehouse && referenceOffer?.saleUnitId,
-    "Seeded supplier warehouse or sale unit is missing",
+    saleUnit && template && operator,
+    "Reference sale unit, agreement template or test operator is missing",
   );
+  const { agreement, warehouse, document } = await prisma.$transaction(async (tx) => {
+    const supplier = await tx.organization.create({
+      data: {
+        legalName: `B0.4 Test Supplier ${runId}`,
+        displayName: `B0.4 Test Supplier ${runId}`,
+        bin: `8${String(Date.now()).slice(-6)}${String(process.pid % 1000).padStart(3, "0")}99`,
+        capabilities: { create: { capability: "SUPPLIER" } },
+        supplierProfile: { create: { regulatoryDetails: { testFixture: runId } } },
+      },
+    });
+    const warehouse = await tx.warehouse.create({
+      data: { supplierOrganizationId: supplier.id, code: runId, name: `Test warehouse ${runId}` },
+    });
+    const startsAt = new Date(Date.now() - 60_000);
+    const endsAt = new Date(Date.now() + 24 * 60 * 60_000);
+    const metadata = { testFixture: runId, notLegallyBinding: true };
+    const document = await tx.document.create({
+      data: {
+        ownerOrganizationId: supplier.id,
+        templateId: template.id,
+        kind: "MARKETPLACE_SUPPLIER_AGREEMENT",
+        format: "PDF", source: "GENERATED", status: "SIGNED",
+        title: `Synthetic agreement ${runId}`, documentNumber: runId,
+        generatedAt: startsAt, immutableAt: startsAt, expiresAt: endsAt, metadata,
+      },
+    });
+    const agreement = await tx.marketplaceAgreement.create({
+      data: {
+        agreementNumber: runId, supplierOrganizationId: supplier.id,
+        operatorOrganizationId: operator.organizationId,
+        documentId: document.id, templateId: template.id, templateVersion: template.version,
+        status: "ACTIVE", startsAt, endsAt, activatedAt: startsAt,
+        autoRenew: false, metadata,
+      },
+    });
+    return { agreement, warehouse, document };
+  });
+  fixture.supplierId = agreement.supplierOrganizationId;
+  fixture.agreementId = agreement.id;
+  fixture.agreementDocumentId = document.id;
   const product = await prisma.product.create({
     data: {
       canonicalName: `B0.4 PostgreSQL fixture ${runId}`,
       slug: `${runId}-postgres-fixture`,
-      baseUnitId: referenceOffer.saleUnitId,
+      baseUnitId: saleUnit.id,
       productType: "MATERIAL",
       status: "ACTIVE",
     },
@@ -214,26 +245,28 @@ async function createFixtureCatalog() {
       data: {
         productId: product.id,
         sku: `${runId}-${index}`,
-        saleUnitId: referenceOffer.saleUnitId,
+        saleUnitId: saleUnit.id,
         packageQuantity: 1,
         status: "ACTIVE",
       },
     });
+    fixture.variantIds.push(variant.id);
     const packaging = await prisma.productPackaging.create({
       data: {
         productVariantId: variant.id,
-        unitId: referenceOffer.saleUnitId,
+        unitId: saleUnit.id,
         code: `${runId}-${index}`,
         name: `B0.4 unit ${index}`,
         level: "BASE",
         quantityInBaseUnit: 1,
       },
     });
+    fixture.packagingIds.push(packaging.id);
     const offer = await prisma.supplierOffer.create({
       data: {
         supplierOrganizationId: agreement.supplierOrganizationId,
         productVariantId: variant.id,
-        saleUnitId: referenceOffer.saleUnitId,
+        saleUnitId: saleUnit.id,
         packagingId: packaging.id,
         supplierSku: `${runId}-offer-${index}`,
         confirmationMode: "MANUAL",
@@ -241,6 +274,7 @@ async function createFixtureCatalog() {
         status: "ACTIVE",
       },
     });
+    fixture.offerIds.push(offer.id);
     await prisma.offerPublication.create({
       data: {
         offerId: offer.id,
@@ -278,6 +312,7 @@ async function createFixtureCatalog() {
         freshnessExpiresAt: new Date(Date.now() + 60 * 60_000),
       },
     });
+    fixture.balanceIds.push(balance.id);
     const lot = await prisma.inventoryLot.create({
       data: {
         inventoryBalanceId: balance.id,
@@ -293,10 +328,6 @@ async function createFixtureCatalog() {
         expirationDate: new Date("2035-12-31"),
       },
     });
-    fixture.variantIds.push(variant.id);
-    fixture.packagingIds.push(packaging.id);
-    fixture.offerIds.push(offer.id);
-    fixture.balanceIds.push(balance.id);
     fixture.lotIds.push(lot.id);
     created.push({ offerId: offer.id, balanceId: balance.id, lotId: lot.id });
   }
@@ -435,6 +466,12 @@ async function cleanupFixtures() {
     });
   if (fixture.productId)
     await prisma.product.delete({ where: { id: fixture.productId } });
+  if (fixture.agreementId)
+    await prisma.marketplaceAgreement.delete({ where: { id: fixture.agreementId } });
+  if (fixture.agreementDocumentId)
+    await prisma.document.delete({ where: { id: fixture.agreementDocumentId } });
+  if (fixture.supplierId)
+    await prisma.organization.delete({ where: { id: fixture.supplierId } });
   const aggregateIds = [
     ...checkoutIds,
     ...reservationIds,
@@ -446,7 +483,7 @@ async function cleanupFixtures() {
     await prisma.outboxEvent.deleteMany({
       where: { aggregateId: { in: aggregateIds } },
     });
-  const [productsLeft, buyersLeft, cartsLeft, triggersLeft] = await Promise.all(
+  const [productsLeft, buyersLeft, cartsLeft, triggersLeft, suppliersLeft, agreementsLeft, documentsLeft] = await Promise.all(
     [
       prisma.product.count({ where: { slug: `${runId}-postgres-fixture` } }),
       prisma.organization.count({ where: { id: { in: fixture.buyerIds } } }),
@@ -454,6 +491,9 @@ async function cleanupFixtures() {
       prisma.$queryRawUnsafe(
         `SELECT count(*)::int AS count FROM pg_trigger WHERE tgname = '${triggerFunction}' AND NOT tgisinternal`,
       ),
+      prisma.organization.count({ where: { id: { in: fixture.supplierId ? [fixture.supplierId] : [] } } }),
+      prisma.marketplaceAgreement.count({ where: { agreementNumber: runId } }),
+      prisma.document.count({ where: { documentNumber: runId } }),
     ],
   );
   const triggerCount = Number(triggersLeft[0]?.count ?? 0);
@@ -461,8 +501,8 @@ async function cleanupFixtures() {
     productsLeft === 0 &&
       buyersLeft === 0 &&
       cartsLeft === 0 &&
-      triggerCount === 0,
-    `Fixture cleanup left product/buyer/cart/trigger counts ${productsLeft}/${buyersLeft}/${cartsLeft}/${triggerCount}`,
+      triggerCount === 0 && suppliersLeft === 0 && agreementsLeft === 0 && documentsLeft === 0,
+    `Fixture cleanup left product/buyer/cart/trigger/supplier/agreement/document counts ${productsLeft}/${buyersLeft}/${cartsLeft}/${triggerCount}/${suppliersLeft}/${agreementsLeft}/${documentsLeft}`,
   );
 }
 
@@ -515,6 +555,25 @@ try {
   api.stdout.on("data", rememberLog);
   api.stderr.on("data", rememberLog);
   await waitUntilReady();
+
+  // The test fixture must satisfy, not bypass, the mandatory supplier agreement.
+  const agreementCart = await expectStatus(
+    `/buyers/${tenantOwner.organizationId}/carts`,
+    { method: "POST", identity: tenantOwner, body: { currency: "KZT" } },
+    201,
+  );
+  fixture.cartIds.push(agreementCart.id);
+  await prisma.marketplaceAgreement.update({
+    where: { id: fixture.agreementId }, data: { status: "AWAITING_SIGNATURE" },
+  });
+  await expectStatus(
+    `/carts/${agreementCart.id}/items`,
+    { method: "POST", identity: tenantOwner, body: { offerId: rollbackOffer.offerId, quantity: 1 } },
+    403,
+  );
+  await prisma.marketplaceAgreement.update({
+    where: { id: fixture.agreementId }, data: { status: "ACTIVE" },
+  });
 
   // AUD-FIX-04: owned disposable fixtures; no edits to the seeded pilot offers.
   const correctionBuyer = await createBuyer(6);
@@ -745,6 +804,7 @@ try {
         status: "passed",
         database: parsedDatabaseUrl.pathname.slice(1),
         scenarios: {
+          supplierAgreementRequired: "passed",
           tenantIsolation: "passed",
           transactionRollback: "passed",
           concurrentIdempotency: "passed",

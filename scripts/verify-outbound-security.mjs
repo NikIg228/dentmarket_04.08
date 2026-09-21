@@ -23,7 +23,15 @@ const credentialBearingAdapters = [
   },
   {
     relativePath: "apps/api/src/modules/identity/auth-sessions.service.ts",
-    urlKeys: ["EMAIL_PROVIDER_URL", "AUTH_EMAIL_BASE_URL"],
+    urlKeys: ["AUTH_EMAIL_BASE_URL"],
+  },
+  {
+    relativePath: "apps/api/src/modules/identity/auth-mail.delivery.ts",
+    urlKeys: ["EMAIL_PROVIDER_URL"],
+  },
+  {
+    relativePath: "apps/api/src/modules/identity/registration-resume.service.ts",
+    urlKeys: ["AUTH_EMAIL_BASE_URL"],
   },
   {
     relativePath: "apps/api/src/modules/ai/openai-responses.service.ts",
