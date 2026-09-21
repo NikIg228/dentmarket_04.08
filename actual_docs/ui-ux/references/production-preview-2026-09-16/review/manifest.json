@@ -1,0 +1,912 @@
+{
+  "kind": "reference-review-packaging",
+  "approval": "PENDING",
+  "surfaceCount": 78,
+  "categories": [
+    {
+      "folder": "01-публичные-страницы",
+      "title": "Публичные страницы",
+      "count": 3
+    },
+    {
+      "folder": "02-покупатель",
+      "title": "Покупатель",
+      "count": 14
+    },
+    {
+      "folder": "03-поставщик",
+      "title": "Поставщик",
+      "count": 11
+    },
+    {
+      "folder": "04-оператор",
+      "title": "Оператор",
+      "count": 19
+    },
+    {
+      "folder": "05-авторизация",
+      "title": "Авторизация",
+      "count": 6
+    },
+    {
+      "folder": "06-модальные-окна-и-панели",
+      "title": "Модальные окна и контекстные панели",
+      "count": 13
+    },
+    {
+      "folder": "07-компоненты",
+      "title": "Компоненты",
+      "count": 4
+    },
+    {
+      "folder": "08-системные-состояния",
+      "title": "Системные состояния",
+      "count": 6
+    },
+    {
+      "folder": "09-юридические-страницы",
+      "title": "Юридические страницы",
+      "count": 2
+    }
+  ],
+  "surfaces": [
+    {
+      "id": "public-home",
+      "title": "Главная",
+      "role": "public",
+      "category": "01-публичные-страницы",
+      "file": "01-публичные-страницы/public-home.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "public-about",
+      "title": "О DentMarket",
+      "role": "public",
+      "category": "01-публичные-страницы",
+      "file": "01-публичные-страницы/public-about.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "public-suppliers",
+      "title": "Для поставщиков",
+      "role": "public",
+      "category": "01-публичные-страницы",
+      "file": "01-публичные-страницы/public-suppliers.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "public-catalog",
+      "title": "Каталог",
+      "role": "buyer",
+      "category": "02-покупатель",
+      "file": "02-покупатель/public-catalog.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "product-offers",
+      "title": "Товар и предложения",
+      "role": "buyer",
+      "category": "02-покупатель",
+      "file": "02-покупатель/product-offers.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "buyer-cart",
+      "title": "Корзина",
+      "role": "buyer",
+      "category": "02-покупатель",
+      "file": "02-покупатель/buyer-cart.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "buyer-checkout",
+      "title": "Проверка заказа",
+      "role": "buyer",
+      "category": "02-покупатель",
+      "file": "02-покупатель/buyer-checkout.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "buyer-orders",
+      "title": "Заказы клиники",
+      "role": "buyer",
+      "category": "02-покупатель",
+      "file": "02-покупатель/buyer-orders.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "buyer-documents",
+      "title": "Документы",
+      "role": "buyer",
+      "category": "02-покупатель",
+      "file": "02-покупатель/buyer-documents.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "buyer-workspace",
+      "title": "Списки и бюджеты",
+      "role": "buyer",
+      "category": "02-покупатель",
+      "file": "02-покупатель/buyer-workspace.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "buyer-notifications",
+      "title": "Уведомления",
+      "role": "buyer",
+      "category": "02-покупатель",
+      "file": "02-покупатель/buyer-notifications.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "buyer-support",
+      "title": "Поддержка",
+      "role": "buyer",
+      "category": "02-покупатель",
+      "file": "02-покупатель/buyer-support.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "buyer-assistant",
+      "title": "AI-помощник",
+      "role": "buyer",
+      "category": "02-покупатель",
+      "file": "02-покупатель/buyer-assistant.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "buyer-recommendations",
+      "title": "Варианты поставки",
+      "role": "buyer",
+      "category": "02-покупатель",
+      "file": "02-покупатель/buyer-recommendations.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "account",
+      "title": "Организация и реквизиты",
+      "role": "buyer",
+      "category": "02-покупатель",
+      "file": "02-покупатель/account.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "team",
+      "title": "Команда и доступ",
+      "role": "buyer",
+      "category": "02-покупатель",
+      "file": "02-покупатель/team.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "manual-payment",
+      "title": "Подтверждение оплаты",
+      "role": "buyer",
+      "category": "02-покупатель",
+      "file": "02-покупатель/manual-payment.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "supplier-dashboard",
+      "title": "Обзор поставщика",
+      "role": "supplier",
+      "category": "03-поставщик",
+      "file": "03-поставщик/supplier-dashboard.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "supplier-orders",
+      "title": "Заказы поставщику",
+      "role": "supplier",
+      "category": "03-поставщик",
+      "file": "03-поставщик/supplier-orders.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "supplier-offers",
+      "title": "Предложения",
+      "role": "supplier",
+      "category": "03-поставщик",
+      "file": "03-поставщик/supplier-offers.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "supplier-inventory",
+      "title": "Остатки и актуальность",
+      "role": "supplier",
+      "category": "03-поставщик",
+      "file": "03-поставщик/supplier-inventory.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "supplier-imports",
+      "title": "Загрузка товаров",
+      "role": "supplier",
+      "category": "03-поставщик",
+      "file": "03-поставщик/supplier-imports.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "supplier-connectors",
+      "title": "Учётные системы",
+      "role": "supplier",
+      "category": "03-поставщик",
+      "file": "03-поставщик/supplier-connectors.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "supplier-compliance",
+      "title": "Документы поставщика",
+      "role": "supplier",
+      "category": "03-поставщик",
+      "file": "03-поставщик/supplier-compliance.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "supplier-documents",
+      "title": "Документы",
+      "role": "supplier",
+      "category": "03-поставщик",
+      "file": "03-поставщик/supplier-documents.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "supplier-promotions",
+      "title": "Акции и продвижение",
+      "role": "supplier",
+      "category": "03-поставщик",
+      "file": "03-поставщик/supplier-promotions.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "supplier-trust",
+      "title": "Отзывы и география",
+      "role": "supplier",
+      "category": "03-поставщик",
+      "file": "03-поставщик/supplier-trust.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "billing",
+      "title": "Услуги платформы",
+      "role": "supplier",
+      "category": "03-поставщик",
+      "file": "03-поставщик/billing.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "admin-overview",
+      "title": "Рабочая очередь",
+      "role": "admin",
+      "category": "04-оператор",
+      "file": "04-оператор/admin-overview.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "admin-organizations",
+      "title": "Организации",
+      "role": "admin",
+      "category": "04-оператор",
+      "file": "04-оператор/admin-organizations.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "admin-access",
+      "title": "Пользователи и права",
+      "role": "admin",
+      "category": "04-оператор",
+      "file": "04-оператор/admin-access.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "admin-catalog",
+      "title": "Мастер-карточки и варианты",
+      "role": "admin",
+      "category": "04-оператор",
+      "file": "04-оператор/admin-catalog.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "admin-taxonomy",
+      "title": "Атрибуты каталога",
+      "role": "admin",
+      "category": "04-оператор",
+      "file": "04-оператор/admin-taxonomy.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "admin-catalog-quality",
+      "title": "Качество каталога",
+      "role": "admin",
+      "category": "04-оператор",
+      "file": "04-оператор/admin-catalog-quality.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "admin-corrections",
+      "title": "Проверка исправлений",
+      "role": "admin",
+      "category": "04-оператор",
+      "file": "04-оператор/admin-corrections.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "admin-imports",
+      "title": "Сопоставление товаров",
+      "role": "admin",
+      "category": "04-оператор",
+      "file": "04-оператор/admin-imports.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "admin-supply",
+      "title": "Предложение и публикация",
+      "role": "admin",
+      "category": "04-оператор",
+      "file": "04-оператор/admin-supply.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "admin-lots",
+      "title": "Партии и резервы",
+      "role": "admin",
+      "category": "04-оператор",
+      "file": "04-оператор/admin-lots.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "admin-connectors",
+      "title": "Подключения и ошибки",
+      "role": "admin",
+      "category": "04-оператор",
+      "file": "04-оператор/admin-connectors.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "admin-connector-readiness",
+      "title": "Готовность коннекторов",
+      "role": "admin",
+      "category": "04-оператор",
+      "file": "04-оператор/admin-connector-readiness.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "admin-agreements",
+      "title": "Договоры с поставщиками",
+      "role": "admin",
+      "category": "04-оператор",
+      "file": "04-оператор/admin-agreements.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "admin-controls",
+      "title": "Допуск поставщиков",
+      "role": "admin",
+      "category": "04-оператор",
+      "file": "04-оператор/admin-controls.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "admin-assurance",
+      "title": "Готовность и ограничения",
+      "role": "admin",
+      "category": "04-оператор",
+      "file": "04-оператор/admin-assurance.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "admin-trust",
+      "title": "Риски и апелляции",
+      "role": "admin",
+      "category": "04-оператор",
+      "file": "04-оператор/admin-trust.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "admin-audit",
+      "title": "Журнал действий",
+      "role": "admin",
+      "category": "04-оператор",
+      "file": "04-оператор/admin-audit.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "admin-settings",
+      "title": "Настройки платформы",
+      "role": "admin",
+      "category": "04-оператор",
+      "file": "04-оператор/admin-settings.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "admin-metrics",
+      "title": "Операционные показатели",
+      "role": "admin",
+      "category": "04-оператор",
+      "file": "04-оператор/admin-metrics.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "auth-login",
+      "title": "Вход в DentMarket",
+      "role": "auth",
+      "category": "05-авторизация",
+      "file": "05-авторизация/auth-login.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "auth-register",
+      "title": "Создать аккаунт",
+      "role": "auth",
+      "category": "05-авторизация",
+      "file": "05-авторизация/auth-register.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "auth-resume",
+      "title": "Продолжить регистрацию",
+      "role": "auth",
+      "category": "05-авторизация",
+      "file": "05-авторизация/auth-resume.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "auth-verify",
+      "title": "Подтверждение почты",
+      "role": "auth",
+      "category": "05-авторизация",
+      "file": "05-авторизация/auth-verify.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "auth-reset",
+      "title": "Восстановление доступа",
+      "role": "auth",
+      "category": "05-авторизация",
+      "file": "05-авторизация/auth-reset.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "auth-admin",
+      "title": "Вход оператора",
+      "role": "auth",
+      "category": "05-авторизация",
+      "file": "05-авторизация/auth-admin.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "buyer-order-detail",
+      "title": "Заказ № DM-0264",
+      "role": "buyer",
+      "category": "06-модальные-окна-и-панели",
+      "file": "06-модальные-окна-и-панели/buyer-order-detail.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "buyer-document-detail",
+      "title": "Счёт № INV-0264",
+      "role": "buyer",
+      "category": "06-модальные-окна-и-панели",
+      "file": "06-модальные-окна-и-панели/buyer-document-detail.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "buyer-document-upload",
+      "title": "Загрузка документа",
+      "role": "buyer",
+      "category": "06-модальные-окна-и-панели",
+      "file": "06-модальные-окна-и-панели/buyer-document-upload.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "buyer-reviews",
+      "title": "Отзыв о поставщике",
+      "role": "buyer",
+      "category": "06-модальные-окна-и-панели",
+      "file": "06-модальные-окна-и-панели/buyer-reviews.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "supplier-onboarding",
+      "title": "Подготовка к публикации",
+      "role": "supplier",
+      "category": "06-модальные-окна-и-панели",
+      "file": "06-модальные-окна-и-панели/supplier-onboarding.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "supplier-order-detail",
+      "title": "Заказ № DM-0264",
+      "role": "supplier",
+      "category": "06-модальные-окна-и-панели",
+      "file": "06-модальные-окна-и-панели/supplier-order-detail.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "supplier-shipment",
+      "title": "Отгрузка заказа DM-0264",
+      "role": "supplier",
+      "category": "06-модальные-окна-и-панели",
+      "file": "06-модальные-окна-и-панели/supplier-shipment.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "supplier-offer-editor",
+      "title": "Предложение: композит A2",
+      "role": "supplier",
+      "category": "06-модальные-окна-и-панели",
+      "file": "06-модальные-окна-и-панели/supplier-offer-editor.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "supplier-import-review",
+      "title": "Проверка прайса",
+      "role": "supplier",
+      "category": "06-модальные-окна-и-панели",
+      "file": "06-модальные-окна-и-панели/supplier-import-review.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "supplier-agreement",
+      "title": "Договор с DentMarket",
+      "role": "supplier",
+      "category": "06-модальные-окна-и-панели",
+      "file": "06-модальные-окна-и-панели/supplier-agreement.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "supplier-corrections",
+      "title": "Исправления карточек",
+      "role": "supplier",
+      "category": "06-модальные-окна-и-панели",
+      "file": "06-модальные-окна-и-панели/supplier-corrections.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "supplier-document-detail",
+      "title": "Счёт № INV-0264",
+      "role": "supplier",
+      "category": "06-модальные-окна-и-панели",
+      "file": "06-модальные-окна-и-панели/supplier-document-detail.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "admin-organization-create",
+      "title": "Новая организация",
+      "role": "admin",
+      "category": "06-модальные-окна-и-панели",
+      "file": "06-модальные-окна-и-панели/admin-organization-create.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "components-controls",
+      "title": "Компоненты · ввод и действия",
+      "role": "buyer",
+      "category": "07-компоненты",
+      "file": "07-компоненты/components-controls.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "components-overlays",
+      "title": "Компоненты · раскрытые элементы",
+      "role": "buyer",
+      "category": "07-компоненты",
+      "file": "07-компоненты/components-overlays.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "components-feedback",
+      "title": "Компоненты · состояния",
+      "role": "buyer",
+      "category": "07-компоненты",
+      "file": "07-компоненты/components-feedback.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "components-navigation",
+      "title": "Компоненты · навигация",
+      "role": "buyer",
+      "category": "07-компоненты",
+      "file": "07-компоненты/components-navigation.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "system-empty",
+      "title": "Пустой список",
+      "role": "buyer",
+      "category": "08-системные-состояния",
+      "file": "08-системные-состояния/system-empty.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "system-error",
+      "title": "Ошибка загрузки",
+      "role": "buyer",
+      "category": "08-системные-состояния",
+      "file": "08-системные-состояния/system-error.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "system-forbidden",
+      "title": "Нет доступа",
+      "role": "buyer",
+      "category": "08-системные-состояния",
+      "file": "08-системные-состояния/system-forbidden.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "system-session",
+      "title": "Сессия завершена",
+      "role": "buyer",
+      "category": "08-системные-состояния",
+      "file": "08-системные-состояния/system-session.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "system-not-found",
+      "title": "Страница не найдена",
+      "role": "public",
+      "category": "08-системные-состояния",
+      "file": "08-системные-состояния/system-not-found.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "system-loading",
+      "title": "Загрузка документов",
+      "role": "buyer",
+      "category": "08-системные-состояния",
+      "file": "08-системные-состояния/system-loading.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "legal-terms",
+      "title": "Условия использования",
+      "role": "public",
+      "category": "09-юридические-страницы",
+      "file": "09-юридические-страницы/legal-terms.html",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "id": "legal-privacy",
+      "title": "Конфиденциальность",
+      "role": "public",
+      "category": "09-юридические-страницы",
+      "file": "09-юридические-страницы/legal-privacy.html",
+      "status": "Ожидает утверждения"
+    }
+  ],
+  "images": [
+    {
+      "file": "00-исходное-направление/01-supplier-order.png",
+      "source": "originals/01-supplier-order.png",
+      "title": "Заказ поставщика",
+      "sha256": "25935ca2ef2a7706db481c0b7b3a90ae9027876c6749f2caf95ae33904a56f3c",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "file": "00-исходное-направление/02-cart-reprice.png",
+      "source": "originals/02-cart-reprice.png",
+      "title": "Корзина и reprice",
+      "sha256": "16ca10e0777ab1bd121b1db6cc79a64f8ed63e717c7f6f0045aacd2cceadd826",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "file": "00-исходное-направление/03-product-offers.png",
+      "source": "originals/03-product-offers.png",
+      "title": "Товар и предложения",
+      "sha256": "961848a0afc4a3eec6c26667f8d2200f579f6e0fc701e93a398a88d2bab2518d",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "file": "00-исходное-направление/04-catalog.png",
+      "source": "originals/04-catalog.png",
+      "title": "Каталог · фильтры слева",
+      "sha256": "dbafd27eccbd0ec244d5a9eba0ef4a560e94e3010e7eb1a9a9769fe3c5558458",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "file": "10-дополнительные-концепты/buyer-documents-ai.png",
+      "source": "concepts/buyer-documents-ai.png",
+      "title": "Документолог · AI-концепт",
+      "sha256": "fcf96988d802e035b1b283d86f947b24b7c52c61b99af776057eee8cec5d489e",
+      "status": "Ожидает утверждения"
+    },
+    {
+      "file": "10-дополнительные-концепты/components-overlays-ai.png",
+      "source": "concepts/components-overlays-ai.png",
+      "title": "Раскрытые элементы · AI-концепт",
+      "sha256": "a9c9aeee6673def7f7a21965da86fd69ffbe494a5fee8165698d79cbb0d35d1f",
+      "status": "Ожидает утверждения"
+    }
+  ],
+  "inputs": {
+    "pages.js": "9ecdcf3be3ad1c76b483cc46c245615211967927022c16c7918cbc1bd08de950",
+    "source-manifest.json": "41e23dc8fe55c24055212796491d0d230809b6ec0adcf33b54b870116859c83b",
+    "rendered/public-home.html": "5dcb431c5be9e7dfa3d7e137f300d39ebe5887c3196b5e5e9a2f7c4679d396c7",
+    "rendered/public-about.html": "49dfe3cf54ecf8e860a642f0a0db256d182fc345d0626623f5475e5c3afea34a",
+    "rendered/public-suppliers.html": "d7440673ddff90b9536c3a9a55b4f347d0899cea341c512f6c92b22f05461486",
+    "rendered/public-catalog.html": "c9f7c81caa757c41a6e7e75861d19ad308739ccbffd34f68a9ff4d81afc05561",
+    "rendered/product-offers.html": "6005e2af497461b8310fb2ce14aefb0490f2d3b3f5ad98481fa554bb6844ca86",
+    "rendered/buyer-cart.html": "b3ba0de74b84573577cef88a66d884b8e72d8e0df18c2eeb0722654ac59f621a",
+    "rendered/buyer-checkout.html": "7631717cd8a99ad68675384c816eb1b35867fb2a59793da41fbafed9bad99a64",
+    "rendered/buyer-orders.html": "1181f395a1539afa45967371dcbd6bff72ac1e15be2c04fcd1910a17bb180288",
+    "rendered/buyer-documents.html": "3cf1358a260e5cd033f4fe2f9b483b53949ee8fea6eb08dcc2500cc1e203930f",
+    "rendered/buyer-workspace.html": "f1f2ba0fbfa6da7f18dee2f7304cbea3a1def6909ad46cdef7b8bed3cdae98c2",
+    "rendered/buyer-notifications.html": "a571b133122b159ceec4ba500b61430a05754cfe087b689ce1cb6e327f2f0727",
+    "rendered/buyer-support.html": "d866b35d604e01173fe4028f2f4cd979126b14ce455e1ea9cf5fd9238ae6ac40",
+    "rendered/buyer-assistant.html": "6c925abb687cb18ae4547039836f387dc7a70b2cf6ef8774311401d56710ea58",
+    "rendered/buyer-recommendations.html": "b49217df53ea61a75d33311a7be840e1d1e5a3a8b14c3b01d8f343cb51e9055c",
+    "rendered/account.html": "f7dae1e975f3e794dd9d95fd4eec7ccb9112820e4a17479b908c372aa38ac371",
+    "rendered/team.html": "4cd0b24347e35f6daa487badafb795fe4e56aac00012a68f80949bc1ed3873f0",
+    "rendered/manual-payment.html": "8bee465d29e35083e4d74c2ccf41607a8bcd501ec0d549f05936ec9c93537cd9",
+    "rendered/supplier-dashboard.html": "29e3a30fed895d0a9ab6aaf540c3f4c8191edc18d5981a8bff44306acf4f117c",
+    "rendered/supplier-orders.html": "9a54dc6484f319641e6b082ab248b47c2a14d3a2df7c5f096243590f4965f0f5",
+    "rendered/supplier-offers.html": "f601546212a92723ec3bb1b06ac071d38ddf41b866a0504f3dbeb236dfad22d8",
+    "rendered/supplier-inventory.html": "7c8938468c8148e612a9f5c21bb99def1a298d198f364a6d503a97228edac783",
+    "rendered/supplier-imports.html": "210bf3a26fc67651b4288255280986ff963428e1d30468d6a9d5f75271148960",
+    "rendered/supplier-connectors.html": "2aa3288c046161733e966ac4713eab8d7dde2b6f666f57a4636a6f91018573df",
+    "rendered/supplier-compliance.html": "897ec6204e7dbfe4dc3166644a57c4d83a1572f00c67e301f1e460a08a730011",
+    "rendered/supplier-documents.html": "a44472f4f4464b69f47fd996766d1b17e3d73c4cd61b859991f9f75ae324602d",
+    "rendered/supplier-promotions.html": "2a4ef9f76df934deafa6d107c6bece404adf035c8c72eee9e98f68404f5c6941",
+    "rendered/supplier-trust.html": "bed92d8a14c45260641774eaf3d48d4cb659e4bcdc1f6a1d98ccbdbeb7475f9e",
+    "rendered/billing.html": "075ffc66dd14d584c42d69a7ebccb801f10cbf13c3dde9b76e88255fa2216366",
+    "rendered/admin-overview.html": "8290c5c32cadbde0264743a15d935fe28f7ce950331f352d41c940636f2a3fd9",
+    "rendered/admin-organizations.html": "3ff2fba6a36a6f11b6ce04885a5b378d62efe336d8e0e17e48f0937af1d8760b",
+    "rendered/admin-access.html": "05bc7cc1c6c5251f2e9155f30e6537747b26062bbf108e117def81c1b9c7a019",
+    "rendered/admin-catalog.html": "171b55c7e4d5286d838bf363813836a3e01bcab56d933b5310c5feefaefd3d52",
+    "rendered/admin-taxonomy.html": "e7c310c351c60c2379d3ab2b8a0125ac05a1fba9cf0d6ba9aef0ea2515485c80",
+    "rendered/admin-catalog-quality.html": "aadcc28d07519d97c4e6203a5feef78daa827d756082c8d61c3461495e61ee2b",
+    "rendered/admin-corrections.html": "30b74c8b9fb4c49303ca1ec8f71aa7a00c34a4ab3d3fe9972b7ea97fbe0a9635",
+    "rendered/admin-imports.html": "8883f04c94ccf9bf2d5a36b374c3121b7c8cb05413c51ce3de51f78334775732",
+    "rendered/admin-supply.html": "1220ad1c2b125fda0f5ef5a70900177e0e19e426f7f6569bffc2bfb56d709260",
+    "rendered/admin-lots.html": "18339600551be7604daf1f496ac28d3d3d1d2db8d73c4e841fa44b16a49d307f",
+    "rendered/admin-connectors.html": "cbfae51c3bcd53813c10ba425de5b17e7dfa2f3e5c57264621765407806c9ee4",
+    "rendered/admin-connector-readiness.html": "d22beefc683ef531d9f36ed88f346a15eb4637d19052bbeb68fdc142419ca27a",
+    "rendered/admin-agreements.html": "951947b3e25cee8a32ada2353fa71c61e04d06385519e9123c5321f23a4f3105",
+    "rendered/admin-controls.html": "bba66c242619cc2e63d87745fdf433d5c6bb44c069b8b4ae810193f8d4308111",
+    "rendered/admin-assurance.html": "b7eda440925ee887c64476c55314afab10cd91e35d5dcdee3f01f5118d5c79bc",
+    "rendered/admin-trust.html": "b5e2d64e30c1b8fcb68cc9be8f0550bde64c03d6d056646acdfdc8c4bf0a926e",
+    "rendered/admin-audit.html": "c88041a22cd2865dda77d0fea4e8ba0d76de1f2c4b9356dc8af1677087c4b6d2",
+    "rendered/admin-settings.html": "8b840ea9621436e94deb32d6fd3c18a47a1786650c73fc7f5af0083686c5d0e6",
+    "rendered/admin-metrics.html": "9f2b66fd2a8b0b13eee143f2dda2d19535db592300ecdd8a64b674bd010931db",
+    "rendered/auth-login.html": "9eb5336f55655f629017b054299ad05ca09ca187ea52c42e2cdcd880758a80d3",
+    "rendered/auth-register.html": "3dc9aae3d94aebcf2b2ecccd90c7769a759bf987dfa6615bbb93377b44bd355a",
+    "rendered/auth-resume.html": "a05aea6eb30d9b08d721ab0e5531e3ac95807928e861d11818a092e7a503f503",
+    "rendered/auth-verify.html": "8a5aabd61e95bfb61f1c25efa4ec12113958267f14584c60c406c6b62129b36b",
+    "rendered/auth-reset.html": "f7e7ea8f4d9d63a58cbabb901fd13f52db94f9c1ce82b47f0e2981d401cac93c",
+    "rendered/auth-admin.html": "a33d88c43d30dd0b0a69cbb127d6b42997c83d863ae3328fce22bc81978f869d",
+    "rendered/buyer-order-detail.html": "d27c53b487561efd2ae567eb3376f7f8e79c8903f78c8f92fdd863164909e316",
+    "rendered/buyer-document-detail.html": "0311b5593b3cb7522767a96e70f355d35eec871abd9d5a1b2c1136e459134a2c",
+    "rendered/buyer-document-upload.html": "31aef384e89537239ee375e090ca57a2a6363466dc2bc0805bd336244a8021bd",
+    "rendered/buyer-reviews.html": "6726d7653e5910954f9dff37e9bf7c1c0b30591fbac73a07c88a97805601cc2d",
+    "rendered/supplier-onboarding.html": "b48f2fbd189a2d5e07b4dafb8b06bfd1ce6fa1db62cbfc182e66924cfa023cd3",
+    "rendered/supplier-order-detail.html": "e14e15d5a96bd877ae3533cde4e5821ecfc3e6a9954c5f5200ce546369c3dfb8",
+    "rendered/supplier-shipment.html": "5b98d881591cc7c16cac97b5a6da231da4a78d3c4e9ecae0578754d7216d6dbe",
+    "rendered/supplier-offer-editor.html": "9dc4b7ea4885391c8c1b940554e3bfa7ceaf0d4558dde4c584f9fda7ff91d423",
+    "rendered/supplier-import-review.html": "84db81c2721ba831481b4d7a682dcc39626bd37c0ac1e0e45ba10213266fc191",
+    "rendered/supplier-agreement.html": "82fb0695fb9c0079f6c5a6af7b102549b9a7066377e7687e964a6d838d1a7aea",
+    "rendered/supplier-corrections.html": "f7ab320ed9f8515f6a41ed04fc07d39b635b0969d0ccdc23867882c9c2df81c2",
+    "rendered/supplier-document-detail.html": "ab2c77bd239a22b420e2a0d222fbf2028b491c2e083b86d56dd17793d0bc87f7",
+    "rendered/admin-organization-create.html": "5ed45f5184cf1b3b4a7f63c206b8ac58e3e83963b66e8f4aa0aac783311f42e8",
+    "rendered/components-controls.html": "30a6d1e9277464e5f5f10cb0d1ef04754359436b127a10f7154eb443cf0feaec",
+    "rendered/components-overlays.html": "59c2e420049155cd35cd7f74e2999d064002277f35c09e33cbc7ad7339fbdbe3",
+    "rendered/components-feedback.html": "a7fa1ccf37e4bfdd3014aaa91b210fc313956afd28cb07410e4490acbf00d721",
+    "rendered/components-navigation.html": "95fc14b5108cddd8377a14fa1363b962eb75337aa1abc227084efb12f6f3f263",
+    "rendered/system-empty.html": "9d6b7532fb3c0d3ebd2aefd85978ed7fbad39805eb017dc4271f02dfd351b373",
+    "rendered/system-error.html": "b56d1c2aabcc08c39fa7f9f58d49562e796b73b12fae0729e71d6d0b85b950d2",
+    "rendered/system-forbidden.html": "25f7c94e0c9d7f1ea92d1eca77ca7b96788b17147ec4d5b0f978ea3be8017f39",
+    "rendered/system-session.html": "0de2fd62410a5092b9f936330760e28437302f18d35d9032eee88bf161f1f7c2",
+    "rendered/system-not-found.html": "f963d95b167e39e9084f8ddad9d3bf92e6d7edb3f83a9ba61bcbdfb5be8a9faf",
+    "rendered/system-loading.html": "e238db10be8a5f41aa1e4b267a01039d39cc46dd3e3f90937f3c1fcddbff91c1",
+    "rendered/legal-terms.html": "bfec853f14fd3b2b32a0a53ee2fab3a7cb0305769a7d22d9ea04e2556c0f2176",
+    "rendered/legal-privacy.html": "5c3a3f8bdc2502baad02306b8dbffac247672b2e831c0907b7725f6abf2f768f",
+    "originals/01-supplier-order.png": "25935ca2ef2a7706db481c0b7b3a90ae9027876c6749f2caf95ae33904a56f3c",
+    "originals/02-cart-reprice.png": "16ca10e0777ab1bd121b1db6cc79a64f8ed63e717c7f6f0045aacd2cceadd826",
+    "originals/03-product-offers.png": "961848a0afc4a3eec6c26667f8d2200f579f6e0fc701e93a398a88d2bab2518d",
+    "originals/04-catalog.png": "dbafd27eccbd0ec244d5a9eba0ef4a560e94e3010e7eb1a9a9769fe3c5558458",
+    "concepts/buyer-documents-ai.png": "fcf96988d802e035b1b283d86f947b24b7c52c61b99af776057eee8cec5d489e",
+    "concepts/components-overlays-ai.png": "a9c9aeee6673def7f7a21965da86fd69ffbe494a5fee8165698d79cbb0d35d1f"
+  },
+  "outputs": {
+    "review.css": "536fa12cd5259cd913084cbc945c03a3fadacad1be61547a38de5cb167e3711f",
+    "01-публичные-страницы/public-home.html": "0094e10b8d63d3fde67e99664aeaa1093723fd0c48355b92c2cc7334c9c5d0dc",
+    "01-публичные-страницы/public-about.html": "7347a50fb3e9dc8f44b393cb77cf1b0520850a4582f455e00cb13140077c04d9",
+    "01-публичные-страницы/public-suppliers.html": "bc6ce215f001a46853d937893e4e436e098d1fa094a41d6ef250d388487ad77d",
+    "02-покупатель/public-catalog.html": "4f2d07ecdef95adb28447b4c4b8719bc5e770a15c62d1f5e65d1f2813cad53b4",
+    "02-покупатель/product-offers.html": "dc289b7ec3eae559d840a39058b41337c6ca68c38ecff607fafb587f9ab4dfb1",
+    "02-покупатель/buyer-cart.html": "48eb3968dfdd4de9928b070d2b57a114f5fc5ac828b8642789d9325230e5d0c2",
+    "02-покупатель/buyer-checkout.html": "82b01f90d4e7098d40cc03d6e88e20a9d4dd6dc3f0aad42b9a4e0e1313d085cb",
+    "02-покупатель/buyer-orders.html": "69e7a978c44ffe8d801bda48d3107d53694c2d61263c41058f703be45ce638a5",
+    "02-покупатель/buyer-documents.html": "74986bbcc708eb32aa82e4ec0d68bf4c1c68acf45adc4f229769e9e1932c353e",
+    "02-покупатель/buyer-workspace.html": "b14de68391a3bfaf669219522e6891e5b2c7f37f2744842e9c5149ca790d0bff",
+    "02-покупатель/buyer-notifications.html": "a77ebd4a7e504aff56f2e24e58546355f35e12ad65395cb820e3a31fd6a5b917",
+    "02-покупатель/buyer-support.html": "184f5a6fb5e2141fac6d7bd2e61e8098cab1e2ac6728fc76bd3920d9bc7560e3",
+    "02-покупатель/buyer-assistant.html": "89a13803a212062cff9723362e9293e48947eeb71ac14a27c815f8a3cad98f37",
+    "02-покупатель/buyer-recommendations.html": "8d0dc201681ae8297f0077fc0e73bfc447707a01e682d333d89b94225fa63ada",
+    "02-покупатель/account.html": "3c4689b22c950957171a5a0c70470d649018962666a17c0db88892d978d93ae3",
+    "02-покупатель/team.html": "95b544db78a9e43f635acdbc8acadf2262b86f20875bda9e2a91e61163f262c7",
+    "02-покупатель/manual-payment.html": "e7437a917a5e4c9c2e41496c736e503bc84ea8d4b68721892f0a2502c6ef581a",
+    "03-поставщик/supplier-dashboard.html": "4fff8410932a7bfa207742692bad0a70f1cdaa0c16d7e7b12a606fadf4c57ba6",
+    "03-поставщик/supplier-orders.html": "c30330aa389eda4bb804ad9f0ab6cd45e09e600199bc413e8f5d94d59b7b6a2e",
+    "03-поставщик/supplier-offers.html": "24c620c2d1c5cc3f73bdaffbd3e6e61494d9c0b78c104b6e8660687e2643a01e",
+    "03-поставщик/supplier-inventory.html": "b289395b59225cc1618b7d4c8be62f95b9eb31a2323bb0435eaedebea649f716",
+    "03-поставщик/supplier-imports.html": "3ff5d06898854ec795b8b0bc97f0a3fbb17b080abc0e4409239d347c95800e7a",
+    "03-поставщик/supplier-connectors.html": "cd732816517d3da666c51a77d8ff238c8999965b88be5f457af7d6bde0a1b5a9",
+    "03-поставщик/supplier-compliance.html": "6e69e667e98177e7946be16286fe5205700de2accb2ab4f3d25910e8a64d8a73",
+    "03-поставщик/supplier-documents.html": "4c9c68ed5705ce502986f926ccdb7a1c14cba114b50eecec99bc1ea6125db34f",
+    "03-поставщик/supplier-promotions.html": "cee348acb9b1f6ca610192b6125aabfc26b27c103bf38d06aeb874fc9400c1ea",
+    "03-поставщик/supplier-trust.html": "8ed1987caaa40682d839d47a913d2cc257f6a564fac42328f6dc703db80501b2",
+    "03-поставщик/billing.html": "ddd2328c7684afd7be40db52a0a75ac7938599926e0938ba7fb18d4e7d78cc72",
+    "04-оператор/admin-overview.html": "48259b2c536dc0bd945e26f1f4e5ce1efe1815bbbddfcd8dfcd6c8d500dfd7a2",
+    "04-оператор/admin-organizations.html": "c5d753029c4944a1942f4013fb0ca784e04065e0df7361695e5aef2a053eefc6",
+    "04-оператор/admin-access.html": "6981970319390d8cd127e237b3cf55a12166d217e1eb5cbdc245f3e9b5415637",
+    "04-оператор/admin-catalog.html": "f54a4ecd4a7b3154cc2c889069ad3920982aa43fc2038bcf23e9e6e01a71cadb",
+    "04-оператор/admin-taxonomy.html": "284ffbb29ef58b2103b4114d98f2bb4f99b167448204555a2984e1cd89e825fe",
+    "04-оператор/admin-catalog-quality.html": "0823be95ca8a3c06d866710846c0f34d97f86bb896b770f78f1c81ca27143ca8",
+    "04-оператор/admin-corrections.html": "ce3af43554fbf9b824599166cd7ce5b311219cc6d6cc5ca26f04fa2a880a9cc8",
+    "04-оператор/admin-imports.html": "0de213a970256e10f321e2a363c0a9e94a833b25479bdb20fd6966100efa9bf5",
+    "04-оператор/admin-supply.html": "7a38e4d473e261507411c08776a1975081a2d1d0c7962e74f97536d5c348dd96",
+    "04-оператор/admin-lots.html": "9a493e8ce49032ddcd3885b54630f59831afbf451ab23e4728f0f6a578a15625",
+    "04-оператор/admin-connectors.html": "d5e30f66f6d659148db6663907b45acd2360f3b1e67a36ebef896a493e5b19e5",
+    "04-оператор/admin-connector-readiness.html": "3dcaea0eb0530c89b3240c08b62c6adb3518de68dd43dcdae81febbb5b884e16",
+    "04-оператор/admin-agreements.html": "db7d3fb91ae84bf7b73653ca66a8eaaf960cfaadcefd7334c3a42ca98f3bdde2",
+    "04-оператор/admin-controls.html": "0294e582d73c5d1dc6ad565c9662607d206ca301483458fb11b7a461a5aba327",
+    "04-оператор/admin-assurance.html": "96ee9bd3555d6b3a492062f22fa7aaf035e9042a76626826dd22efbae2895065",
+    "04-оператор/admin-trust.html": "aeba9cf6c43ffa7f780b19bf6302b6f2b3ca15e91505f359a89b5ee96cf1047c",
+    "04-оператор/admin-audit.html": "a8cf6556f51d964f8f4b0a16652adfa4ff93b191ceb0c51adfe152ee79d48178",
+    "04-оператор/admin-settings.html": "d64bfa05e506e7610e4e0573cb7605ce9cfd140016e574abdce6245e90070504",
+    "04-оператор/admin-metrics.html": "e5fe6f04c6ec7ab4869fa83552a179cf387e44ae03301afabbe486d1bd9d2687",
+    "05-авторизация/auth-login.html": "88177c58ead93b88b3eff10eb5f138d4938e4413cd313534923e61b0e106007c",
+    "05-авторизация/auth-register.html": "d2bd0b1dfd58e78783b7297e6953095f6b08c9e6d67aa4b741c3bc981e1c57de",
+    "05-авторизация/auth-resume.html": "60cf15b64871822e14dc32ac4c5c14b7757dc301ec3c7258d99ae7d06bc5bc2a",
+    "05-авторизация/auth-verify.html": "60aad4a743b611668c04dc4a16853beeb2cf07a7935947c68db8d5b991cd562d",
+    "05-авторизация/auth-reset.html": "f0c06b2c71d1fc24bab976878b860e8c0050a1838253c544d79a05d81ba09698",
+    "05-авторизация/auth-admin.html": "6bbb019aa33b521b15a54c6cd14572ad3306900e78abff572375254804754dc8",
+    "06-модальные-окна-и-панели/buyer-order-detail.html": "c5b3b397cb6bf291b99a10b569855aa9620f48fa092228b3f2168a197dfe9ba7",
+    "06-модальные-окна-и-панели/buyer-document-detail.html": "abdc5b28ca65d95c32f26799e480bfe6f63e9be6d15a9bfadf82569c7b8329e3",
+    "06-модальные-окна-и-панели/buyer-document-upload.html": "d20bd31caf117cf061b5b52a98a1dfa4b26b1bf45e0fc08fff6925e9c51649f5",
+    "06-модальные-окна-и-панели/buyer-reviews.html": "8e7ab0a3b19de31b78577378e6d11f6907b581dd130640787d86d5b838d055bc",
+    "06-модальные-окна-и-панели/supplier-onboarding.html": "509d783f04b1cb97d790161c7d61bbc1815c90a103c735e69cd85a96c639858f",
+    "06-модальные-окна-и-панели/supplier-order-detail.html": "96118731478bbe3144ed86ac4f25d2d73b8e1e728f54acfb2218ddf0168eec4e",
+    "06-модальные-окна-и-панели/supplier-shipment.html": "c2b156d6ff7ea8d6634458d924892508ceb0e9cf1391737cf382c8fe96552f1a",
+    "06-модальные-окна-и-панели/supplier-offer-editor.html": "2733cef4781168f34988486bd9d7cc7f293f9d4be5bcf9e908d4d3e168543c19",
+    "06-модальные-окна-и-панели/supplier-import-review.html": "1b87cfb4ec8953a54342f32fabc1a68cdaab1e56b2d71b145e6daf2b1c4867ad",
+    "06-модальные-окна-и-панели/supplier-agreement.html": "f1d168f6e97f0893e03a4a72fa9a85c0de08f220baf61e51c21d7d5fedc73fe6",
+    "06-модальные-окна-и-панели/supplier-corrections.html": "11fe51fe8f133e4aecd9cf25d4f2a6b81963d59465ca353d9938f42f10bb38c1",
+    "06-модальные-окна-и-панели/supplier-document-detail.html": "b8c1055f916662a2b0bfdb4a34b7411ad93b71fa3c736e1db30ddb5c06818f80",
+    "06-модальные-окна-и-панели/admin-organization-create.html": "2f3796d354256561d7e27f01839095d07b07d14adba4718aeb63d104c2fefa0a",
+    "07-компоненты/components-controls.html": "08dbc134e1bf489efcd1b159485e29471b2195139109e0fa097e23d6527b7fd1",
+    "07-компоненты/components-overlays.html": "8e1fe089c44d19266f3c3deda5f1e3c498ef5773e9d6b442f7d968907657c29a",
+    "07-компоненты/components-feedback.html": "8b40c2b21c8ee24033e3ba105bb7a8ec5b872195d8ad6737c248885c7752dd72",
+    "07-компоненты/components-navigation.html": "bed0202a9121de942f046b6f11d23a81a705b5c6a89330ab62c942c47b8f26c9",
+    "08-системные-состояния/system-empty.html": "491cdae2848d629113406d3fc8e3b34fc2d8a27a42635f975b11ddc20b756f2a",
+    "08-системные-состояния/system-error.html": "66acde712d570373ab6b093b96ac8eaf683e429fa1eb92d90534f219b425b705",
+    "08-системные-состояния/system-forbidden.html": "a1dea7083cff252a251212c13f38d6d620ead8a8b5e83bbe968f03dcf7ab89f3",
+    "08-системные-состояния/system-session.html": "730c606762c83d701cc7b37126689ac1cbd75d66bae8dde10be8dd6ee58f7bb8",
+    "08-системные-состояния/system-not-found.html": "024186fa59a4a86a3cd301ef9b2397b882e4e859dd12de30efddc1f1fe0286dc",
+    "08-системные-состояния/system-loading.html": "8127626d0e011f19aac67034101b5cb8e9f265320c1583853b1cf0ebda74bd4d",
+    "09-юридические-страницы/legal-terms.html": "d10e89793e20da362ed6469b804caa2dd68e1a764bf3ba37b2e829b9126dfe55",
+    "09-юридические-страницы/legal-privacy.html": "87aaf31d9a886e90fc96ab1d8c44763983bc3397216a7531fcef77e54b445f5e",
+    "snapshot-navigation.css": "840e39ed016cddef35829f08b0cf58587444c1d89b2056f277b9d9ccc45dc70e",
+    "01-публичные-страницы/index.html": "f4e86b81743f222c5b2a617d4c141bbbdfe2022e826f3e557d35ff669cbcee15",
+    "02-покупатель/index.html": "933c5bdce84fa3ae4e43c118068f658fbf178f3412e374936c827d9e9b09439d",
+    "03-поставщик/index.html": "0f30d6260da7d97f1819f4d55eafeb2925dbe05cc2a596e5595e8a00c5687e88",
+    "04-оператор/index.html": "3a29aae887c5e48d10c27d87f91878fa0eff27f04b7e16ba239b630ada9781ca",
+    "05-авторизация/index.html": "96e6de8b3dfd5c868a03c0696222edc2bb2d2478ec050031ca0e821754f58709",
+    "06-модальные-окна-и-панели/index.html": "0ba53981863d20753e448a828b8e8b94df8ce36fef906188c225a96853e8646b",
+    "07-компоненты/index.html": "6a55eee86fe7f03b42ea176e36fa8457d80c994779350010215438259fbdbd35",
+    "08-системные-состояния/index.html": "3233aebd474423589e63171e2ac86a698e365b037b30a57486a141a3c6b22b66",
+    "09-юридические-страницы/index.html": "6bbef56ee0658de385bb39eb7b0761451ad46877ec36293e1b9d6cafddcc31a7",
+    "00-исходное-направление/01-supplier-order.png": "25935ca2ef2a7706db481c0b7b3a90ae9027876c6749f2caf95ae33904a56f3c",
+    "00-исходное-направление/02-cart-reprice.png": "16ca10e0777ab1bd121b1db6cc79a64f8ed63e717c7f6f0045aacd2cceadd826",
+    "00-исходное-направление/03-product-offers.png": "961848a0afc4a3eec6c26667f8d2200f579f6e0fc701e93a398a88d2bab2518d",
+    "00-исходное-направление/04-catalog.png": "dbafd27eccbd0ec244d5a9eba0ef4a560e94e3010e7eb1a9a9769fe3c5558458",
+    "00-исходное-направление/index.html": "3e0b4d3ca665bdb4c48d63068c0276991b170657debbb7e212144e89abbc6b9f",
+    "10-дополнительные-концепты/buyer-documents-ai.png": "fcf96988d802e035b1b283d86f947b24b7c52c61b99af776057eee8cec5d489e",
+    "10-дополнительные-концепты/components-overlays-ai.png": "a9c9aeee6673def7f7a21965da86fd69ffbe494a5fee8165698d79cbb0d35d1f",
+    "10-дополнительные-концепты/index.html": "91ab1ea3012d60780a5f95302ca379ed0777103d56cbc9cb1242dea7ee0d86b0",
+    "index.html": "a569b7cf93eb7d072994191c90ba7b1c8af909b1a63f03e4d3d06fe977b6cec5",
+    "CHECKLIST.md": "bdea0f630c510e2d6b1ab9be9facd93c354436e4fb716cdd71ebc6afc0c0af65"
+  },
+  "excluded": "screens/ and evidence/ diagnostic images; no new app routes or business approvals"
+}

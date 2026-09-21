@@ -1,0 +1,3 @@
+.review-toolbar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;padding:16px 24px;background:#f0f4f1;border-block:1px solid #cbd6cf;font:14px/1.5 system-ui,sans-serif}.review-toolbar a{color:#00503e}.review-toolbar p{margin:0}.review-status{color:#805015;background:#fff5e4;border:1px solid #e3d3af;border-radius:4px;padding:2px 8px;font-size:13px}
+.review-links{display:flex;gap:16px;flex-wrap:wrap}
+.review-toolbar a:focus-visible{outline:3px solid #006451;outline-offset:4px}
