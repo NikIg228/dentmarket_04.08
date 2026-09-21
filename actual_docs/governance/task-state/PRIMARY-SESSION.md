@@ -2,6 +2,84 @@
 
 Дата: 2026-09-21. Это карточка исполнения, не продуктовый backlog.
 
+## Единственный дополнительный CI цикл — разрешён владельцем 21.09.2026
+
+- Владелец ответил «да» на один дополнительный проверочный цикл в существующем
+  изолированном PostgreSQL CI, где pg_trgm доступен. Решение передано
+  Оркестратором01a02859-08f3-7082-920d-49400f0fbb09. Это attempt4 сверх трёх
+  сохранённых неудач ниже, не сброс лимита и не ещё три попытки.
+- Свежая сверка: canonical root, main@10c236ec1aaf71f09987321073ad18c094df79d0,
+  primary01a0c415-1c3c-73e3-a270-5ad591fa9ca7, generation2/idle. Входной dirty
+  только этот checkpoint; собственных API/seed процессов нет, один writer.
+- Scope: минимальный CI bootstrap существующего prisma:seed:legacy перед
+  неизменённым verify:search-commerce. PostgreSQL17-alpine — уже описанный
+  job.services.postgres на GitHub-hosted ubuntu; DATABASE_URL указывает на
+  localhost5432/marketplace/public. Service без bind mounts/production secrets;
+  cleanup контейнеров выполняется штатным завершением этого hosted job.
+- До любых fixture writes: CI/hosted identity, job container image/running/
+  local-volume/port binding checks; Prisma read-only transaction подтверждает
+  current_database/current_schema и реальный оператор pg_trgm. Ошибка preflight
+  прекращает bootstrap. Никакой локальной public БД/новой DB/cluster/CREATEDB,
+  extension modifications, бизнес-кода, assertions, guards или dependencies.
+- Budget: весь verify job45мин, bootstrap5мин, extended HTTP suite10мин;
+  один push-triggered цикл, без manual restart/re-run. Static preflight gates
+  перед публикацией: YAML/embedded JS parse, fail-closed negative config probes,
+  сохранность smoke source/остальных CI steps, diff/secrets/staged review.
+- Экспериментальный кандидат не принят до runtime результата. PASS требует
+  полного неизменённого search-commerce и общего обязательного CI, включая
+  ранее skipped browser; только затем разрешена карта экранов. FAIL/TIMEOUT →
+  cleanup/evidence/stop, пятой попытки без нового решения нет. Compact не
+  прерывает этот scope. Практики прежние: Backend Architect, Code Reviewer,
+  Git Workflow Master; инструкции уже прочитаны, агентов нет.
+- Static gates PASS: YAML/embedded Node parse, 6/6 fail-closed config probes,
+  все прежние CI commands/env и search-commerce source сохранены. Проверка
+  истории checkpoint: attempt1 ошибочный endsWith comparator не учитывал
+  добавленные промежуточные записи; attempt2 line-subsequence PASS, история
+  не удалена. Это docs probe, не новый runtime cycle. Локальной DB access нет.
+  Evidence: outputs/ci-screenmap-20260921/attempt4/static-gates.json.
+- Следующий шаг: scoped review/commit/push и один фактический CI run/readback,
+  без повторного локального schema-only setup. До runtime результата кандидат
+  остаётся experimental, CI → карта не завершено.
+
+## Предыдущий stop checkpoint — CI fixture setup BLOCKED
+
+- Primary01a0c415-1c3c-73e3-a270-5ad591fa9ca7, generation2/idle; не передавать
+  и не архивировать задачу: исходный DoD CI → карта ещё не выполнен.
+  main @ 10c236ec1aaf71f09987321073ad18c094df79d0 = origin/main.
+- Опубликованы governance a438ffe и seed fix10c236e. Hook22/22 PASS,
+  JSON/19links/diff PASS; seed unit7/7 REUSED_PASS, real repeat-seed attempt2
+  PASS20.945с, cleanup/public hashes PASS. Runtime hook trust UNVERIFIED.
+- Remote CI35606360220 завершён FAIL404 buyer030 в verify:search-commerce.
+  Prisma migrate/validate, seed/profiles, typecheck, npm test/build, outbound,
+  outbox, observability, runtime/profile/core-contract/config/auth/audit gates
+  PASS; postgres-integration (postgres/platform-authority/backup-restore) PASS.
+  Security35606360252 PASS. Pilot browser verification SKIPPED после FAIL.
+  Actual CI readback завершён; активных операций нет. Governance
+  CI35605753924 завершён FAIL404 buyer030, PostgreSQL
+  job PASS; Security35605753909 PASS. Повтор baseline не считается исправлением.
+- Legacy fixture verification: исходный baseline FAIL404 buyer030; local
+  changed-setup attempt2 FAIL startup30с; attempt3 FAIL после успешного
+  startup28.424с/health200 — search GET500, PostgreSQL42883:
+  оператор text % text не виден в Prisma search_path собственной схемы.
+  Это локальная изоляция pg_trgm, не доказанный дефект приложения в public.
+  Legacy seed сам PASS; полный search/commerce outcome НЕ доказан.
+- Лимит3 исчерпан, дальнейшие попытки/изменения test setup остановлены по
+  Workflow §4.3. Последний gate51.766с; собственный API PID12920 остановлен,
+  схема ci_seed_1789998160518_17732 удалена, public row hashes совпали.
+  Attempt2 также cleaned; собственных активных серверов/DB-runner больше нет.
+- Evidence: outputs/ci-screenmap-20260921/legacy-fixture-attempt{2,3}/
+  seed-repeat-result.json, api.log, legacy-fixtures.log, search-commerce.log;
+  seed-commit-ci-final.json для завершённого remote run. Новых source/app/CI fixes для legacy нет:
+  кандидат не опубликован при failed gate. Dirty — только этот checkpoint.
+- Карта экранов не менялась; UI Standard/Agency UI Designer прочитаны только
+  для подготовки. Ни новые DB/cluster/CREATEDB/extension changes, ни working/demo
+  DB, live-интеграции, API guards, trust, auto-compaction не изменялись.
+- Один следующий шаг после нового явного решения владельца по Workflow §4.3:
+  проверить legacy-fixture bootstrap в public существующего disposable CI
+  PostgreSQL service (вместо локальной схемы без видимости pg_trgm), сохранив
+  исходные smoke assertions и все guards. Это изменённая предпосылка setup,
+  не четвёртая автоматическая попытка и не новое разрешение DB/интеграций.
+
 ## Возобновление и правило полного DoD — 2026-09-21, generation 2
 
 - Единственный primary/writer: 01a0c415-1c3c-73e3-a270-5ad591fa9ca7;
@@ -74,6 +152,48 @@
 - Следующий шаг: commit/push seed fix, фактический CI с Prisma deploy и repeat
   profiles; старый search-commerce fixture blocker остаётся открытым. Карта
   экранов только после завершения CI remediation, без ротации этой задачи.
+
+### Ожидание CI исправленного seed
+
+- Commit10c236ec1aaf71f09987321073ad18c094df79d0 опубликован в origin/main;
+  readback SHA совпал, checkout после commit чист. CI35606360220 и
+  Security35606360252 начаты 13:33:21 UTC, пока PENDING, budget45мин.
+  Evidence outputs/ci-screenmap-20260921/seed-commit-ci.json. Успех общего CI
+  не заявлен; переход к карте экранов не начат.
+- Read-only подготовка следующего известного blocker: search-commerce,
+  document-compliance и trust-geo используют legacy buyer030/offers150+ и
+  упаковки/города. Текущие profiles этих fixtures не создают. Их источник —
+  существующий apps/api/prisma/seed.ts / prisma:seed:legacy; одной смены ID
+  недостаточно. Возможный fix только в test setup изолированного CI service,
+  до расширенных smoke и после проверки profiles; решение ещё не применено.
+- Следующий шаг: получить фактический CI результат seed/следующего blocker;
+  unit/repeat-seed не повторять, продуктовый backlog не расширять.
+
+### Известный legacy fixture blocker — ограниченная проверка setup
+
+- Внутри того же CI remediation проверяется кандидат подготовки данных:
+  существующий prisma:seed:legacy после штатных profiles, только в новой
+  собственной схеме disposable test DB; неизменённый verify:search-commerce
+  против собственного go_live API с test adapters/no background queues.
+  Это не product feature, не изменение рабочих данных и не переход к карте.
+- Исходный search-commerce remote baseline FAIL404 сохранён. Новый local
+  changed-setup запуск — attempt2/max3, budget5мин, диагностика15мин. API/src
+  и schemas/src совпали с записанным build baseline16af5ca; существующий dist
+  используется без переписывания/build. Shell secrets не наследуются runtime.
+- Legacy source прочитан: fixed buyers/offers/packaging/cities/mock documents;
+  LOCAL_STORAGE_PATH задаётся внутри ignored outputs. Никаких live signatures/
+  payments. Cleanup только своего PID/schema, public row hashes до/после.
+- Следующий шаг: выполнить локальный search-commerce gate; сохранять любой
+  следующий guard/contract FAIL, не ослаблять assertions ради CI.
+- Local attempt2 FAIL52.09с: profiles/legacy seed PASS, но собственный API не
+  ответил за ошибочно укороченный runner startup30с; API log пуст, HTTP сценарий
+  не достигнут. API/schema cleanup PASS, public preserved. Evidence:
+  outputs/ci-screenmap-20260921/legacy-fixture-attempt2/seed-repeat-result.json.
+- Последний разрешённый attempt3 проверит именно запуск с уже существующим
+  стандартным startup60с из verify-platform-authority и сохранит last HTTP
+  error/status, info log и PID; общий gate budget5мин не повышается. Гипотеза:
+  прежний сокращённый startup30с не покрывал загрузку локального go_live artifact.
+  При третьем FAIL — BLOCKED и остановка, без смены инструмента/новых retries.
 
 ## История прерванной передачи — 2026-09-21, generation 1
 
