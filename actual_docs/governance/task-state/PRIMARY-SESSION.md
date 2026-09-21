@@ -2,6 +2,52 @@
 
 Дата: 2026-09-21. Это карточка исполнения, не продуктовый backlog.
 
+## CI API + worker — один разрешённый цикл №5, 21.09.2026
+
+- Явное «да» владельца передано Оркестратором 01a02859-08f3-7082-920d-49400f0fbb09:
+  исправить только CI/test harness и выполнить один дополнительный runtime цикл.
+  Это attempt5 общей истории, без сброса предыдущих четырёх и без шестого rerun.
+- Fresh snapshot: canonical root, main@98c1888795ac810a4b5501abcef2e2a1ec5ef4dc;
+  primary 01a0c415-1c3c-73e3-a270-5ad591fa9ca7, generation2/idle, один writer.
+  Входной dirty только этот checkpoint; его история сохраняется.
+- Read-only разбор завершён отдельно: API health из attempt4 подтвердил api/
+  schedules=false/queueConsumer=false; worker в CI не запускался. POST
+  notifications/process вызывает только processPending, не outbox projection.
+  GET supplier025 вернул200, JSON content-length2; массив по коду означает пусто.
+  Доставка пользователям этим не признана неисправной. Credential organizationId
+  не соответствует projector /OrganizationId$/ — отдельное расхождение вне fix.
+- Scope/DoD: штатные API + worker на том же disposable CI PostgreSQL/Redis;
+  настоящий API /health/ready и worker runtime.ready после snapshot dependencies,
+  liveness до/после smoke, cleanup обоих при любом результате. Существующий
+  fail-closed isolated-service preflight и все прежние smoke сохраняются.
+  Документный smoke ограниченно ожидает исходное nonempty + all SENT, при timeout
+  выводит только безопасные ids/status/attempts; HTTP ошибки не маскируются.
+- Budgets заранее: readiness60с, notification poll60с, extended step10мин,
+  полный verify job45мин. Test adapters/local storage, без реальных provider env.
+  Рабочая/demo/local public DB, business API, guards, зависимости, новые
+  worktrees/задачи/интеграции не меняются. Scope CI → карта по-прежнему один.
+- Gates до публикации: YAML/JS parse, сфокусированные проверки readiness/poll
+  условий без API/DB, preservation старых smoke/preflight, diff/staged/secrets.
+  Затем один reviewed commit/push и actual CI с API+worker/outbox→SENT/browser.
+  FAIL/TIMEOUT → evidence/cleanup/stop; только полный PASS разрешает карту.
+- Практики: Backend Architect (границы обработчиков), Code Reviewer (readiness,
+  сохранность assertions/ошибок), Git Workflow Master (scoped publication).
+  Все инструкции прочитаны; делегирования нет.
+- Реализован candidate: CI стартует API + worker/test adapters, readiness helper
+  подтверждает dependency snapshot/worker event и PIDs; каждый прежний smoke
+  окружён liveness checks, EXIT/INT/TERM cleanup завершает оба PID за10с, затем
+  forced cleanup при необходимости и оба лога. Preflight container/DB неизменён.
+  Документный polling только GET, прежний POST/process и финальный assertion
+  сохранены; timeout диагностирует IDs/status/attempts без payload/secrets.
+- Gates PASS: node --test scripts/ci-verification.test.mjs 6/6 (94мс), три
+  node --check, YAML parse, Git Bash -n, прежний порядок smoke/fixture preflight/
+  финальный assertion сохранены. Source preservation attempt1 raw bytes FAIL
+  на CRLF/LF неизменённых файлов; attempt2 normalized PASS. Runtime не запускался.
+  Evidence: outputs/ci-screenmap-20260921/attempt5/static-gates.json.
+  Product TS/API не менялись; полные suites локально NOT_RUN, выполняются в CI.
+- Следующий шаг: review/staging/commit/push и один фактический attempt5; кандидат
+  не принят до runtime readiness/notification outcome и полного CI/browser.
+
 ## Единственный дополнительный CI цикл — разрешён владельцем 21.09.2026
 
 - Владелец ответил «да» на один дополнительный проверочный цикл в существующем
@@ -37,9 +83,37 @@
   добавленные промежуточные записи; attempt2 line-subsequence PASS, история
   не удалена. Это docs probe, не новый runtime cycle. Локальной DB access нет.
   Evidence: outputs/ci-screenmap-20260921/attempt4/static-gates.json.
-- Следующий шаг: scoped review/commit/push и один фактический CI run/readback,
-  без повторного локального schema-only setup. До runtime результата кандидат
-  остаётся experimental, CI → карта не завершено.
+- Кандидат опубликован: 98c1888795ac810a4b5501abcef2e2a1ec5ef4dc, main;
+  origin/main readback SHA совпал. Scope/staged/secrets/diff checks PASS.
+  Единственный attempt4: CI35609086298, Security35609086179, start13:59:00 UTC,
+  deadline14:44:00 UTC; завершены примерно14:11:25 UTC, budget не исчерпан.
+- Итог attempt4: **BLOCKED / общий CI FAIL**, следующую фазу не начинать.
+  CI/container/read-only database/pg_trgm preflight и legacy seed PASS.
+  Неизменённый `npm run verify:search-commerce` PASS: projection505,
+  3 offers/3 cities, 8 freshness policies, override ACTIVE, checkout4 suppliers.
+  Прежние buyer404 и schema-only pg_trgm препятствия на целевой CI БД сняты.
+- Следующий неизменённый `npm run verify:document-compliance` FAIL14:11:22 UTC,
+  scripts/verify-document-compliance.mjs:182: "Domain events were not delivered
+  as durable notifications". После POST notifications/process проверка не нашла
+  ожидаемый непустой набор со всеми status SENT; точная причина ещё не установлена.
+  Не считать это доказанным дефектом business logic и не ослаблять assertion.
+  Последующие verify:security/onboarding-agreement/trust-geo и Pilot browser
+  verification не выполнены из-за остановки Extended API step.
+- Typecheck/npm test/build, migrations/seed profiles/Prisma validate, runtime,
+  profile/core-contract/config/auth/audit gates PASS. Отдельный postgres job
+  (postgres/platform-authority/backup-restore) PASS. Security workflow PASS.
+  API EXIT trap выполнен; Stop containers обоих CI jobs PASS. Локальных API,
+  DB writes или процессов этого цикла не было. Пятой попытки/re-run нет.
+- Evidence: outputs/ci-screenmap-20260921/attempt4/{static-gates.json,
+  ci-current.json,final-jobs.json,runtime-excerpt.log}. Public API readback позже
+  вернул403; финальные jobs/logs получены штатным GitHub connector, без запуска
+  нового CI. Полный job outcome и cleanup подтверждены, PENDING операций нет.
+- Карта экранов/продуктовый код не изменены. Кандидат setup опубликован,
+  но весь DoD CI → карта не выполнен; автоматической передачи/архивации нет.
+  Dirty после результата — только этот evidence checkpoint, без нового push.
+- Один следующий шаг после нового решения владельца: read-only разобрать путь
+  outbox → notifications и условия notifications/process в CI для точной причины
+  document-compliance FAIL; отдельный runtime цикл этим checkpoint не разрешён.
 
 ## Предыдущий stop checkpoint — CI fixture setup BLOCKED
 

@@ -1,4 +1,5 @@
 import { mkdir, writeFile } from "node:fs/promises";
+import { waitForSentNotifications } from "./lib/ci-verification.mjs";
 
 const base = process.env.API_URL ?? "http://127.0.0.1:4012/api";
 const actorId = "00000000-0000-4000-8000-000000000002";
@@ -172,14 +173,27 @@ if (check.status === "BLOCKED")
   );
 
 await request("/notifications/process", { method: "POST" });
-const notifications = await json(
-  `/notifications/organizations/${supplierOrganizationId}?limit=200`,
-);
-const relevant = notifications.filter(({ aggregateId }) =>
-  [document.id, check.id, credential.id].includes(aggregateId),
-);
-if (relevant.length === 0 || relevant.some(({ status }) => status !== "SENT"))
+let notifications = [];
+const relevant = await waitForSentNotifications(async (remainingMs) => {
+  const response = await request(
+    `/notifications/organizations/${supplierOrganizationId}?limit=200`,
+    { signal: AbortSignal.timeout(Math.max(1, Math.min(5_000, remainingMs))) },
+  );
+  notifications = await response.json();
+  return notifications.filter(({ aggregateId }) =>
+    [document.id, check.id, credential.id].includes(aggregateId),
+  );
+});
+if (relevant.length === 0 || relevant.some(({ status }) => status !== "SENT")) {
+  console.error(JSON.stringify({
+    notificationWait: "timeout after 60s",
+    recipientOrganizationId: supplierOrganizationId,
+    expectedAggregateIds: [document.id, check.id, credential.id],
+    returned: notifications.length,
+    relevant: relevant.map(({ id, aggregateId, status, attempts, channel }) => ({ id, aggregateId, status, attempts, channel })),
+  }));
   throw new Error("Domain events were not delivered as durable notifications");
+}
 
 console.log(
   JSON.stringify(

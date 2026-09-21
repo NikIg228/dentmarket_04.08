@@ -113,20 +113,47 @@ jobs:
         timeout-minutes: 10
         env:
           DEPLOYMENT_PROFILE: go_live
+          NODE_ENV: test
+          PAYMENT_PROVIDER_MODE: mock
+          BACKGROUND_QUEUE_ENABLED: "true"
         run: |
-          (cd apps/api && exec node dist/src/main.js) > /tmp/marketplace-api.log 2>&1 &
+          node --test scripts/ci-verification.test.mjs
+          node scripts/verify-ci-runtime-readiness.mjs --preflight
+          API_PID=
+          WORKER_PID=
+          cleanup() {
+            result=$?
+            trap - EXIT
+            for pid in $API_PID $WORKER_PID; do kill "$pid" 2>/dev/null || true; done
+            for attempt in $(seq 1 10); do
+              alive=false
+              for pid in $API_PID $WORKER_PID; do if kill -0 "$pid" 2>/dev/null; then alive=true; fi; done
+              if [ "$alive" = false ]; then break; fi
+              sleep 1
+            done
+            for pid in $API_PID $WORKER_PID; do
+              if kill -0 "$pid" 2>/dev/null; then kill -KILL "$pid" 2>/dev/null || true; fi
+              wait "$pid" 2>/dev/null || true
+            done
+            echo "CI runtime cleanup: owned API and worker stopped"
+            cat /tmp/marketplace-api.log /tmp/marketplace-worker.log
+            exit "$result"
+          }
+          trap cleanup EXIT
+          trap 'exit 130' INT
+          trap 'exit 143' TERM
+          (cd apps/api && PROCESS_ROLE=api exec node dist/src/main.js) > /tmp/marketplace-api.log 2>&1 &
           API_PID=$!
-          trap 'kill "$API_PID" 2>/dev/null || true; wait "$API_PID" 2>/dev/null || true; cat /tmp/marketplace-api.log' EXIT
-          for attempt in $(seq 1 30); do
-            if curl --fail --silent http://127.0.0.1:4012/api/health > /dev/null; then break; fi
-            sleep 1
+          (cd apps/api && PROCESS_ROLE=worker exec node dist/src/worker.js) > /tmp/marketplace-worker.log 2>&1 &
+          WORKER_PID=$!
+          node scripts/verify-ci-runtime-readiness.mjs "$API_PID" "$WORKER_PID" /tmp/marketplace-worker.log
+          for gate in search-commerce document-compliance security onboarding-agreement trust-geo; do
+            kill -0 "$API_PID"
+            kill -0 "$WORKER_PID"
+            npm run "verify:$gate"
+            kill -0 "$API_PID"
+            kill -0 "$WORKER_PID"
           done
-          curl --fail http://127.0.0.1:4012/api/health
-          npm run verify:search-commerce
-          npm run verify:document-compliance
-          npm run verify:security
-          npm run verify:onboarding-agreement
-          npm run verify:trust-geo
       - name: Pilot browser verification
         run: |
           npm run verify:flow-b3
@@ -138,6 +165,7 @@ jobs:
           name: ci-diagnostics
           path: |
             /tmp/marketplace-api.log
+            /tmp/marketplace-worker.log
             test-results/
             playwright-report/
           if-no-files-found: ignore
