@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "projectName": "Platforma.Market",
+  "projectId": "local-affe45ff7ccd29c6dcc081e3663d7082",
+  "canonicalRoot": "C:\\Users\\user\\Desktop\\dentmarket-kz-main",
+  "generation": 1,
+  "primaryThreadId": "01a0c36e-38a1-7942-957b-9e8620c01442",
+  "successorThreadId": null,
+  "transition": "idle",
+  "autoHandoffEnabled": true,
+  "hookActivationStatus": "REQUIRES_REVIEW_AND_TRUST",
+  "handoffPath": "actual_docs/PROJECT_HANDOFF.md",
+  "checkpointPath": "actual_docs/governance/task-state/PRIMARY-SESSION.md",
+  "protocolPath": "actual_docs/governance/SESSION_ROLLOVER.md",
+  "retiredThreadIds": [
+    "019fc298-67f6-77c3-bd13-456defdc513c",
+    "01a020bb-35e2-76e3-8ae5-b7932e9e7909",
+    "01a02551-6288-7e10-b66f-d67bd887ff05",
+    "01a025b2-389e-78a2-90fe-8ca01b056de4"
+  ],
+  "sourceThreadIds": [
+    "019fc298-67f6-77c3-bd13-456defdc513c",
+    "01a020bb-35e2-76e3-8ae5-b7932e9e7909",
+    "01a02551-6288-7e10-b66f-d67bd887ff05",
+    "01a025b2-389e-78a2-90fe-8ca01b056de4"
+  ],
+  "lastAuthorization": "Owner requested consolidation and automatic same-scope handoff on 2026-09-21; no additional product implementation authorized."
+}

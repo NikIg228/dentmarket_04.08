@@ -1,5 +1,5 @@
 {
-  "description": "Read-only continuity reminders. Requires Codex hook review and trust. No file writes, transcript access, Git operations or task creation.",
+  "description": "Read-only event adapter. SessionStart compact requests owner-authorized two-phase handoff via native app tools. Exact hooks require user review/trust; no direct task, file, Git or network writes.",
   "hooks": {
     "SessionStart": [
       {
@@ -7,10 +7,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo 'Project continuity for Platforma.Market: before acting read the current repository AGENTS.md and the task-continuity section in actual_docs/governance/DEVELOPMENT_WORKFLOW.md. Read the checkpoint for the selected task only. After compaction or handoff verify cwd, branch, HEAD, dirty ownership and evidence. Preserve the latest authorized scope and the single-owner rule. Maintain a compact checkpoint at meaningful milestones when file writes are authorized. Do not repeat completed work or reset failed-check attempts. A new session is not authorization for code changes, new tasks, archiving or Git mutations. If the task or checkpoint is ambiguous, ask instead of guessing.'",
-            "commandWindows": "powershell.exe -NoLogo -NoProfile -NonInteractive -Command \"Write-Output 'Project continuity for Platforma.Market: before acting read the current repository AGENTS.md and the task-continuity section in actual_docs/governance/DEVELOPMENT_WORKFLOW.md. Read the checkpoint for the selected task only. After compaction or handoff verify cwd, branch, HEAD, dirty ownership and evidence. Preserve the latest authorized scope and the single-owner rule. Maintain a compact checkpoint at meaningful milestones when file writes are authorized. Do not repeat completed work or reset failed-check attempts. A new session is not authorization for code changes, new tasks, archiving or Git mutations. If the task or checkpoint is ambiguous, ask instead of guessing.'\"",
+            "command": "node \"$(git rev-parse --show-toplevel)/.codex/continuity-hook.cjs\"",
+            "commandWindows": "node \"C:\\Users\\user\\Desktop\\dentmarket-kz-main\\.codex\\continuity-hook.cjs\"",
             "timeout": 5,
-            "statusMessage": "Loading project task-continuity reminder"
+            "additionalContextLimit": 5000,
+            "statusMessage": "Restore project state / request safe handoff after compaction"
           }
         ]
       }
@@ -20,10 +21,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo 'Project continuity for Platforma.Market: before acting read the current repository AGENTS.md and the task-continuity section in actual_docs/governance/DEVELOPMENT_WORKFLOW.md. Read the checkpoint for the selected task only. After compaction or handoff verify cwd, branch, HEAD, dirty ownership and evidence. Preserve the latest authorized scope and the single-owner rule. Maintain a compact checkpoint at meaningful milestones when file writes are authorized. Do not repeat completed work or reset failed-check attempts. A new session is not authorization for code changes, new tasks, archiving or Git mutations. If the task or checkpoint is ambiguous, ask instead of guessing.'",
-            "commandWindows": "powershell.exe -NoLogo -NoProfile -NonInteractive -Command \"Write-Output 'Project continuity for Platforma.Market: before acting read the current repository AGENTS.md and the task-continuity section in actual_docs/governance/DEVELOPMENT_WORKFLOW.md. Read the checkpoint for the selected task only. After compaction or handoff verify cwd, branch, HEAD, dirty ownership and evidence. Preserve the latest authorized scope and the single-owner rule. Maintain a compact checkpoint at meaningful milestones when file writes are authorized. Do not repeat completed work or reset failed-check attempts. A new session is not authorization for code changes, new tasks, archiving or Git mutations. If the task or checkpoint is ambiguous, ask instead of guessing.'\"",
+            "command": "node \"$(git rev-parse --show-toplevel)/.codex/continuity-hook.cjs\"",
+            "commandWindows": "node \"C:\\Users\\user\\Desktop\\dentmarket-kz-main\\.codex\\continuity-hook.cjs\"",
             "timeout": 5,
-            "statusMessage": "Loading project task-continuity reminder"
+            "additionalContextLimit": 5000,
+            "statusMessage": "Restore project state / request safe handoff after compaction"
           }
         ]
       }

@@ -1,5 +1,12 @@
 # Актуальная документация DentMarket KZ
 
+После объединения задач 2026-09-21 начинать с
+[PROJECT_HANDOFF](PROJECT_HANDOFF.md),
+[PRIMARY-SESSION](governance/task-state/PRIMARY-SESSION.md) и
+[SESSION_ROLLOVER](governance/SESSION_ROLLOVER.md).
+`.codex/project-session.json` определяет единственного основного исполнителя.
+Это маршрут восстановления контекста, не новая очередь и не разрешение начать код.
+
 `actual_docs` — единая папка проектной документации. Корневые `README.md` и
 `AGENTS.md` остаются вне неё намеренно: первый является входной страницей
 репозитория, второй должен автоматически обнаруживаться агентами и
