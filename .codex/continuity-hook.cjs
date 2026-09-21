@@ -42,21 +42,19 @@ function buildResponse(event, registry) {
     return result(eventName, intro + 'You are not the registered primary owner. Read-only comprehension/audit only unless the current user explicitly changes ownership. Do not rotate this task, create another primary, start product work or archive another task.');
   }
   if (registry.transition !== 'idle' || registry.successorThreadId) {
-    return result(eventName, intro + 'HANDOFF_TRANSITION_IN_PROGRESS. No product writes and no new independent rollover. Read the existing transition and checkpoint; recover only that same handoff. If a successor is already recorded, reuse and inspect it, never create a duplicate. During initial bootstrap the orchestrator retains control; perform only the requested read-only comprehension.');
-  }
-  if (eventName === 'SessionStart' && event.source === 'compact' && registry.autoHandoffEnabled === true) {
-    return result(eventName, intro +
-      'AUTOMATIC_PROJECT_HANDOFF_REQUIRED: the owner authorized replacement of the primary task after context compaction on 2026-09-21. ' +
-      'Before any more product edits, follow the two-phase procedure in the protocol: persist the exact unfinished authorized scope and evidence, freeze source writes, reuse an already recorded successor or create exactly one fresh task in this saved project using environment.type=local, never a worktree or fork. ' +
-      'Have the successor perform read-only comprehension; inspect its reply, then transfer ownership, archive this source through the native Codex tool and release the successor to the same unfinished authorized scope. ' +
-      'Do not replay the entire backlog, reset attempt budgets, bypass hook trust, commit WIP just because of compaction, or claim archive/create succeeded without readback. ' +
-      'If app tools or trust are unavailable, or creation has an uncertain result, stop safely and report the blocker; do not retry blind or resume writing in the old task.');
+    return result(eventName, intro + 'HANDOFF_TRANSITION_IN_PROGRESS. No product writes and no new independent rollover. Read the existing transition and checkpoint; recover only that same handoff. If a successor is already recorded, reuse and inspect it, never create a duplicate. A pre-validated successor or authorized orchestrator may finalize the same transition idempotently only with verified comprehension, stopped source, ownership and native archive confirmation; a registry flag alone proves none of these. Recovery of an interrupted task requires explicit owner authorization. During initial bootstrap the orchestrator retains control; perform only the requested read-only comprehension.');
   }
   return result(eventName, intro +
+    (eventName === 'SessionStart' && event.source === 'compact'
+      ? 'RESTORE_AND_CONTINUE_CURRENT_TASK: compaction does not interrupt the authorized task or request a handoff. Restore the checkpoint and continue in this same primary task. '
+      : '') +
     'Maintain the existing task checkpoint after meaningful milestones and before handoff; do not wait for a full context window. ' +
+    'Approaching the context limit is not a rollover trigger. Complete the entire agreed Definition of Done, mandatory checks/review, authorized publication and actual CI where required, with no unfinished operations. ' +
+    'FAILED/BLOCKED/PENDING/unknown outcomes are incomplete: preserve evidence, report the blocker and stop at the existing attempt/time limits without rotating. Never narrow the task to one test or governance edit to claim completion. ' +
     (registry.autoHandoffEnabled === true
-      ? 'On a known compaction follow the authorized protocol even if hook execution is unavailable; disclose that limitation. '
-      : 'Automatic rollover is disabled. Do not create or archive tasks on compaction. Restore the checkpoint in this task. ') +
+      ? 'Defer rollover until full task completion is evidenced and successor read-only comprehension is verified under the protocol; no registry flag alone certifies readiness. '
+      : 'Automatic rollover is disabled. Restore the checkpoint in this task. ') +
+    'Do not create or archive tasks merely because of compaction, bypass hook trust or disable engine auto-compaction. ' +
     'One writer, unchanged task scope and acceptance criteria; no auto-next-phase. Preserve valid checks and failed-attempt counts. ' +
     'Only the recorded primary owns implementation; latest explicit stop/read-only instructions override automatic continuation.');
 }

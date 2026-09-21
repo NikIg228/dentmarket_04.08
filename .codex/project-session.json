@@ -3,16 +3,18 @@
   "projectName": "Platforma.Market",
   "projectId": "local-affe45ff7ccd29c6dcc081e3663d7082",
   "canonicalRoot": "C:\\Users\\user\\Desktop\\dentmarket-kz-main",
-  "generation": 1,
-  "primaryThreadId": "01a0c36e-38a1-7942-957b-9e8620c01442",
+  "generation": 2,
+  "primaryThreadId": "01a0c415-1c3c-73e3-a270-5ad591fa9ca7",
   "successorThreadId": null,
   "transition": "idle",
   "autoHandoffEnabled": true,
+  "rolloverPolicy": "after-task-completion",
   "hookActivationStatus": "REQUIRES_REVIEW_AND_TRUST",
   "handoffPath": "actual_docs/PROJECT_HANDOFF.md",
   "checkpointPath": "actual_docs/governance/task-state/PRIMARY-SESSION.md",
   "protocolPath": "actual_docs/governance/SESSION_ROLLOVER.md",
   "retiredThreadIds": [
+    "01a0c36e-38a1-7942-957b-9e8620c01442",
     "019fc298-67f6-77c3-bd13-456defdc513c",
     "01a020bb-35e2-76e3-8ae5-b7932e9e7909",
     "01a02551-6288-7e10-b66f-d67bd887ff05",
@@ -24,5 +26,5 @@
     "01a02551-6288-7e10-b66f-d67bd887ff05",
     "01a025b2-389e-78a2-90fe-8ca01b056de4"
   ],
-  "lastAuthorization": "2026-09-21: owner approved B2B requirements and their recording, then clarified that promotions support configurable N+M and product discounts; 3+1 is only an example. Reservation of all ordered goods, including gifts, is mandatory. Current scope remains requirements/docs publication, without runtime implementation, live integrations or old CI fixes. Existing same-scope handoff authorization remains."
+  "lastAuthorization": "2026-09-21: owner explicitly authorized recovery of the already interrupted handoff; source archive and successor comprehension confirmed, generation 2 finalized without another rotation. Owner superseded immediate rollover: compaction restores/continues the entire current task; handoff only after full DoD/checks/review/authorized publication/actual CI where required, no unfinished operations and verified successor comprehension. Failed, blocked, pending or unknown outcomes are incomplete. Governance update is separate from preserved CI remediation, then approved B2B screen map. September 26 target is internal backend/frontend; no live integrations, working DB reseed, worktrees or blanket production certification. Payment channels clarified; commission collection and bank products remain unapproved options."
 }

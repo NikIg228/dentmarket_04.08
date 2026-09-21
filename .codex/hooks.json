@@ -1,5 +1,5 @@
 {
-  "description": "Read-only event adapter. SessionStart compact requests owner-authorized two-phase handoff via native app tools. Exact hooks require user review/trust; no direct task, file, Git or network writes.",
+  "description": "Read-only event adapter. SessionStart compact restores the checkpoint and continues the same task; rollover is deferred until full DoD and verified handoff prerequisites. Exact hooks require user review/trust; no direct task, file, Git or network writes.",
   "hooks": {
     "SessionStart": [
       {
@@ -11,7 +11,7 @@
             "commandWindows": "node \"C:\\Users\\user\\Desktop\\dentmarket-kz-main\\.codex\\continuity-hook.cjs\"",
             "timeout": 5,
             "additionalContextLimit": 5000,
-            "statusMessage": "Restore project state / request safe handoff after compaction"
+            "statusMessage": "Restore checkpoint / continue current task to full DoD"
           }
         ]
       }
@@ -25,7 +25,7 @@
             "commandWindows": "node \"C:\\Users\\user\\Desktop\\dentmarket-kz-main\\.codex\\continuity-hook.cjs\"",
             "timeout": 5,
             "additionalContextLimit": 5000,
-            "statusMessage": "Restore project state / request safe handoff after compaction"
+            "statusMessage": "Restore checkpoint / continue current task to full DoD"
           }
         ]
       }

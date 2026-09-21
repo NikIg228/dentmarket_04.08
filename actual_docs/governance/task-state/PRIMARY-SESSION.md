@@ -2,6 +2,140 @@
 
 Дата: 2026-09-21. Это карточка исполнения, не продуктовый backlog.
 
+## Возобновление и правило полного DoD — 2026-09-21, generation 2
+
+- Единственный primary/writer: 01a0c415-1c3c-73e3-a270-5ad591fa9ca7;
+  каноническая папка, main @ 2b1671419bbead295672eee959d33145aaec1666.
+- Явное разрешение владельца передано Оркестратором
+  01a02859-08f3-7082-920d-49400f0fbb09: завершить уже прерванную передачу и
+  продолжить сохранённый scope. READ-ONLY READY принят. Source
+  01a0c36e-38a1-7942-957b-9e8620c01442 найден в native list_archived_threads
+  самим преемником; остановка writer подтверждена Оркестратором, процессов
+  seed/API/web по canonical path при свежей сверке нет. Семь ожидаемых WIP
+  путей и пустой staging совпали. Тот же переход завершён: idle/null,
+  generation=2 сохранена, source retired; новых задач/архиваций нет.
+- Новый отдельно проверяемый governance scope: AGENTS, Workflow, SESSION_ROLLOVER,
+  handoff/registry/checkpoint, continuity-hook/hooks.json/tests. Сжатие не
+  прерывает работу: restore/continue до полного исходного DoD, без сужения
+  задачи. Передача только после checks/review/публикации/фактического CI где
+  требуются, завершения операций и comprehension; blocked/pending/unknown не PASS.
+  После архива тот же переход может завершить pre-validated successor или
+  уполномоченный оркестратор с evidence, не по одному флагу.
+- Gates governance PASS, попытка 1: `node --test .codex/continuity-hook.test.cjs`
+  22/22 (0.205с); Node JSON/local-links/consistency gate — 19 ссылок, registry
+  generation2/idle, прежняя история checkpoint сохранена; `git diff --check` PASS.
+  Evidence: outputs/governance-rollover-20260921/{hook-tests.log,gates.json}.
+  Product WIP hashes сохранены для review; после этой evidence-only записи
+  только scoped/staged review, без повторного unit suite. Budget 2мин/max3.
+  Product suites
+  для этих правок NOT_RUN: исходники продукта не изменяются. Runtime hook
+  REQUIRES_REVIEW_AND_TRUST; trust и auto-compaction не меняются.
+- Практики: OpenAI Docs (SessionStart semantics), Agency Git Workflow Master
+  (отдельный commit и явный staging), Code Reviewer (guards/evidence).
+  Прочитаны; агентов нет. После фиксации правил — короткий отчёт Оркестратору.
+- Продуктовый WIP seed/helper/test/ci.yml сохраняется отдельно от governance
+  staging. Исходная задача CI → карта НЕ завершена; repeat-seed attempt1 FAIL
+  до seed, 18.9с/cleanup PASS; 7/7 unit и node check по checkpoint не повторять.
+  Remote baseline failure1, max3/blocker, диагностика15мин/local gate5мин/CI45мин.
+- Следующий шаг: закончить scoped governance gates/publication, затем read-only
+  диагностика pg_trgm/search_path существующей test DB dentmarket_audit_20260914.
+  Ни новые DB/cluster/CREATEDB/public extensions, ни working/demo DB не разрешены.
+  Три аннотации и платёжные ограничения ниже сохраняются для итогового ответа.
+
+## История прерванной передачи — 2026-09-21, generation 1
+
+- Source/primary: 01a0c36e-38a1-7942-957b-9e8620c01442; transition=preparing.
+  Successor: 01a0c415-1c3c-73e3-a270-5ad591fa9ca7, только read-only comprehension.
+- Read-only comprehension преемника получен и проверен: продукт, WIP, gates,
+  counters, запреты и следующий шаг совпали. Теперь primary передан ему,
+  generation=2 / awaiting_archive. Оба остаются без продуктовой записи до
+  подтверждения архива source; source меняет только завершающие поля handoff.
+  Продуктовая запись остановлена; собственных активных seed/API/web процессов нет.
+- main @ 2b1671419bbead295672eee959d33145aaec1666. Собственный WIP:
+  `.github/workflows/ci.yml`, `scripts/seed-pilot-demo-market.mjs`, новые
+  `scripts/lib/pilot-variant-selection.mjs`, `scripts/pilot-variant-selection.test.mjs`,
+  `.codex/project-session.json`, этот checkpoint и PROJECT_HANDOFF. Staging/commit/
+  push текущей реализации ещё не выполнялись. Чужих правок не обнаружено.
+- Реализовано: seed сохраняет уже назначенный вариант для предложений; при первом
+  запуске выбирает стабильно по createdAt/id, отклоняет конфликтующие связи/единицу.
+  Единица продажи выбирается по unique code=piece. CI запускает regression test.
+- PASS (попытка 1): `node --test scripts/pilot-variant-selection.test.mjs` — 7/7;
+  `node --check scripts/seed-pilot-demo-market.mjs` и helper — PASS. Эти исходники
+  после проверки не менялись; не повторять из-за нового чата или handoff-docs.
+- PostgreSQL repeat-seed gate, попытка 1: FAIL до запуска seed, миграция
+  20260716153000_init_foundation / P3018 / PostgreSQL 42704: gin_trgm_ops не виден
+  в новой схеме. Это test setup blocker, не доказательство ошибки исправленного seed.
+  Evidence: ignored `outputs/ci-screenmap-20260921/seed-repeat-result.json`,
+  `migrations.log`, runner `seed-repeat.mjs`. Длительность 18.9с; cleanup PASS:
+  собственная схема ci_seed_1789995761424_9048 удалена. Рабочая БД не затронута.
+- Следующий ОДИН шаг: read-only проверить расположение pg_trgm и search_path
+  существующей test DB dentmarket_audit_20260914 и выбрать безопасный test setup
+  в пределах Workflow §4.1. Не менять public extensions, не выдавать CREATEDB,
+  не создавать новую БД/cluster без отдельного разрешения; не обходить failed gate.
+  Максимум 3 попытки на blocker, 15мин диагностики; локальный runner budget 5мин.
+  До подтверждённого setup новой попытки не было. Старые CI counters сохраняются.
+- После устранения blocker: scoped review/gates → commit/push/actual CI;
+  затем согласованная карта экранов. Нельзя выдать CI PASS, начать весь CORE backlog,
+  live-интеграции, деплой, повторную организацию 78 референсов или редизайн приложения.
+- Последние три аннотации пользователя ещё требуют итогового ответа: (1) карты
+  личные/корпоративные и банковский перевод, без платы клинике; (2) около 10%,
+  split и отдельный счёт поставщику — варианты, не утверждённые правила;
+  (3) продолжить CI → карту, цель 26 сентября, интеграции отдельно. В ответе
+  использовать :codex-annotation{index="1"}, :codex-annotation{index="2"},
+  :codex-annotation{index="3"}. Не фиксировать пока неизвестную модель как принятую.
+- Рекомендации для обсуждения с банком: отличать покупателя-организацию от
+  держателя карты, факт оплаты от поступления/расщепления, банковскую комиссию от
+  комиссии платформы; спросить про multi-supplier корзину, возвраты/частичные
+  подтверждения. Обычный внутренний перевод не обязательно SWIFT. Проверенные
+  официальные источники: https://nationalbank.kz/ru/page/payment-systems и
+  https://halykbank.kz/kz/business/payment/epay (наличие продукта не подтверждает
+  согласованные условия для нашей площадки). Рассрочка/кредит отложены до банка.
+- Напоминания: ранее упоминалось paused dentmarket, но в локальном реестре найден
+  только zeny-dentmarket-refresh (PAUSED), привязанный к Оркестратору
+  01a02859-08f3-7082-920d-49400f0fbb09, его не менять. Native view dentmarket
+  отрисовал карточку без возвращённых полей; существование/параметры и перенос
+  этого напоминания не подтверждены. Ничего не включалось и не пересоздавалось.
+  Hook остаётся REQUIRES_REVIEW_AND_TRUST, фактический runtime hook не доказан.
+
+## Текущая последовательность — CI, затем карта экранов
+
+- Владелец после подтверждённого аварийного восстановления: primary
+  01a0c415-1c3c-73e3-a270-5ad591fa9ca7, один writer;
+  main @ 2b1671419bbead295672eee959d33145aaec1666, старт clean = origin/main.
+- Основание: владелец согласовал «завершить проверку CI, затем обновить карту
+  экранов», попросил продолжать; целевой срок внутреннего backend/frontend —
+  26.09.2026, внешние интеграции исключены. Production/deployment не объявлять
+  готовыми по дедлайну; нужны их prerequisites и точная среда.
+- Состояние: active / CI_SEED_REMEDIATION. CI35601261774 FAIL на Prepare
+  deterministic pilot market, PostgreSQL job PASS; Security35601261739 PASS.
+  Новый blocker: повторный pilot seed, SupplierOffer P2002 по id. До старого
+  search-commerce fixture gate этот run не дошёл; он не объявляется исправленным.
+- Диагноз: seed выбирает variants[0] с ORDER BY createdAt без tie-break;
+  id предложения зависит от source product и supplier, natural key — от variant.
+  При повторе выбор другого варианта вызывает collision. Сохранять имеющиеся
+  связи pilot offers; для первого запуска — детерминированный выбор.
+- Ближайший scope/DoD: минимальный seed fix + regression, повторный реальный
+  seed/manifest на отдельной схеме существующей disposable DB
+  dentmarket_audit_20260914, явный cleanup только своей схемы. Никакой записи
+  в working/demo DB, смены бизнес-правил, dependencies или новых worktrees.
+  Gates: node check/unit regression, PostgreSQL repeat-seed, diff; actual CI.
+- Попытки: remote seed failure — baseline1; local changed-input attempt1 FAIL
+  на миграции test setup, seed не достигнут (подробности выше). Бюджет local gate
+  5мин, CI45мин, max3 на blocker. Начальный
+  env probe не нашёл URL; read-only источник настроек найден в dev-local.mjs
+  по существующему preflight, секреты не выводить. Временная схема удалена.
+- После зелёных обязательных gates текущего slice — отдельный scoped commit/push,
+  затем продолжить согласованную карту экранов; не запускать весь CORE backlog.
+- Платёжное уточнение пользователя для последующей фиксации: личные/корпоративные
+  карты через эквайринг и банковский перевод; клиника без платы на старте;
+  около10% поставщика — гипотеза, split/отдельный счёт не утверждены. Рассрочка/
+  кредит зависят от встречи с банком. Не выдавать эти варианты за готовый контракт.
+- Практики: Backend Architect (idempotent data), Git Workflow Master (scope),
+  UI Designer для следующей карты; инструкции прочитаны, агентов нет.
+- Следующий продуктовый шаг: read-only диагностика test setup после governance gates.
+
+## История — утверждение B2B-состава
+
 ## Текущий checkpoint — B2B-SCOPE-APPROVAL-2026-09-21
 
 ### Последнее уточнение — общая поддержка акций
