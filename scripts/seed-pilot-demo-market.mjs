@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { PrismaClient } from "@prisma/client";
+import { selectPilotVariant } from "./lib/pilot-variant-selection.mjs";
 
 const root = path.resolve(process.cwd());
 const catalog = JSON.parse(
@@ -47,8 +48,8 @@ try {
   if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is required");
   await prisma.$queryRaw`SELECT 1`;
   const city = await prisma.city.findFirst({ orderBy: { nameRu: "asc" } });
-  const saleUnit = await prisma.unitOfMeasure.findFirst({
-    where: { OR: [{ code: "piece" }, { symbol: "шт" }, { symbol: "шт." }] },
+  const saleUnit = await prisma.unitOfMeasure.findUnique({
+    where: { code: "piece" },
   });
   if (!city || !saleUnit) {
     throw new Error(
@@ -227,14 +228,21 @@ try {
   for (const productInput of demoProducts) {
     const product = await prisma.product.findUnique({
       where: { slug: slugFor(productInput) },
-      include: { variants: { orderBy: { createdAt: "asc" }, take: 1 } },
+      include: { variants: true },
     });
     if (!product?.variants[0]) {
       throw new Error(
         `Synced product or variant is missing for ${productInput.id}`,
       );
     }
-    const variant = product.variants[0];
+    const existingOffers = await prisma.supplierOffer.findMany({
+      where: {
+        supplierOrganizationId: { in: suppliers.map(({ organization }) => organization.id) },
+        externalId: { startsWith: `pilot-demo:${productInput.id}:` },
+      },
+      select: { productVariantId: true, saleUnitId: true },
+    });
+    const variant = selectPilotVariant(product.variants, existingOffers, saleUnit.id);
     await prisma.product.update({
       where: { id: product.id },
       data: { status: "ACTIVE" },

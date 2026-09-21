@@ -42,6 +42,39 @@
   Ни новые DB/cluster/CREATEDB/public extensions, ни working/demo DB не разрешены.
   Три аннотации и платёжные ограничения ниже сохраняются для итогового ответа.
 
+### CI seed — диагностика и попытка 2
+
+- Governance опубликован отдельно: a438ffea9aef45d4ec7ae7a18dbb8658021f2607,
+  origin/main SHA совпал; Оркестратор уведомлён. CI35605753924 и
+  Security35605753909 ещё in_progress, PASS не заявлен.
+- Диагностика начата 13:28:39 UTC, budget15мин: read-only SQL подтвердил
+  pg_trgm/public и gin_trgm_ops/public, оставшихся ci_seed схем нет.
+  Prisma schema=ci_* задаёт search_path только ci_*; URL options его не меняет.
+- Обоснование attempt2: тот же isolated-schema repeat-seed gate, подготовка
+  всеми32 неизменёнными migration.sql через существующий PostgreSQL17 psql,
+  --single-transaction/ON_ERROR_STOP и session search_path=own_schema,public.
+  Public schema/extension заранее существуют; команды IF NOT EXISTS не меняют
+  их. В migrations нет иных public-qualified targets, search_path overrides
+  или database/extension mutations. Это подготовка seed fixtures, не PASS
+  Prisma migrate deploy; этот реальный gate остаётся в CI на чистой БД.
+- Seed/helper/test/CI diff не менялись; unit PASS сохраняется. Gate budget5мин,
+  attempt2/max3; cleanup только своей новой схемы, public snapshot до/после.
+  Новых БД/прав/extension changes нет. Evidence attempt1 не перезаписывается.
+- Attempt2 PASS20.945с: 32 migration SQL, reference/operator/test, catalog,
+  первый pilot seed и полный повтор четырёх profiles; 500 offer mappings
+  совпали после намеренной смены earliest variant. Cleanup PASS, таблицы public
+  test schema совпали по count/row hashes. Evidence:
+  outputs/ci-screenmap-20260921/attempt2/seed-repeat-result.json + step logs;
+  runner seed-repeat-attempt2.mjs. Первичный node --check runner выявил опечатку
+  кавычек до DB-запуска, исправлена; это не новая DB attempt и не дефект продукта.
+- Локальный slice готов к scoped публикации: seed/helper/test + одна строка CI
+  и checkpoint/handoff. Product TS/API/contracts/migrations не менялись;
+  typecheck/full suites не повторяются. Unit7/7/node checks REUSED_PASS по
+  неизменённым исходникам, diff/staging проверяются перед commit.
+- Следующий шаг: commit/push seed fix, фактический CI с Prisma deploy и repeat
+  profiles; старый search-commerce fixture blocker остаётся открытым. Карта
+  экранов только после завершения CI remediation, без ротации этой задачи.
+
 ## История прерванной передачи — 2026-09-21, generation 1
 
 - Source/primary: 01a0c36e-38a1-7942-957b-9e8620c01442; transition=preparing.

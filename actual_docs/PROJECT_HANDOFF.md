@@ -20,8 +20,11 @@ runtime review/trust не подтверждён. Это не изменение
 **Текущее поручение после фиксации требований:** продолжить CI remediation, затем
 обновить карту экранов под Product §22. Цель владельца — внутренние backend/frontend
 до 26.09.2026; интеграции отдельно, production readiness требует собственных gates.
-main @ 2b1671419bbead295672eee959d33145aaec1666; текущий seed fix ещё не опубликован.
-Unit 7/7 PASS, реальный repeat-seed пока остановлен test schema / gin_trgm_ops.
+Governance опубликован a438ffe; seed fix готовится отдельным scoped commit.
+Unit 7/7 PASS; repeat-seed attempt2 PASS20.945с на отдельной схеме test DB:
+500 offer mappings сохранены при смене порядка вариантов, cleanup/public
+preservation PASS. Setup использовал неизменённые SQL через psql с session
+search_path; Prisma deploy и общий CI ещё требуют фактического remote результата.
 Точный WIP, попытки и передача primary — [PRIMARY-SESSION](governance/task-state/PRIMARY-SESSION.md).
 Эта запись новее исторических запретов продолжать CI ниже: продолжение CI сейчас
 прямо разрешено, но весь backlog этим поручением не запускается.

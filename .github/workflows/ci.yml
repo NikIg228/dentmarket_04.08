@@ -56,6 +56,7 @@ jobs:
         run: SEED_PROFILE_ASSERT_NO_PILOT=true npm run db:seed:test
       - name: Prepare deterministic pilot market
         run: |
+          node --test scripts/pilot-variant-selection.test.mjs
           npm run catalog:sync-production:apply
           npm run db:seed-pilot
           npm run verify:seed-profiles
