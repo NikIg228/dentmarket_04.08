@@ -2,7 +2,10 @@
 
 **Дата аудита:** 21.08.2026
 **Статус:** Audit complete, implementation not certified
-**Текущая итерация, 15.09.2026:** сохранить существующий дизайн; конкретная
+**Последнее решение, 21.09.2026:** редизайн нужен максимально близко к ранее
+созданным референсам; полный набор сначала предъявляется владельцу (§20).
+Статус: `redesign direction requested; reference set approval pending; implementation not started`.
+**Историческая итерация, 15.09.2026:** сохранить существующий дизайн; конкретная
 полировка по [UX audit brief](AUDIT_UX_POLISH_2026-09-15.md), без полного редизайна.
 **Исторический выбор, 14.09.2026:** B — Quiet Editorial (§19), общий скрывающийся
 header без sidebar (§19.3). Референсы не критерий приёмки текущих исправлений.
@@ -640,3 +643,52 @@ font/token значения. Окончательная идентичность
 loading/empty/error/mobile состояния, скролл или реальную работу API.
 Inline-композиция supplier confirmation пока предложение, не изменение
 существующей формы/контракта; неподтверждённые действия CORE-01/02 не обходятся.
+
+## 20. Повторный запрос редизайна и набор на подтверждение, 2026-09-21
+
+Владелец возобновил направление редизайна с максимальной близостью к прежним
+референсам. Поручена только инвентаризация и фиксация решения в документах;
+реализация, CI/backend fixes, новые assets и изменение данных не начинались.
+Полный набор, точные tokens/header и спорные варианты ещё требуют подтверждения.
+
+- [Главная галерея](references/production-preview-2026-09-16/index.html),
+  [интерактивный прототип](references/production-preview-2026-09-16/preview.html),
+  [просмотр по CSS-ширине](references/production-preview-2026-09-16/viewer.html).
+- [Реестр страниц](references/production-preview-2026-09-16/PAGE_INVENTORY.md):
+  78 design surfaces на 69 шаблонах; сверены pages.js, source/final manifests
+  и наличие всех 78 rendered HTML. Это страницы, панели, состояния и четыре
+  листа компонентов, не 78 реализованных маршрутов приложения.
+- [Исходные PNG и provenance](references/production-preview-2026-09-16/source-manifest.json):
+  originals/04-catalog.png, 03-product-offers.png, 02-cart-reprice.png,
+  01-supplier-order.png. Все четыре SHA-256 совпали с manifest и Desktop-оригиналами.
+- [Атлас компонентов](references/production-preview-2026-09-16/COMPONENT_ATLAS.md):
+  controls, overlays, feedback, navigation; отдельные полноразмерные HTML в rendered/.
+  Два AI-листа в concepts/ — дополнительные PROPOSED-концепты, не runtime evidence.
+- Пять PNG из §19.4 — отдельный набор top-header. Товар, корзина и заказ
+  побайтно совпадают с тремя originals. Каталог отличается: originals/04-catalog.png
+  совпадает с историческим reference-b-quiet-editorial.png и показывает локальные
+  фильтры слева; top-header/01-catalog.png использует горизонтальные фильтры.
+  Поэтому B нельзя целиком исключить как отклонённый вариант; A остаётся
+  исторической альтернативой. Выбор каталога и соответствующего правила §2.1
+  UI standard требуется подтвердить, глобальный navigation sidebar не добавляется.
+
+Карта ограничений: существующие Fluent/Manrope surfaces и принятые AUD slices
+описаны в handoff/Foundation; эти макеты не доказывают их визуальное соответствие.
+Статическая сверка текущего кода: общий [AppShell](../../packages/ui/src/index.tsx)
+ещё содержит mp-sidebar и используется buyer/supplier/admin root pages;
+верхняя навигация макетов пока не реализована в этой общей оболочке.
+Нормализованный header, новые компоновки, mobile tables и точные tokens галереи
+PROPOSED. Manual payment, account/team и полный billing UI не становятся принятыми
+продуктовыми контрактами от утверждения картинки. Товарные placeholders в HTML
+не означают отказа от реальных фото в приложении.
+
+[Отчёт набора](references/production-preview-2026-09-16/REVIEW_REPORT.md) сохраняет
+ownerApproval=PENDING, fullVisualAcceptance=NOT_RUN и exactPngExport=BLOCKED
+(три исторические попытки). screens/ и evidence/ содержат диагностические снимки
+статического прототипа; это не эталоны и не фотографии текущего приложения.
+Семь текстовых файлов final-manifest совпали после нормализации CRLF→LF;
+их текущие byte hashes отличаются. Старые browser PASS не объявляются свежими.
+Серверы, генерация, browser/runtime suites и новый визуальный аудит не запускались.
+
+Следующий шаг — подтверждение владельцем найденного набора и варианта каталога.
+До ответа сохраняется `reference set approval pending; implementation not started`.
