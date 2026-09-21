@@ -24,5 +24,5 @@
     "01a02551-6288-7e10-b66f-d67bd887ff05",
     "01a025b2-389e-78a2-90fe-8ca01b056de4"
   ],
-  "lastAuthorization": "Owner requested consolidation and automatic same-scope handoff on 2026-09-21; no additional product implementation authorized."
+  "lastAuthorization": "2026-09-21: owner approved the discussed B2B composition and rules, including gift stock/reservation for 3+1, and requested recording them. Current scope is canonical requirements/docs publication; runtime implementation, live integrations and old CI fixes are not part of this documentation task. Existing same-scope handoff authorization remains."
 }
