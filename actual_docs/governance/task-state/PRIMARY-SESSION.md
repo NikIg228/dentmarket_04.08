@@ -4,6 +4,29 @@
 
 ## Текущий checkpoint — B2B-SCOPE-APPROVAL-2026-09-21
 
+### Последнее уточнение — общая поддержка акций
+
+- Владелец/папка прежние; main @ d7ba31446ba1a13c6d33380b5a6195206e0b02af,
+  исходно clean = origin/main. Предыдущая фиксация уже опубликована, не повторять.
+- Состояние: READY_FOR_PUBLICATION. Пользователь уточнил: «3 + 1» — пример; нужны разные
+  акции (1 + 1, 2 + 1, скидка на товар и другие описанные механики), бронь обязательна.
+- Scope/DoD: уточнить Product §22.7, соответствующую строку Foundation, handoff,
+  lastAuthorization и этот checkpoint; резервировать товары оформляемого заказа,
+  включая подарки. Никакой реализации promotions/API/БД или новых интеграций.
+- Выполнено: N + M описано параметрами, скидка — отдельная механика общей акции;
+  дополнительные механики требуют конкретных условий, 3 + 1 не зашивается в код.
+- Gates: read-only Node docs gate PASS, попытка 1: 5 scoped paths, 38 локальных
+  ссылок, JSON ownership и история сохранены; runtime не изменён, новых [x]
+  и credential-pattern findings нет. git diff --check PASS. Бюджет 2 минуты,
+  максимум 3 попытки. TS/build/DB/browser NOT_RUN: меняются только требования.
+  После этой evidence-only записи — review/staged diff check, без rerun suites.
+- Практики: Backend Architect (условия/резервы) и Git Workflow Master (scoped
+  docs commit/push), инструкции прочитаны ранее; агентов/процессов нет.
+- Следующий шаг: scoped staging, commit/push/readback и остановка.
+  Итоговые SHA/CI — в финальном ответе, без отдельного evidence-only коммита.
+
+### Предыдущая фиксация — опубликована в d7ba314
+
 - Владелец: primary 01a0c36e-38a1-7942-957b-9e8620c01442, реестр idle;
   один writer в C:\Users\user\Desktop\dentmarket-kz-main, иных worktrees нет.
 - Состояние: requirements recorded / READY_FOR_PUBLICATION; реализация не начата.
