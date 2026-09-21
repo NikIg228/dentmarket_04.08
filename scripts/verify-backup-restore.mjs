@@ -11,6 +11,7 @@ import {
 import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
+import { postgresInvocation } from "./lib/postgres-tool-invocation.mjs";
 
 const root = path.resolve(import.meta.dirname, "..");
 const apiDirectory = path.join(root, "apps", "api");
@@ -208,30 +209,12 @@ function resolvePostgresTools() {
 
 const postgresTools = resolvePostgresTools();
 
-function postgresInvocation(name, args) {
-  if (postgresTools.mode === "docker") {
-    return {
-      command: "docker",
-      args: [
-        "run",
-        "--rm",
-        "--network",
-        "host",
-        postgresTools.image,
-        name,
-        ...args,
-      ],
-    };
-  }
-  return { command: postgresTools.commands[name], args };
-}
-
 function runPostgresTool(
   name,
   args,
   { stdinFile, stdoutFile, inheritStdout = false } = {},
 ) {
-  const invocation = postgresInvocation(name, args);
+  const invocation = postgresInvocation(postgresTools, name, args, { stdinFile });
   let input;
   let output;
   try {

@@ -132,3 +132,51 @@ PostgreSQL2PASS then final cleanup-adjusted3PASS; root tests1timeout/2PASS.
 
 State: locally verified; commit/push and fresh GitHub CI pending.
 Next: scoped conventional commit, normal fast-forward publication, CI readback.
+
+## Follow-up: Docker backup stdin (approved 2026-09-21)
+
+Previous changes published as279cc826faf22338b74cacc046faae87978c3ac1;
+GitHub confirmed audit, outbound and PostgreSQL gates. Subsequent backup/restore
+failed: `pg_restore --list` reads0bytes although pg_dump's nonempty-file check
+passed. Docker command omits --interactive while the host supplies a file on fd0.
+Source: CI35580074851/job106270658249; backup-restore-runbook §2–4.
+
+User now explicitly authorizes this bounded repair and CI verification.
+Owner: same orchestrator; clean main/origin/main279cc82, sole Market writer.
+Scope: backup verifier's process invocation, pure helper and regression tests,
+its npm alias, runbook and this checkpoint. No runtime/product/CRM/dependency
+updates; no working DB access, local restore/CREATEDB, new worktrees or deployment.
+Given Docker plus stdinFile, keep stdin open without allocating a TTY; both
+archive-list and restore receive binary bytes. Native mode and no-input commands
+retain their existing arguments. Ownership/source-target/checksum/cleanup guards
+remain unchanged.
+
+DoD: regression fails on old invocation and passes after fix; node --check;
+production-config/diff checks; normal commit/push/main SHA readback; actual
+backup/restore gate on the existing ephemeral GitHub PostgreSQL job. Docker is
+not installed locally, so pure command-contract tests are not called a live drill.
+Unchanged application tests/build evidence remains reusable per Workflow4.2;
+CI still runs its full configured matrix. Max3 attempts: remote baseline1;
+patched CI2 planned. Probe2min, local tests2min, CI45min, diagnosis15min.
+Stop on new unrelated failures or exhausted budget; do not weaken a gate.
+
+Separate pre-existing blocker, outside this approval: prior main verify job
+106270657931 reached verify:search-commerce and failed404 `Buyer organization
+not found` for its configured fixture. No fix attempted; overall CI cannot be
+called green merely because backup/restore passes. Next: isolated regression.
+Practice: Agency Git Workflow Master; no subagents needed for this small fix.
+
+Local results for backup follow-up:
+- Old command regression: expected FAIL2/7 (list/restore stdin), unchanged
+  native/no-input/image/argument controls PASS5/7.
+- Fixed pure invocation adds --interactive only for stdinFile, never a TTY.
+  Regression PASS7/7; all3changed/new JS files `node --check` PASS;
+  `node scripts/verify-production-config.mjs` PASS; `git diff --check` PASS.
+- Both real pg_restore call sites use the same tested helper. fd0/fd1 opening,
+  binary buffering, error handling, target ownership and cleanup are unchanged.
+- No TS, application, lockfile or runtime environment inputs changed. Prior
+  local typecheck/test/build retained as REUSED_PASS, not fresh reruns. npm alias
+  now runs the new focused tests before its unchanged build/drill prerequisites.
+- Full Docker restore pending in CI; no local DB connected or altered.
+  Publication/CI evidence will be recorded in ignored outputs and orchestrator
+  report after commit, avoiding a self-referential evidence-only CI loop.

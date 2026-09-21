@@ -65,6 +65,13 @@ npm run verify:backup-restore
 Docker mode запускает client из `postgres:17-alpine`; database service остаётся
 отдельным ephemeral PostgreSQL 17 job.
 
+При передаче dump через stdin Docker client запускается с `--interactive`
+(без `--tty`), чтобы `pg_restore --list` и последующее восстановление получили
+бинарный поток. Для команд без входного файла и native client аргументы не меняются.
+Семантика флага: [Docker run — interactive](https://docs.docker.com/reference/cli/docker/container/run/#interactive).
+Перед drill npm alias запускает `node --test scripts/postgres-tool-invocation.test.mjs`.
+Эти тесты не подключаются к БД и не заменяют полный restore drill.
+
 ## 4. Что именно сверяется
 
 - `pg_dump --format custom --no-owner --no-acl` создаёт непустой artifact;
