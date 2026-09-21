@@ -2,16 +2,21 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
   Headers,
   HttpCode,
   Param,
+  Patch,
   Post,
   Query,
   UseGuards,
 } from "@nestjs/common";
 import {
   addCartItemSchema,
+  updateCartItemSchema,
+  cartVersionSchema,
+  repriceCartSchema,
   checkoutCartSchema,
   confirmSupplierOrderSchema,
   createCartSchema,
@@ -108,16 +113,46 @@ export class CommerceController {
     );
   }
 
+  @Patch("carts/:cartId/items/:itemId")
+  @ApiUuidParam("cartId", "Cart identifier")
+  @ApiUuidParam("itemId", "Cart item identifier")
+  @ApiCoreBody("UpdateCartItemRequest")
+  @ApiCoreResponse("CartResponse")
+  @RequirePermissions("order.create")
+  updateItem(@Param("cartId") cartId: string, @Param("itemId") itemId: string, @Body() body: unknown,
+    @Headers("x-user-id") actorId: string, @Headers("x-organization-id") organizationId: string) {
+    const parsed = updateCartItemSchema.safeParse(body);
+    if (!parsed.success) throw new BadRequestException(parsed.error.flatten());
+    return this.commerce.changeItem(cartId, itemId, parsed.data, this.context(actorId, organizationId));
+  }
+
+  @Delete("carts/:cartId/items/:itemId")
+  @ApiUuidParam("cartId", "Cart identifier")
+  @ApiUuidParam("itemId", "Cart item identifier")
+  @ApiCoreBody("CartVersionRequest")
+  @ApiCoreResponse("CartResponse")
+  @RequirePermissions("order.create")
+  removeItem(@Param("cartId") cartId: string, @Param("itemId") itemId: string, @Body() body: unknown,
+    @Headers("x-user-id") actorId: string, @Headers("x-organization-id") organizationId: string) {
+    const parsed = cartVersionSchema.safeParse(body);
+    if (!parsed.success) throw new BadRequestException(parsed.error.flatten());
+    return this.commerce.changeItem(cartId, itemId, parsed.data, this.context(actorId, organizationId));
+  }
+
   @Post("carts/:cartId/reprice")
   @ApiUuidParam("cartId", "Cart identifier")
+  @ApiCoreBody("RepriceCartRequest")
   @ApiCoreResponse("CartResponse", 201)
   @RequirePermissions("order.create")
   reprice(
     @Param("cartId") cartId: string,
+    @Body() body: unknown,
     @Headers("x-user-id") actorId: string,
     @Headers("x-organization-id") organizationId: string,
   ) {
-    return this.commerce.reprice(cartId, this.context(actorId, organizationId));
+    const parsed = repriceCartSchema.safeParse(body ?? {});
+    if (!parsed.success) throw new BadRequestException(parsed.error.flatten());
+    return this.commerce.reprice(cartId, this.context(actorId, organizationId), parsed.data.expectedVersion);
   }
 
   @Post("carts/:cartId/validate")

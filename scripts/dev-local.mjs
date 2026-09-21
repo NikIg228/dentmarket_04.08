@@ -1,4 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
+import { localDevelopmentProfile } from "./lib/local-development-profile.mjs";
 
 const surface = process.argv[2] ?? "buyer";
 const workspaceBySurface = {
@@ -18,7 +19,10 @@ if (surface !== "all" && !workspaceBySurface[surface]) {
 const env = {
   ...process.env,
   NODE_ENV: "development",
-  DEPLOYMENT_PROFILE: process.env.DEPLOYMENT_PROFILE ?? "pilot",
+  ...localDevelopmentProfile({
+    ...process.env,
+    ...(process.argv.includes("--pilot") ? { DEPLOYMENT_PROFILE: "pilot" } : {}),
+  }),
   PROCESS_ROLE: process.env.PROCESS_ROLE ?? "all",
   DATABASE_URL:
     process.env.DATABASE_URL ??
@@ -121,7 +125,9 @@ async function waitForApi(api) {
 process.once("SIGINT", () => shutdown(130));
 process.once("SIGTERM", () => shutdown(143));
 
-console.log("Starting DentMarket API in development mode...");
+console.log(
+  `Starting DentMarket locally with deployment profile ${env.DEPLOYMENT_PROFILE}...`,
+);
 const api = spawnNpm(["run", "dev", "--workspace=@marketplace/api"]);
 
 let healthUrl;

@@ -43,6 +43,14 @@ npm run db:seed
 npm run dev
 ```
 
+Локальный `npm run dev` включает все пять дополнительных блоков (AI,
+trust/reviews, promotions, billing, smart recommendations) единым профилем
+`go_live` для API и web. Это локальная демонстрация, не production go-live:
+права организаций и обязательный договор поставщика сохраняются, внешние
+интеграции и реальные списания не подключаются. Ограниченный вариант —
+`npm run dev:pilot`; перед переключением остановите текущий launcher.
+Явный process env `DEPLOYMENT_PROFILE=pilot` также сохраняет ограниченный набор.
+
 Нужны PostgreSQL 17, Redis 7 и, если `AV_SCAN_MODE` не `disabled`, ClamAV. Для локального файлового режима установите `OBJECT_STORAGE_DRIVER=local`.
 
 `npm run dev` и `npm run dev:local` поднимают весь проект: API, Admin, Buyer,
@@ -112,6 +120,11 @@ x-organization-id: 00000000-0000-4000-8000-000000000030
 
 ## Проверки
 
+Ниже каталог доступных команд, **не обязательная последовательность для каждой
+задачи**. Выбор gates, пределы попыток и повторное использование evidence —
+[Development Workflow](actual_docs/governance/DEVELOPMENT_WORKFLOW.md).
+Docs-only изменения проверяются статически, без сборки/seed/браузера.
+
 ```bash
 npm run typecheck
 npm test
@@ -126,7 +139,11 @@ npm run verify:postgres
 npm run verify:web
 ```
 
-`npm run verify:postgres` — обязательный integration gate на локальной PostgreSQL. Он применяет миграции, создаёт изолированные по идентификаторам fixtures, проверяет rollback, конкурентный checkout, идемпотентность и tenant isolation, затем удаляет тестовые данные. Docker и внешние сервисы для локального запуска не требуются.
+`npm run verify:postgres` — обязательный integration gate для изменений Prisma,
+checkout, tenant isolation и idempotency. Он применяет миграции и создаёт/удаляет
+fixtures, поэтому требует проверенной disposable test DB, не рабочей demo-БД.
+Изоляция идентификаторов не заменяет проверку назначения базы. Docker и внешние
+сервисы для этого локального gate не требуются.
 
 ## Backup и restore
 

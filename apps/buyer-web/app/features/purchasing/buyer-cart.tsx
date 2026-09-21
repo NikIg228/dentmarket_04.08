@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { Spinner } from "@fluentui/react-components";
 import { Alert24Regular } from "@fluentui/react-icons/svg/alert";
 import { ArrowSync24Regular } from "@fluentui/react-icons/svg/arrow-sync";
@@ -21,8 +22,13 @@ import {
 } from "./cart-view-model";
 import styles from "./buyer-cart.module.css";
 import type { Cart, CartValidation } from "./types";
+import type { MarketplaceApiClient } from "@marketplace/api-client";
+import { CartQuantityEditor, useCartCorrection } from "./cart-correction";
 
 type BuyerCartProps = {
+  api: MarketplaceApiClient;
+  onCartChanged: (cart: Cart) => void;
+  onValidated: (value: CartValidation | null) => void;
   cart: Cart | null;
   validation: CartValidation | null;
   validationLoading: boolean;
@@ -47,6 +53,7 @@ function ValidationIcon({
 }
 
 export function BuyerCart({
+  api, onCartChanged, onValidated,
   cart,
   validation,
   validationLoading,
@@ -56,26 +63,37 @@ export function BuyerCart({
   onAcceptChanges,
   onCheckout,
 }: BuyerCartProps) {
+  const editor = useCartCorrection({ cart, api, onChanged: onCartChanged, onValidated });
+  const root = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!editor.pending && editor.notice === "Позиция удалена из корзины.") root.current?.querySelector<HTMLButtonElement>('[data-cart-refresh]')?.focus();
+  }, [editor.pending, editor.notice]);
+  const locked = Boolean(busy) || editor.pending || cart?.status !== "ACTIVE" || Boolean(cart.checkout);
+  const checkedValidation = validation?.cartId === cart?.id && validation?.cartVersion === cart?.version ? validation : null;
   const validationByItem = new Map(
-    (validation?.items ?? []).map((item) => [item.cartItemId, item]),
+    (checkedValidation?.items ?? []).map((item) => [item.cartItemId, item]),
   );
   const presentation = cartValidationPresentation(
-    validation,
-    validationLoading,
+    checkedValidation,
+    validationLoading || editor.pending,
   );
 
   return (
-    <div className="mp-stack">
+    <div className="mp-stack" ref={root}>
       <PageHeader
         eyebrow="Заказ"
         title="Корзина клиники"
         description="Перед резервированием система повторно проверяет цену, остаток и доступность каждой позиции."
         actions={
-          <DmButton icon={<ArrowSync24Regular />} onClick={onRefresh}>
-            Обновить
+          <DmButton data-cart-refresh icon={<ArrowSync24Regular />} disabled={Boolean(busy) || editor.pending} onClick={cart ? () => void editor.reload() : onRefresh}>
+            Обновить корзину
           </DmButton>
         }
       />
+      {editor.pending ? <p role="status">Сохраняем и проверяем корзину…</p> : null}
+      {editor.error ? <p role="alert">{editor.error}</p> : null}
+      {editor.notice ? <p role="status">{editor.notice}</p> : null}
+      {Object.entries(editor.drafts).filter(([id]) => !cart?.items.some(item => item.id === id)).map(([id, draft]) => <p key={id} role="alert">Позиция больше не находится в корзине. Несохранённое количество: {draft.value}. <DmButton onClick={() => editor.discard(id)}>Отменить ввод удалённой позиции</DmButton></p>)}
       {!cart?.items.length ? (
         <Section>
           <EmptyState
@@ -131,7 +149,7 @@ export function BuyerCart({
                     itemValidation?.changes.includes("STOCK") ?? false;
                   const unavailable =
                     itemValidation?.status === "UNAVAILABLE" ||
-                    current?.fulfillmentStatus !== "AVAILABLE";
+                    (current !== undefined && current !== null && current.fulfillmentStatus !== "AVAILABLE");
 
                   return (
                     <tr
@@ -167,7 +185,7 @@ export function BuyerCart({
                           "Поставщик"}
                       </td>
                       <td data-label="Количество">
-                        <strong>{item.quantity}</strong>
+                        <CartQuantityEditor id={item.id} name={item.offer?.productVariant?.product?.canonicalName ?? `Позиция ${item.offerId.slice(0, 8)}`} quantity={item.quantity} editor={editor} disabled={locked} />
                         <small
                           className={
                             stockChanged ? styles.changeMessage : undefined
@@ -225,18 +243,19 @@ export function BuyerCart({
           <div className={styles.checkoutBar}>
             <div>
               <span>Итого по корзине</span>
-              <strong>{formatMoney(cartTotalMinor(cart, validation), cart.currency)}</strong>
+              <strong>{formatMoney(cartTotalMinor(cart, checkedValidation), cart.currency)}</strong>
               <small>Финальная сумма фиксируется после успешного резерва.</small>
             </div>
             <div className={styles.checkoutActions}>
-              {validation?.hasChanges ? (
+              {editor.hasDrafts ? <p role="status">Сохраните или отмените введённое количество перед оформлением.</p> : null}
+              {checkedValidation?.hasChanges ? (
                 <DmButton
                   appearance={
-                    validation.requiresAcceptance ? "primary" : "secondary"
+                    checkedValidation.requiresAcceptance ? "primary" : "secondary"
                   }
                   icon={<ArrowSync24Regular />}
                   onClick={onAcceptChanges}
-                  disabled={busy === "reprice" || validationLoading}
+                  disabled={locked || editor.hasDrafts || validationLoading}
                 >
                   {busy === "reprice"
                     ? "Применяем изменения"
@@ -249,9 +268,9 @@ export function BuyerCart({
                 icon={<ShoppingBag24Regular />}
                 onClick={onCheckout}
                 disabled={
-                  busy === "checkout" ||
+                  locked || editor.hasDrafts ||
                   validationLoading ||
-                  !validation?.canCheckout
+                  !checkedValidation?.canCheckout
                 }
               >
                 {busy === "checkout" ? "Резервируем" : "Оформить заказ"}

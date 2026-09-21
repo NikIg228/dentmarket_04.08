@@ -64,6 +64,8 @@ const environmentSchema = z
     JWT_REQUIRE_MFA: booleanFromString.default(false),
     SOCIAL_AUTH_ENABLED: booleanFromString.default(false),
     PUBLIC_DEMO_MODE: booleanFromString.default(false),
+    AUTH_LOCAL_MAIL_ENABLED: booleanFromString.default(false),
+    LOCAL_OPERATOR_PASSWORD_LOGIN_ENABLED: booleanFromString.default(false),
     PUBLIC_CATALOG_ORGANIZATION_ID: z
       .string()
       .uuid()
@@ -172,6 +174,12 @@ const environmentSchema = z
       .default("info"),
   })
   .superRefine((value, context) => {
+    if (value.AUTH_LOCAL_MAIL_ENABLED || value.LOCAL_OPERATOR_PASSWORD_LOGIN_ENABLED) {
+      if (value.NODE_ENV === "production" || !["127.0.0.1", "::1", "localhost"].includes(value.API_HOST))
+        context.addIssue({ code: "custom", path: ["AUTH_LOCAL_MAIL_ENABLED"], message: "Local auth tools require non-production loopback API" });
+    }
+    if (value.LOCAL_OPERATOR_PASSWORD_LOGIN_ENABLED && (value.AUTH_MODE !== "jwt" || !value.JWT_REQUIRE_MFA))
+      context.addIssue({ code: "custom", path: ["LOCAL_OPERATOR_PASSWORD_LOGIN_ENABLED"], message: "Local operator login requires JWT and mandatory MFA" });
     if (value.NODE_ENV === "production") {
       for (const key of PRODUCTION_HTTPS_URL_KEYS) {
         const configuredUrl = value[key];

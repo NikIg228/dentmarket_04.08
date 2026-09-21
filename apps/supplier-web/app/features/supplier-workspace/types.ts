@@ -29,6 +29,8 @@ export type Offer = {
     quantityInBaseUnit: string;
     unit: { symbol: string };
   } | null;
+  saleUnit?: { nameRu: string; symbol: string } | null;
+  baseUnitsPerSaleUnit?: string;
   publication: {
     status: string;
     marketplaceVisible: boolean;

@@ -1,4 +1,5 @@
 "use client";
+import { authForgotAcceptedSchema } from "@marketplace/schemas";
 
 import Script from "next/script";
 import { DmButton, DmField, DmInput } from "@marketplace/ui";
@@ -117,11 +118,11 @@ export default function LoginPage() {
     setBusyAction("forgot");
     setFeedback(null);
     try {
-      await authRequest("/auth/password/forgot", { email });
+      const accepted = authForgotAcceptedSchema.parse(await authRequest("/auth/password/forgot", { email }));
       setFeedback({
         kind: "success",
         message:
-          "Если аккаунт существует, мы отправили ссылку для восстановления пароля.",
+          accepted.delivery === "LOCAL_FILE" ? "Запрос принят. Если аккаунт существует, тестовое письмо сохранено на этом ПК в .tmp/auth-mail локального API. В интернет ничего не отправлялось; при отсутствии письма обратитесь к оператору стенда." : accepted.message,
       });
     } catch (cause) {
       setFeedback(feedbackFromError(cause, "Не удалось отправить письмо"));

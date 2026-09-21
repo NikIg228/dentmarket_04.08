@@ -1,4 +1,5 @@
 "use client";
+import { authRegistrationAcceptedSchema } from "@marketplace/schemas";
 
 import {
   DmButton,
@@ -52,6 +53,7 @@ export default function RegisterPage() {
   const [capability, setCapability] = useState<AuthCapability>("BUYER");
   const [form, setForm] = useState(initialForm);
   const [registeredEmail, setRegisteredEmail] = useState<string | null>(null);
+  const [delivery, setDelivery] = useState<"LOCAL_FILE" | "PROVIDER" | null>(null);
   const [busy, setBusy] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [feedback, setFeedback] = useState<AuthFeedback | null>(null);
@@ -130,12 +132,13 @@ export default function RegisterPage() {
           "Эта заявка уже завершена или истекла. Войдите в аккаунт либо обратитесь в поддержку.",
         );
       }
-      await authRequest("/auth/register", {
+      const accepted = authRegistrationAcceptedSchema.parse(await authRequest("/auth/register", {
         email: form.email,
         displayName: form.ownerDisplayName,
         password: form.password,
         registrationToken: result.registrationToken,
-      });
+      }));
+      setDelivery(accepted.delivery);
       setRegisteredEmail(result.registration.email);
     } catch (cause) {
       setFeedback(
@@ -158,14 +161,14 @@ export default function RegisterPage() {
           <div className="successMark" aria-hidden="true">
             ✓
           </div>
-          <h1 id="registration-complete-title">Проверьте почту</h1>
+          <h1 id="registration-complete-title">{delivery === "LOCAL_FILE" ? "Письмо сохранено локально" : "Проверьте почту"}</h1>
           <p>
-            Мы отправили письмо на <strong>{registeredEmail}</strong>. Перейдите
+            {delivery === "LOCAL_FILE" ? "Тестовое письмо для " : "Мы передали на доставку письмо для "}<strong>{registeredEmail}</strong>. Перейдите
             по ссылке в письме — после подтверждения откроется кабинет{" "}
             {capability === "SUPPLIER" ? "поставщика" : "клиники"}.
           </p>
           <div className="authChecklist">
-            <span>Проверьте папку «Спам», если письма нет во входящих.</span>
+            <span>{delivery === "LOCAL_FILE" ? "Письмо не отправлялось в интернет. Откройте JSON-файл в папке .tmp/auth-mail локального API или попросите оператора тестового стенда." : "Проверьте папку «Спам», если письма нет во входящих."}</span>
             <span>Ссылка ограничена по времени и используется один раз.</span>
           </div>
           <div className="registrationActions">
@@ -392,6 +395,9 @@ export default function RegisterPage() {
             После отправки мы попросим подтвердить рабочий email. Введённые
             данные сохранятся, если сервер попросит исправить форму.
           </p>
+          <a className="authBackLink wide" href="/register/resume">
+            Уже начинали регистрацию? Продолжить незавершённую заявку
+          </a>
         </form>
       </section>
     </main>

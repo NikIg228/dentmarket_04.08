@@ -4,6 +4,11 @@
 
 Принято.
 
+Уточнение области 2026-09-14: [ADR 011](011-local-full-feature-demonstration.md)
+разрешает go_live по умолчанию только для локального launcher. Shared/API
+default pilot и production-инварианты этого ADR сохраняются. Порядок запусков
+и повторов определяется Workflow, а не повторным исполнением каждого ADR.
+
 ## Контекст
 
 Product V2 исключает из controlled pilot AI-помощник, billing/tariffs,

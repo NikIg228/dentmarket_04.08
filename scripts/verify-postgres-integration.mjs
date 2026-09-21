@@ -206,7 +206,7 @@ async function createFixtureCatalog() {
     },
   });
   fixture.productId = product.id;
-  const quantities = [10, 10, 5];
+  const quantities = [10, 10, 5, 20];
   const created = [];
   for (let index = 0; index < quantities.length; index += 1) {
     const quantity = quantities[index];
@@ -496,7 +496,7 @@ try {
   );
   runNpm(["run", "db:seed:test"], testEnvironment);
   await prisma.$connect();
-  const [rollbackOffer, idempotencyOffer, concurrencyOffer] =
+  const [rollbackOffer, idempotencyOffer, concurrencyOffer, correctionOffer] =
     await createFixtureCatalog();
   const [
     tenantOwner,
@@ -515,6 +515,59 @@ try {
   api.stdout.on("data", rememberLog);
   api.stderr.on("data", rememberLog);
   await waitUntilReady();
+
+  // AUD-FIX-04: owned disposable fixtures; no edits to the seeded pilot offers.
+  const correctionBuyer = await createBuyer(6);
+  const correctionCart = await createCartWithItem(correctionBuyer, correctionOffer.offerId, 4);
+  const currentCart = async () => (await expectStatus(`/buyers/${correctionBuyer.organizationId}/carts`, { identity: correctionBuyer }, 200)).find(cart => cart.id === correctionCart.id);
+  let edited = await currentCart();
+  const correctionItemId = edited.items[0].id;
+  const correctionPath = `/carts/${edited.id}/items/${correctionItemId}`;
+  for (const method of ['PATCH', 'DELETE']) await expectStatus(correctionPath, { method, identity: foreignTenant, body: { expectedVersion: edited.version, ...(method === 'PATCH' ? { quantity: 2 } : {}) } }, 403);
+  await expectStatus(correctionPath, { method: 'PATCH', identity: correctionBuyer, body: { quantity: 0, expectedVersion: edited.version } }, 400);
+  const oldVersion = edited.version;
+  edited = await expectStatus(correctionPath, { method: 'PATCH', identity: correctionBuyer, body: { quantity: 100, expectedVersion: oldVersion } }, 200);
+  assert(edited.items[0].quantity === '100', 'Explicit quantity must not be silently clamped');
+  const insufficient = await expectStatus(`/carts/${edited.id}/validate`, { method: 'POST', identity: correctionBuyer }, 200);
+  assert(!insufficient.canCheckout && insufficient.items[0].current.fulfillmentStatus === 'INSUFFICIENT_STOCK', 'Insufficient stock must remain blocked');
+  await expectStatus(correctionPath, { method: 'PATCH', identity: correctionBuyer, body: { quantity: 2, expectedVersion: oldVersion } }, 409);
+  await prisma.offerPrice.updateMany({ where: { offerId: correctionOffer.offerId }, data: { amountMinor: 210000 } });
+  edited = await expectStatus(correctionPath, { method: 'PATCH', identity: correctionBuyer, body: { quantity: 2, expectedVersion: edited.version } }, 200);
+  assert(edited.items[0].unitPriceMinor === '130000' && edited.items[0].totalPriceMinor === '260000', 'Quantity edit must retain the old price for explicit reprice');
+  const priceDiff = await expectStatus(`/carts/${edited.id}/validate`, { method: 'POST', identity: correctionBuyer }, 200);
+  assert(priceDiff.requiresAcceptance && !priceDiff.canCheckout, 'Editing must not auto-accept changed prices');
+  await expectStatus(`/carts/${edited.id}/checkout`, { method: 'POST', identity: correctionBuyer, body: { idempotencyKey: `${runId}-stale`, expectedVersion: oldVersion } }, 409);
+  await expectStatus(`/carts/${edited.id}/reprice`, { method: 'POST', identity: correctionBuyer, body: { expectedVersion: oldVersion } }, 409);
+  edited = await expectStatus(`/carts/${edited.id}/reprice`, { method: 'POST', identity: correctionBuyer, body: { expectedVersion: edited.version } }, 201);
+  const noOp = await expectStatus(correctionPath, { method: 'PATCH', identity: correctionBuyer, body: { quantity: 2, expectedVersion: edited.version } }, 200);
+  assert(noOp.version === edited.version, 'Same quantity retry must not increment version');
+  assert(noOp.items[0].offer.productVariant.product.canonicalName.includes(runId), 'No-op response must retain display metadata');
+  await prisma.supplierOffer.update({ where: { id: correctionOffer.offerId }, data: { status: 'INACTIVE' } });
+  const unavailable = await expectStatus(`/carts/${edited.id}/validate`, { method: 'POST', identity: correctionBuyer }, 200);
+  assert(unavailable.items[0].status === 'UNAVAILABLE', 'Unpublished offer must be unavailable');
+  const removedVersion = edited.version;
+  edited = await expectStatus(correctionPath, { method: 'DELETE', identity: correctionBuyer, body: { expectedVersion: removedVersion } }, 200);
+  assert(edited.items.length === 0 && edited.status === 'ACTIVE', 'Removing unavailable last line must leave an empty active cart');
+  await expectStatus(correctionPath, { method: 'DELETE', identity: correctionBuyer, body: { expectedVersion: removedVersion } }, 409);
+  const repeatDelete = await expectStatus(correctionPath, { method: 'DELETE', identity: correctionBuyer, body: { expectedVersion: edited.version } }, 200);
+  assert(repeatDelete.version === edited.version, 'Current-version repeated delete must be a no-op');
+  const empty = await expectStatus(`/carts/${edited.id}/validate`, { method: 'POST', identity: correctionBuyer }, 200);
+  assert(!empty.canCheckout, 'Empty cart is not checkout-ready');
+  await prisma.supplierOffer.update({ where: { id: correctionOffer.offerId }, data: { status: 'ACTIVE' } });
+  await createCartWithItem(correctionBuyer, correctionOffer.offerId, 1);
+  edited = await currentCart();
+  const raceItemId = edited.items[0].id, raceKey = `${runId}-edit-checkout`;
+  const [editRace, checkoutRace] = await Promise.all([
+    request(`/carts/${edited.id}/items/${raceItemId}`, { method: 'PATCH', identity: correctionBuyer, body: { quantity: 2, expectedVersion: edited.version } }),
+    request(`/carts/${edited.id}/checkout`, { method: 'POST', identity: correctionBuyer, body: { idempotencyKey: raceKey, expectedVersion: edited.version } }),
+  ]);
+  assert((editRace.status === 200 && checkoutRace.status === 409) || (editRace.status === 409 && checkoutRace.status === 201), `Edit/checkout race outcomes ${editRace.status}/${checkoutRace.status}`);
+  if (checkoutRace.status === 409) await expectStatus(`/carts/${edited.id}/checkout`, { method: 'POST', identity: correctionBuyer, body: { idempotencyKey: raceKey, expectedVersion: editRace.body.version } }, 201);
+  const historical = await prisma.supplierOrderItem.findFirstOrThrow({ where: { cartItemId: raceItemId } });
+  assert(historical.quantity.toString() === (editRace.status === 200 ? '2' : '1'), 'Checkout history must equal the winning cart version');
+  const completedCorrection = await currentCart();
+  await expectStatus(`/carts/${edited.id}/items/${raceItemId}`, { method: 'DELETE', identity: correctionBuyer, body: { expectedVersion: completedCorrection.version } }, 409);
+  assert(await prisma.auditLog.count({ where: { entityId: edited.id, action: 'cart.item.removed' } }) === 1, 'Repeated delete must not duplicate audit');
 
   const tenantCart = await createCartWithItem(
     tenantOwner,
@@ -696,6 +749,7 @@ try {
           transactionRollback: "passed",
           concurrentIdempotency: "passed",
           scarceStockConcurrency: "passed",
+          cartCorrectionAndCheckoutRace: "passed",
         },
         persisted: {
           idempotentCheckoutCount,

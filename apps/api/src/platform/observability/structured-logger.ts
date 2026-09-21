@@ -10,7 +10,11 @@ const config = environment();
 export const structuredLogger = pino({
   level: config.LOG_LEVEL,
   base: { service: "marketplace-api", release: process.env.APP_RELEASE ?? "local" },
-  redact: { paths: ["req.headers.authorization", "req.headers.cookie", "password", "token", "secret", "credentials"], censor: "[REDACTED]" },
+  redact: {
+    // Node normalizes HTTP header names; redact the whole cookie array, not one token.
+    paths: ["req.headers.authorization", "req.headers.cookie", 'req.headers["x-csrf-token"]', 'res.headers["set-cookie"]', "password", "token", "secret", "credentials"],
+    censor: "[REDACTED]",
+  },
 });
 
 function normalize(message: unknown) { return message instanceof Error ? { message: message.message, stack: message.stack } : { message: typeof message === "string" ? message : JSON.stringify(message) }; }

@@ -1,0 +1,28 @@
+{
+  "scope": "Only production-preview-2026-09-16 artifacts",
+  "branch": "codex/frontend-pilot-composition",
+  "head": "3d644963ed72f99a100e180db2d373bc5abeaef9",
+  "hashes": {
+    "pages.js": "6dfaf5819ec741045c3a053c82424f15c4f91e2298e26930a25e25ac8ec1cc7e",
+    "app.js": "1cca53cf1d2e35869f206a3fa40b6a4ba9c1af36f2d54dd912fac655c86a00a2",
+    "templates.js": "b5d4d7ce2571fae6c12efa96967eb9d87f3599fb95514a0c31ab7a1e6aed5226",
+    "style.css": "9deae549a7a26f8013ea84cb51037e8ecf8d64606bc8b650e346684a94995ddc",
+    "gallery.js": "c6d6d9b50178278421ae19aaef4925ef2d5ef24035479e48cbf4b13c314940b2",
+    "viewer.js": "7df92f760f65d0bbd74c4d79c997f9a58cf27eeee97cdcf3a4a2fa182c4649a2",
+    "serve.mjs": "c4a4d2dd7344f0ae35e775a2af60945ffb3e218b3e9a39cacc2f0188b3279955"
+  },
+  "surfaces": 78,
+  "templates": 69,
+  "structurePass": 78,
+  "domPassByWidth": {
+    "360": 78,
+    "390": 78,
+    "1536": 78
+  },
+  "textFiles": 111,
+  "trailingWhitespace": [],
+  "exactPngExport": "BLOCKED",
+  "fullVisualAcceptance": "NOT_RUN",
+  "ownerApproval": "PENDING",
+  "runtimeAcceptance": "NOT_IN_SCOPE"
+}

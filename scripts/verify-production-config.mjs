@@ -92,6 +92,10 @@ const run = (env) =>
 const accepted = run(valid);
 if (accepted.status !== 0)
   throw new Error(`Valid production contract rejected: ${accepted.stderr}`);
+for (const flag of ["AUTH_LOCAL_MAIL_ENABLED", "LOCAL_OPERATOR_PASSWORD_LOGIN_ENABLED"]) {
+  const localAuth = run({ ...valid, API_HOST: "127.0.0.1", [flag]: "true" });
+  if (localAuth.status === 0 || !String(localAuth.stderr).includes("non-production loopback")) throw new Error(`Production must reject ${flag}, even on loopback`);
+}
 const insecure = run({ ...valid, CORS_ORIGINS: "http://localhost:3000" });
 if (insecure.status === 0)
   throw new Error("Insecure localhost production CORS was accepted");

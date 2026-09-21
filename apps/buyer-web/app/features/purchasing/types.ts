@@ -18,6 +18,8 @@ export type CartItem = {
 
 export type Cart = {
   id: string;
+  buyerOrganizationId: string;
+  version: number;
   status: string;
   currency: string;
   items: CartItem[];

@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { ArrowRight24Regular } from "@fluentui/react-icons/svg/arrow-right";
 import { Box24Regular } from "@fluentui/react-icons/svg/box";
 import { CheckmarkCircle24Regular } from "@fluentui/react-icons/svg/checkmark-circle";
@@ -16,51 +15,30 @@ import {
   ErrorState,
   LoadingState,
   formatDate,
-  formatMoney,
 } from "@marketplace/ui";
 import type { CatalogSearchResponse } from "@marketplace/api-client";
-import { useCallback, useEffect, useState } from "react";
 import { PublicHeader } from "../public-header";
 import {
   availableCatalogOffers,
   catalogImageUrl,
   catalogPackagingLabel,
-  selectCatalogPriceMinor,
+  selectCatalogOffer,
+  formatCatalogMoney,
 } from "./catalog-view-model";
+import { useCatalogSearch } from "./use-catalog-search";
+import { catalogPageRange, type CatalogSort } from "./catalog-request";
 import styles from "./page.module.css";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:4012/api";
-const PAGE_SIZE = 24;
-type SortOption = "RELEVANCE" | "PRICE_ASC" | "PRICE_DESC" | "NAME_ASC" | "UPDATED_DESC";
-
-type CatalogRequest = {
-  query: string;
-  sort: SortOption;
-  categoryId?: string;
-  inStockOnly: boolean;
-};
-
-function updateCatalogUrl(router: ReturnType<typeof useRouter>, request: CatalogRequest) {
-  const params = new URLSearchParams();
-  if (request.query) params.set("q", request.query);
-  if (request.categoryId) params.set("categoryId", request.categoryId);
-  if (request.inStockOnly) params.set("inStock", "true");
-  if (request.sort !== "RELEVANCE") params.set("sort", request.sort);
-  const query = params.toString();
-  router.replace(query ? `/catalog?${query}` : "/catalog", { scroll: false });
-}
-
 function CatalogCard({ product }: { product: CatalogSearchResponse["items"][number] }) {
   const availableOffers = availableCatalogOffers(product);
-  const priceMinor = selectCatalogPriceMinor(product);
+  const offer = selectCatalogOffer(product);
   const imageUrl = catalogImageUrl(product, API_URL);
-  const freshness = product.offers
-    .flatMap((offer) => offer.freshness)
-    .find((item) => item.updatedAt);
+  const freshness = offer?.freshness.find((item) => item.updatedAt);
   const supplierNames = [...new Set(availableOffers.map((offer) => offer.supplier.name))];
 
   return (
-    <article className={styles.card}>
+    <article className={styles.card} data-testid="catalog-card" data-product-id={product.id} data-offer-id={offer?.id}>
       <Link className={styles.cardImage} href={`/products/${product.id}`} aria-label={`Открыть ${product.name}`}>
         {imageUrl ? <img src={imageUrl} alt="" loading="lazy" /> : <span className={styles.imageFallback}>DM</span>}
         {product.isAvailable ? <span className={styles.availableBadge}><CheckmarkCircle24Regular aria-hidden="true" /> В наличии</span> : null}
@@ -75,13 +53,15 @@ function CatalogCard({ product }: { product: CatalogSearchResponse["items"][numb
         </Link>
         <p className={styles.cardDescription}>{product.description ?? "Описание и характеристики доступны в карточке товара."}</p>
         <div className={styles.cardFacts}>
-          <span><Box24Regular aria-hidden="true" /> {catalogPackagingLabel(product)}</span>
+          <span><Box24Regular aria-hidden="true" /> {catalogPackagingLabel(product)}{offer?.packaging.unit ? ` · ${offer.packaging.quantityInBaseUnit} ${offer.packaging.unit} в единице продажи` : " · состав уточняется"}</span>
               <span><VehicleTruckProfile24Regular aria-hidden="true" /> Доставка от поставщика</span>
         </div>
         <div className={styles.cardFooter}>
           <div>
-            <span className={styles.priceCaption}>Цена от</span>
-            <strong className={styles.price}>{priceMinor ? formatMoney(priceMinor, "KZT") : "По запросу"}</strong>
+            <span className={styles.priceCaption}>За упаковку / единицу продажи, от</span>
+            <strong className={styles.price}>{formatCatalogMoney(offer?.priceMinor, offer?.currency ?? "KZT")}</strong>
+            <span className={styles.supplierCaption}>{offer?.normalizedPriceMinor && offer.packaging.unit ? `${formatCatalogMoney(offer.normalizedPriceMinor, offer.currency ?? "KZT")} за 1 ${offer.packaging.unit}` : "Цена за базовую единицу уточняется"}</span>
+            {offer ? <span className={styles.supplierCaption}>Цена и фасовка: {offer.supplier.name}</span> : null}
             <span className={styles.supplierCaption}>{supplierNames.length ? `${supplierNames.length} поставщик${supplierNames.length === 1 ? "" : "а"}` : "Поставщик уточняется"}</span>
           </div>
           <Link className={styles.cardAction} href={`/products/${product.id}`}>
@@ -95,95 +75,10 @@ function CatalogCard({ product }: { product: CatalogSearchResponse["items"][numb
 }
 
 export default function CatalogPage() {
-  const router = useRouter();
-  const [query, setQuery] = useState("");
-  const [sort, setSort] = useState<SortOption>("RELEVANCE");
-  const [categoryId, setCategoryId] = useState<string | undefined>();
-  const [inStockOnly, setInStockOnly] = useState(false);
-  const [response, setResponse] = useState<CatalogSearchResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const loadCatalog = useCallback(async (request: CatalogRequest) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const params = new URLSearchParams({
-        q: request.query,
-        sort: request.sort,
-        offset: "0",
-        limit: String(PAGE_SIZE),
-      });
-      if (request.categoryId) params.set("categoryId", request.categoryId);
-      if (request.inStockOnly) params.set("inStock", "true");
-      const response = await fetch(`/catalog-search?${params.toString()}`, {
-        cache: "no-store",
-        signal: AbortSignal.timeout(3_500),
-      });
-      if (!response.ok) throw new Error("Catalog request failed");
-      const nextResponse = (await response.json()) as CatalogSearchResponse;
-      if (!Array.isArray(nextResponse.items)) {
-        throw new Error("Catalog response is invalid");
-      }
-      setResponse(nextResponse);
-    } catch {
-      setResponse(null);
-      setError("Каталог временно недоступен. Проверьте соединение и повторите попытку.");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const initialRequest: CatalogRequest = {
-      query: params.get("q") ?? "",
-      sort: (params.get("sort") as SortOption | null) ?? "RELEVANCE",
-      categoryId: params.get("categoryId") ?? undefined,
-      inStockOnly: params.get("inStock") === "true",
-    };
-    setQuery(initialRequest.query);
-    setSort(initialRequest.sort);
-    setCategoryId(initialRequest.categoryId);
-    setInStockOnly(initialRequest.inStockOnly);
-    void loadCatalog(initialRequest);
-  }, [loadCatalog]);
-
-  const request = (overrides: Partial<CatalogRequest> = {}): CatalogRequest => ({
-    query,
-    sort,
-    categoryId,
-    inStockOnly,
-    ...overrides,
-  });
-
-  const runSearch = (nextQuery = query) => {
-    const next = request({ query: nextQuery.trim() });
-    setQuery(next.query);
-    updateCatalogUrl(router, next);
-    void loadCatalog(next);
-  };
-
-  const selectCategory = (nextCategoryId?: string) => {
-    const next = request({ categoryId: nextCategoryId });
-    setCategoryId(next.categoryId);
-    updateCatalogUrl(router, next);
-    void loadCatalog(next);
-  };
-
-  const changeStockFilter = (nextInStockOnly: boolean) => {
-    const next = request({ inStockOnly: nextInStockOnly });
-    setInStockOnly(next.inStockOnly);
-    updateCatalogUrl(router, next);
-    void loadCatalog(next);
-  };
-
-  const changeSort = (nextSort: SortOption) => {
-    const next = request({ sort: nextSort });
-    setSort(next.sort);
-    updateCatalogUrl(router, next);
-    void loadCatalog(next);
-  };
+  const catalog = useCatalogSearch();
+  const { query, setQuery, response, loading, error, request } = catalog;
+  const { categoryId, inStockOnly, sort } = request;
+  const range = catalogPageRange(request, response?.total ?? 0, response?.items.length ?? 0);
 
   return (
     <div className={styles.page}>
@@ -193,7 +88,7 @@ export default function CatalogPage() {
         query={query}
         searching={loading}
         onQueryChange={setQuery}
-        onSearch={(value) => runSearch(value)}
+        onSearch={catalog.search}
       />
       <main>
         <section className={styles.hero}>
@@ -216,24 +111,25 @@ export default function CatalogPage() {
           </div>
         </section>
 
-        <section className={styles.content} aria-label="Каталог товаров">
+        <section className={styles.content} aria-label="Каталог товаров" aria-busy={loading}>
           <aside className={styles.filters} aria-label="Фильтры каталога">
             <div className={styles.filterHeading}><Filter24Regular aria-hidden="true" /><strong>Фильтры</strong></div>
             <DmCheckbox
               className={styles.checkRow}
               checked={inStockOnly}
-              onChange={(_, data) => changeStockFilter(data.checked === true)}
+              onChange={(_, data) => catalog.change({ inStockOnly: data.checked === true })}
               label="Только в наличии"
             />
             <div className={styles.filterGroup}>
               <span className={styles.filterLabel}>Категории</span>
-              <button type="button" className={!categoryId ? styles.filterOptionActive : styles.filterOption} onClick={() => selectCategory(undefined)}>Все категории</button>
+              <button type="button" className={!categoryId ? styles.filterOptionActive : styles.filterOption} onClick={() => catalog.change({ categoryId: undefined })}>Все категории</button>
               {response?.facets.categories.slice(0, 8).map((facet) => (
-                <button type="button" key={facet.id} className={facet.id === categoryId ? styles.filterOptionActive : styles.filterOption} onClick={() => selectCategory(facet.id)}>
+                <button type="button" key={facet.id} className={facet.id === categoryId ? styles.filterOptionActive : styles.filterOption} onClick={() => catalog.change({ categoryId: facet.id })}>
                   <span>{facet.name}</span><small>{facet.count}</small>
                 </button>
               ))}
             </div>
+            <DmButton type="button" onClick={catalog.reset}>Сбросить всё</DmButton>
             <div className={styles.filterNote}>
               <strong>Понятные условия закупки</strong>
               <span>Цена, упаковка, наличие и срок обновления предложения отображаются прямо в выдаче.</span>
@@ -249,7 +145,7 @@ export default function CatalogPage() {
               </div>
               <label className={styles.sortControl}>
                 <span>Сортировка</span>
-                <DmSelect value={sort} onChange={(_, data) => changeSort(data.value as SortOption)}>
+                <DmSelect value={sort} onChange={(_, data) => catalog.change({ sort: data.value as CatalogSort })}>
                   <option value="RELEVANCE">По релевантности</option>
                   <option value="PRICE_ASC">Сначала дешевле</option>
                   <option value="PRICE_DESC">Сначала дороже</option>
@@ -262,14 +158,20 @@ export default function CatalogPage() {
             {loading ? (
               <div className={styles.loadingArea}><LoadingState label="Загружаем предложения поставщиков" /></div>
             ) : error ? (
-              <div className={styles.stateArea}><ErrorState description={error} action={<DmButton appearance="primary" type="button" onClick={() => void loadCatalog(request())}>Повторить загрузку</DmButton>} /></div>
+              <div className={styles.stateArea}><ErrorState description={error} action={<DmButton appearance="primary" type="button" onClick={() => void catalog.retry()}>Повторить загрузку</DmButton>} /></div>
             ) : response?.items.length ? (
               <div className={styles.grid}>
                 {response.items.map((product) => <CatalogCard key={product.id} product={product} />)}
               </div>
             ) : (
-              <div className={styles.stateArea}><EmptyState title="Ничего не нашли" description="Измените запрос или уберите часть фильтров — мы попробуем подобрать другие предложения." action={<DmButton appearance="primary" type="button" onClick={() => { setQuery(""); selectCategory(undefined); }}>Сбросить фильтры</DmButton>} /></div>
+              <div className={styles.stateArea}><EmptyState title="Ничего не нашли" description="Измените запрос или уберите часть фильтров — мы попробуем подобрать другие предложения." action={<DmButton appearance="primary" type="button" onClick={catalog.reset}>Сбросить фильтры</DmButton>} /></div>
             )}
+
+            {!error && response ? <nav className={styles.pagination} aria-label="Страницы каталога">
+              <DmButton type="button" disabled={loading || request.offset === 0} onClick={() => catalog.page(range.previous)}>Предыдущая страница</DmButton>
+              <span role="status">{loading ? "Обновляем страницу…" : `${range.first}–${range.last} из ${response.total}${!range.hasNext && response.items.length ? " · Конец списка" : ""}`}</span>
+              <DmButton type="button" disabled={loading || !range.hasNext} onClick={() => catalog.page(range.next)}>Следующая страница</DmButton>
+            </nav> : null}
 
             {response?.facets.suppliers.length ? (
               <div className={styles.supplierStrip}>

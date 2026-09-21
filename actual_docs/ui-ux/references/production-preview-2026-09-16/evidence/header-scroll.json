@@ -1,0 +1,24 @@
+{
+  "firstObservation": "Too early before scroll event; no PASS inferred",
+  "desktopDown": {
+    "hidden": true,
+    "y": 257.6000061035156
+  },
+  "desktopUp": {
+    "hidden": false,
+    "y": 0
+  },
+  "held": {
+    "hidden": false,
+    "menuOpen": true
+  },
+  "mobileDown": {
+    "hidden": true,
+    "y": 844
+  },
+  "mobileUp": {
+    "hidden": false,
+    "y": 0
+  },
+  "note": "Prototype only. Desktop menu hold checked; mobile menu hold NOT_RUN."
+}

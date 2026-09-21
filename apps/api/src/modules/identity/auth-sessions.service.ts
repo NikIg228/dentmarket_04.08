@@ -1,6 +1,7 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
-import type { SocialExchangeInput } from "@marketplace/schemas";
-import { createHash, randomBytes, randomUUID, scryptSync, timingSafeEqual } from "node:crypto";
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException, UnauthorizedException } from "@nestjs/common";
+import type { SocialExchangeInput, WorkspaceContext } from "@marketplace/schemas";
+import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
+import { passwordHash, passwordMatches } from "./password-codec";
 import jwt from "jsonwebtoken";
 import { Prisma } from "@prisma/client";
 import { environment } from "../../platform/config/environment";
@@ -8,6 +9,8 @@ import { PrismaService } from "../../platform/prisma/prisma.service";
 import { OidcVerifierService } from "./oidc-verifier.service";
 import { OnboardingService } from "../onboarding/onboarding.service";
 import { PlatformAuthorityPolicy } from "../access-control/platform-authority.policy";
+import { authMailMode, deliverAuthMail, requireAuthMail } from "./auth-mail.delivery";
+import { setTimeout as delay } from "node:timers/promises";
 
 type RequestMetadata = { ipAddress?: string; userAgent?: string; correlationId?: string };
 const hash = (value: string) => createHash("sha256").update(value).digest("hex");
@@ -15,20 +18,11 @@ const secureEqual = (left: string, right: string) => {
   const a = Buffer.from(left); const b = Buffer.from(right);
   return a.length === b.length && timingSafeEqual(a, b);
 };
-const passwordHash = (password: string) => {
-  const salt = randomBytes(16).toString("hex");
-  return `scrypt$${salt}$${scryptSync(password, salt, 64).toString("hex")}`;
-};
-const passwordMatches = (password: string, encoded: string | null) => {
-  if (!encoded?.startsWith("scrypt$")) return false;
-  const [, salt, expected] = encoded.split("$");
-  if (!salt || !expected) return false;
-  const actual = scryptSync(password, salt, 64).toString("hex");
-  return secureEqual(actual, expected);
-};
 
 @Injectable()
 export class AuthSessionsService {
+  private readonly logger = new Logger(AuthSessionsService.name);
+  clientOptions() { const config = environment(); return { localOperatorPasswordEnabled: config.LOCAL_OPERATOR_PASSWORD_LOGIN_ENABLED, emailDelivery: authMailMode(config) }; }
   constructor(
     private readonly prisma: PrismaService,
     private readonly oidc: OidcVerifierService,
@@ -60,6 +54,21 @@ export class AuthSessionsService {
     return this.prisma.organizationMembership.findMany({ where: { userId, status: "ACTIVE", organization: { status: "ACTIVE" } }, select: { organizationId: true, isPrimary: true }, orderBy: { acceptedAt: "asc" } });
   }
 
+  async workspaceContext(userId?: string, organizationId?: string): Promise<WorkspaceContext> {
+    if (!userId || !organizationId) throw new UnauthorizedException("Войдите в аккаунт с активной организацией");
+    const membership = await this.prisma.organizationMembership.findFirst({
+      where: { userId, organizationId, status: "ACTIVE", user: { status: "ACTIVE" }, organization: { status: "ACTIVE" } },
+      select: { organization: { select: { id: true, displayName: true, capabilities: { select: { capability: true } } } } },
+    });
+    if (!membership) throw new ForbiddenException("Доступ к организации недоступен. Обратитесь к владельцу организации.");
+    return {
+      organizationId: membership.organization.id,
+      organizationDisplayName: membership.organization.displayName,
+      capabilities: membership.organization.capabilities.map(item => item.capability)
+        .filter((value): value is "BUYER" | "SUPPLIER" => value === "BUYER" || value === "SUPPLIER"),
+    };
+  }
+
   private async createSession(userId: string, organizationIds: string[], activeOrganizationId: string | null, authMethods: string[], metadata: RequestMetadata) {
     const refreshToken = randomBytes(48).toString("base64url");
     const config = environment();
@@ -68,14 +77,7 @@ export class AuthSessionsService {
   }
 
   private async email(to: string, subject: string, text: string) {
-    const config = environment();
-    if (!config.EMAIL_PROVIDER_URL || !config.EMAIL_PROVIDER_TOKEN) {
-      if (config.NODE_ENV === "production") throw new UnauthorizedException("Email delivery is not configured");
-      console.info(`[auth-email:${to}] ${subject}\n${text}`);
-      return;
-    }
-    const response = await fetch(config.EMAIL_PROVIDER_URL, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${config.EMAIL_PROVIDER_TOKEN}` }, body: JSON.stringify({ to, subject, text }), signal: AbortSignal.timeout(10_000) });
-    if (!response.ok) throw new UnauthorizedException("Email delivery is temporarily unavailable");
+    return deliverAuthMail(environment(), { to, subject, text });
   }
 
   private async issueEmailToken(userId: string, type: "EMAIL_VERIFICATION" | "PASSWORD_RESET", metadata?: Record<string, unknown>) {
@@ -88,15 +90,16 @@ export class AuthSessionsService {
   }
 
   async registerEmail(input: { email: string; displayName: string; password: string; registrationToken?: string }, metadata: RequestMetadata) {
+    requireAuthMail(environment());
     const existing = await this.prisma.user.findUnique({ where: { email: input.email } });
     if (existing) throw new ConflictException("Аккаунт с таким email уже существует. Войдите или восстановите пароль.");
     const user = await this.prisma.user.create({ data: { email: input.email, displayName: input.displayName, passwordHash: passwordHash(input.password) } });
     try {
       const token = await this.issueEmailToken(user.id, "EMAIL_VERIFICATION", input.registrationToken ? { registrationToken: input.registrationToken } : undefined);
       const link = `${environment().AUTH_EMAIL_BASE_URL}/verify-email?token=${encodeURIComponent(token.raw)}`;
-      await this.email(user.email, "Подтвердите email в DentMarket", `Здравствуйте, ${user.displayName}!\n\nПодтвердите email по ссылке:\n${link}\n\nСсылка действует до ${token.expiresAt.toISOString()}.`);
+      const delivery = await this.email(user.email, "Подтвердите email в DentMarket", `Здравствуйте, ${user.displayName}!\n\nПодтвердите email по ссылке:\n${link}\n\nСсылка действует до ${token.expiresAt.toISOString()}.`);
       await this.prisma.securityEvent.create({ data: { type: "auth.email.registered", severity: "INFO", actorId: user.id, ipAddress: metadata.ipAddress, userAgent: metadata.userAgent } });
-      return { ok: true, verificationRequired: true, email: user.email };
+      return { ok: true as const, verificationRequired: true as const, email: user.email, delivery };
     } catch (error) {
       // Do not leave an unusable account behind when delivery is unavailable.
       // The user can retry registration immediately after the provider recovers.
@@ -122,16 +125,22 @@ export class AuthSessionsService {
     return { ...result, ...(onboarding ?? {}), verified: true };
   }
 
-  private async passwordSession(user: { id: string; email: string; displayName: string }, metadata: RequestMetadata) {
+  private async passwordSession(user: { id: string; email: string; displayName: string }, metadata: RequestMetadata, preferredOrganizationId?: string) {
     const memberships = await this.memberships(user.id);
     const organizationIds = memberships.map(({ organizationId }) => organizationId);
-    const activeOrganizationId = memberships.find(({ isPrimary }) => isPrimary)?.organizationId ?? organizationIds[0] ?? null;
+    if (preferredOrganizationId && !organizationIds.includes(preferredOrganizationId)) throw new UnauthorizedException("Активное членство недоступно");
+    const activeOrganizationId = preferredOrganizationId ?? memberships.find(({ isPrimary }) => isPrimary)?.organizationId ?? organizationIds[0] ?? null;
     const session = await this.createSession(user.id, organizationIds, activeOrganizationId, ["password"], metadata);
     await this.prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
     return { user: { id: user.id, email: user.email, displayName: user.displayName }, ...session };
   }
 
-  async loginEmail(input: { email: string; password: string }, metadata: RequestMetadata) {
+  async loginLocalOperator(input: { email: string; password: string }, metadata: RequestMetadata) {
+    if (!environment().LOCAL_OPERATOR_PASSWORD_LOGIN_ENABLED) throw new NotFoundException("Локальный вход отключён");
+    return this.loginEmail(input, metadata, true);
+  }
+
+  async loginEmail(input: { email: string; password: string }, metadata: RequestMetadata, operatorOnly = false) {
     const user = await this.prisma.user.findUnique({ where: { email: input.email } });
     if (user?.lockedUntil && user.lockedUntil > new Date()) throw new UnauthorizedException("Слишком много попыток. Попробуйте позже");
     if (!user || !passwordMatches(input.password, user.passwordHash)) {
@@ -146,18 +155,31 @@ export class AuthSessionsService {
       throw new UnauthorizedException("Email или пароль указаны неверно");
     }
     if (!user.emailVerifiedAt) throw new UnauthorizedException("Сначала подтвердите email");
+    let operatorOrganizationId: string | undefined;
+    if (operatorOnly) {
+      if (user.status !== "ACTIVE") throw new UnauthorizedException("Доступ оператора недоступен");
+      const membership = await this.prisma.organizationMembership.findFirst({ where: { userId: user.id, status: "ACTIVE", organization: { status: "ACTIVE", capabilities: { some: { capability: "MARKETPLACE_OPERATOR" } } } }, select: { organizationId: true } });
+      if (!membership) throw new UnauthorizedException("Этот раздел доступен только команде DentMarket");
+      await this.authority.assertPlatformOperator({ actorId: user.id, organizationId: membership.organizationId });
+      operatorOrganizationId = membership.organizationId;
+    }
     await this.prisma.user.update({ where: { id: user.id }, data: { failedLoginAttempts: 0, lockedUntil: null } });
-    return this.passwordSession(user, metadata);
+    return this.passwordSession(user, metadata, operatorOrganizationId);
   }
 
   async forgotPassword(email: string) {
-    const user = await this.prisma.user.findUnique({ where: { email } });
-    if (user) {
-      const token = await this.issueEmailToken(user.id, "PASSWORD_RESET");
-      const link = `${environment().AUTH_EMAIL_BASE_URL}/reset-password?token=${encodeURIComponent(token.raw)}`;
-      await this.email(user.email, "Восстановление пароля DentMarket", `Сбросить пароль: ${link}\nСсылка действует 30 минут.`);
-    }
-    return { ok: true, message: "Если аккаунт существует, письмо отправлено" };
+    const delivery = requireAuthMail(environment());
+    const started = performance.now();
+    try {
+      const user = await this.prisma.user.findUnique({ where: { email } });
+      if (user) {
+        const token = await this.issueEmailToken(user.id, "PASSWORD_RESET");
+        const link = `${environment().AUTH_EMAIL_BASE_URL}/reset-password?token=${encodeURIComponent(token.raw)}`;
+        try { await this.email(user.email, "Восстановление пароля DentMarket", `Сбросить пароль: ${link}\nСсылка действует до ${token.expiresAt.toISOString()}.`); }
+        catch { await this.prisma.emailAuthToken.deleteMany({ where: { tokenHash: hash(token.raw), consumedAt: null } }); this.logger.warn("auth_password_reset_delivery_failed"); }
+      }
+      return { ok: true as const, message: "Запрос принят. Если аккаунт существует, письмо передано на доставку. Если письма нет, обратитесь к оператору.", delivery };
+    } finally { await delay(Math.max(0, 3_000 - (performance.now() - started))); }
   }
 
   async resetPassword(rawToken: string, password: string) {

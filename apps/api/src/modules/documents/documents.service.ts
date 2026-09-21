@@ -8,6 +8,7 @@ import type { SupplierActorContext } from "../suppliers/supplier-access.service"
 import { DocumentRendererService } from "./document-renderer.service";
 import { SignatureAdapterRegistry } from "./signature-adapter-registry.service";
 import { FileUploadPolicyService } from "../../platform/security/file-upload-policy.service";
+import { collectConsistentDocuments, documentReferenceInclude, hasConfirmedDocumentPayment, hasConsistentDocumentReferences, operationalReferenceError, sameDocumentReferences, withoutReferenceRelations, type DocumentGraph } from "./document-reference-graph";
 
 const orderDocumentDefinitions = [
   {
@@ -33,10 +34,11 @@ const orderDocumentDefinitions = [
 const archiveCategories = Object.values(DocumentCategory);
 
 const documentArchiveInclude = Prisma.validator<Prisma.DocumentInclude>()({
-  supplierOrder: { select: { id: true, orderNumber: true, paymentStatus: true, buyerOrganizationId: true, supplierOrganizationId: true } },
-  paymentIntent: { select: { id: true, status: true } },
-  paymentTransaction: { select: { id: true, type: true, status: true } },
-  refund: { select: { id: true, status: true } },
+  ...documentReferenceInclude,
+  supplierOrder: { select: { id: true, orderNumber: true, paymentStatus: true, buyerOrganizationId: true, supplierOrganizationId: true, checkoutId: true } },
+  paymentIntent: { select: { ...documentReferenceInclude.paymentIntent.select, status: true } },
+  paymentTransaction: { select: { ...documentReferenceInclude.paymentTransaction.select, type: true, status: true } },
+  refund: { select: { ...documentReferenceInclude.refund.select, status: true } },
   participants: {
     include: { organization: { select: { id: true, displayName: true, legalName: true, bin: true } } },
     orderBy: [{ role: "asc" }, { organizationId: "asc" }],
@@ -120,7 +122,11 @@ export class DocumentsService {
 
   private mapArchiveDocument(document: ArchiveDocument) {
     return {
-      ...document,
+      ...withoutReferenceRelations(document),
+      supplierOrder: document.supplierOrder ? { id: document.supplierOrder.id, orderNumber: document.supplierOrder.orderNumber, paymentStatus: document.supplierOrder.paymentStatus, buyerOrganizationId: document.supplierOrder.buyerOrganizationId, supplierOrganizationId: document.supplierOrder.supplierOrganizationId } : null,
+      paymentIntent: document.paymentIntent ? { id: document.paymentIntent.id, status: document.paymentIntent.status } : null,
+      paymentTransaction: document.paymentTransaction ? { id: document.paymentTransaction.id, type: document.paymentTransaction.type, status: document.paymentTransaction.status } : null,
+      refund: document.refund ? { id: document.refund.id, status: document.refund.status } : null,
       amountMinor: document.amountMinor?.toString() ?? null,
       documentDate: document.documentDate.toISOString(),
       immutableAt: document.immutableAt?.toISOString() ?? null,
@@ -138,7 +144,7 @@ export class DocumentsService {
 
   async listArchive(input: DocumentArchiveQuery, context: SupplierActorContext) {
     const access = await this.archiveAccessWhere(context);
-    const documents = await this.prisma.document.findMany({
+    const documents = await collectConsistentDocuments((take, cursor) => this.prisma.document.findMany({
       where: {
         AND: [
           access,
@@ -170,11 +176,11 @@ export class DocumentsService {
       },
       include: documentArchiveInclude,
       orderBy: [{ documentDate: "desc" }, { id: "desc" }],
-      cursor: input.cursor ? { id: input.cursor } : undefined,
-      skip: input.cursor ? 1 : undefined,
-      take: input.limit + 1,
-    });
-    const nextCursor = documents.length > input.limit ? documents[input.limit]?.id ?? null : null;
+      cursor: cursor ? { id: cursor } : undefined,
+      skip: cursor ? 1 : undefined,
+      take,
+    }), input.limit + 1, input.cursor);
+    const nextCursor = documents.length > input.limit ? documents[input.limit - 1]?.id ?? null : null;
     return { items: documents.slice(0, input.limit).map((document) => this.mapArchiveDocument(document)), nextCursor };
   }
 
@@ -183,30 +189,44 @@ export class DocumentsService {
     const monthStart = new Date();
     monthStart.setUTCDate(1);
     monthStart.setUTCHours(0, 0, 0, 0);
-    const [total, awaitingSignature, attention, thisMonth, grouped] = await Promise.all([
-      this.prisma.document.count({ where: access }),
-      this.prisma.document.count({ where: { AND: [access, { status: { in: ["AWAITING_SIGNATURE", "PARTIALLY_SIGNED"] } }] } }),
-      this.prisma.document.count({ where: { AND: [access, { OR: [{ status: { in: ["FAILED", "REJECTED", "EXPIRED"] } }, { accountingStatus: { in: ["PENDING_REVIEW", "DISPUTED"] } }] }] } }),
-      this.prisma.document.count({ where: { AND: [access, { documentDate: { gte: monthStart } }] } }),
-      this.prisma.document.groupBy({ by: ["category"], where: access, _count: { _all: true } }),
-    ]);
     const byCategory = Object.fromEntries(archiveCategories.map((category) => [category, 0])) as Record<DocumentCategory, number>;
-    for (const row of grouped) byCategory[row.category] = row._count._all;
-    return { total, awaitingSignature, attention, thisMonth, byCategory };
+    const summary = { total: 0, awaitingSignature: 0, attention: 0, thisMonth: 0, byCategory };
+    let cursor: string | undefined;
+    // Bound memory; counts use the same validity rule as lists, not raw rows.
+    for (;;) {
+      const documents = await this.prisma.document.findMany({ where: access,
+        include: documentReferenceInclude, orderBy: { id: "asc" }, take: 250,
+        cursor: cursor ? { id: cursor } : undefined, skip: cursor ? 1 : undefined });
+      for (const document of documents) {
+        if (!hasConsistentDocumentReferences(document)) continue;
+        summary.total += 1;
+        if (["AWAITING_SIGNATURE", "PARTIALLY_SIGNED"].includes(document.status)) summary.awaitingSignature += 1;
+        if (["FAILED", "REJECTED", "EXPIRED"].includes(document.status) || ["PENDING_REVIEW", "DISPUTED"].includes(document.accountingStatus)) summary.attention += 1;
+        if (document.documentDate >= monthStart) summary.thisMonth += 1;
+        byCategory[document.category] += 1;
+      }
+      if (documents.length < 250) break;
+      const next = documents.at(-1)?.id;
+      if (!next || next === cursor) throw new Error("Document summary pagination did not advance");
+      cursor = next;
+    }
+    return summary;
   }
 
   async getArchive(documentId: string, context: SupplierActorContext) {
     const access = await this.archiveAccessWhere(context);
     const document = await this.prisma.document.findFirst({ where: { AND: [{ id: documentId }, access] }, include: documentArchiveInclude });
     if (!document) throw new NotFoundException("Document not found");
+    this.assertConsistentRead(document);
     const versions = await this.prisma.document.findMany({
-      where: { ownerOrganizationId: document.ownerOrganizationId, documentNumber: document.documentNumber },
-      select: { id: true, version: true, status: true, documentDate: true, createdAt: true },
+      where: { AND: [access, { ownerOrganizationId: document.ownerOrganizationId, documentNumber: document.documentNumber }] },
+      include: documentReferenceInclude,
       orderBy: { version: "desc" },
     });
     return {
       ...this.mapArchiveDocument(document),
-      versions: versions.map((version) => ({ ...version, documentDate: version.documentDate.toISOString(), createdAt: version.createdAt.toISOString() })),
+      versions: versions.filter((version) => hasConsistentDocumentReferences(version) && sameDocumentReferences(document, version))
+        .map((version) => ({ id: version.id, version: version.version, status: version.status, documentDate: version.documentDate.toISOString(), createdAt: version.createdAt.toISOString() })),
     };
   }
 
@@ -257,7 +277,7 @@ export class DocumentsService {
   async list(input: DocumentQueryInput, context: SupplierActorContext) {
     if (input.ownerOrganizationId) await this.assertOrganizationAccess(input.ownerOrganizationId, context);
     const operator = await this.isOperator(context.organizationId);
-    return this.prisma.document.findMany({
+    const documents = await collectConsistentDocuments((take, cursor) => this.prisma.document.findMany({
       where: {
         ownerOrganizationId: input.ownerOrganizationId,
         supplierOrderId: input.supplierOrderId,
@@ -272,14 +292,17 @@ export class DocumentsService {
           { marketplaceAgreement: { is: { OR: [{ supplierOrganizationId: context.organizationId }, { operatorOrganizationId: context.organizationId }] } } },
         ] } : {}),
       },
-      include: { template: true, signatures: { orderBy: { createdAt: "asc" } } },
-      orderBy: { createdAt: "desc" },
-      take: input.limit,
-    });
+      include: { ...documentReferenceInclude, template: true, signatures: { orderBy: { createdAt: "asc" } } },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      cursor: cursor ? { id: cursor } : undefined,
+      skip: cursor ? 1 : undefined,
+      take,
+    }), input.limit);
+    return documents.map(withoutReferenceRelations);
   }
 
   async get(documentId: string, context: SupplierActorContext) {
-    const document = await this.prisma.document.findUnique({ where: { id: documentId }, include: { template: true, signatures: { orderBy: { createdAt: "asc" } }, participants: true, supplierOrder: true, shipment: true, buyerSupplierAgreement: true, marketplaceAgreement: true, previousVersion: true, nextVersions: true } });
+    const document = await this.prisma.document.findUnique({ where: { id: documentId }, include: { ...documentReferenceInclude, template: true, signatures: { orderBy: { createdAt: "asc" } }, participants: true, supplierOrder: true, shipment: { include: { supplierOrder: documentReferenceInclude.supplierOrder } }, buyerSupplierAgreement: true, marketplaceAgreement: true, previousVersion: true, nextVersions: true } });
     if (!document) throw new NotFoundException("Document not found");
     const isParty = document.ownerOrganizationId === context.organizationId
       || document.participants.some(({ organizationId }) => organizationId === context.organizationId)
@@ -290,7 +313,22 @@ export class DocumentsService {
       || document.marketplaceAgreement?.supplierOrganizationId === context.organizationId
       || document.marketplaceAgreement?.operatorOrganizationId === context.organizationId;
     if (!isParty && !(await this.isOperator(context.organizationId))) throw new ForbiddenException("Document belongs to another organization");
-    return document;
+    this.assertConsistentRead(document);
+    const linkedIds = [document.previousVersion?.id, ...(document.nextVersions ?? []).map((version) => version.id)].filter((id): id is string => !!id);
+    const accessibleVersions = linkedIds.length ? await this.prisma.document.findMany({
+      where: { AND: [await this.archiveAccessWhere(context), { id: { in: linkedIds } }] },
+      include: documentReferenceInclude,
+    }) : [];
+    const visibleVersions = new Set(accessibleVersions.filter((version) => hasConsistentDocumentReferences(version) && sameDocumentReferences(document, version)).map((version) => version.id));
+    const { supplierOrder: _validationOrder, ...shipment } = document.shipment ?? {};
+    return { ...withoutReferenceRelations(document), supplierOrder: document.supplierOrder,
+      shipment: document.shipment ? shipment : null,
+      previousVersion: document.previousVersion && visibleVersions.has(document.previousVersion.id) ? document.previousVersion : null,
+      nextVersions: (document.nextVersions ?? []).filter((version) => visibleVersions.has(version.id)) };
+  }
+
+  private assertConsistentRead(document: DocumentGraph) {
+    if (!hasConsistentDocumentReferences(document)) throw new ForbiddenException("Document references are inconsistent");
   }
 
   async generate(input: CreateGeneratedDocumentInput, context: SupplierActorContext, options: { participants?: DocumentParty[]; allowParticipantOwner?: boolean } = {}) {
@@ -463,6 +501,7 @@ export class DocumentsService {
         orderBy: { version: "desc" },
       });
       if (existing) {
+        await this.get(existing.id, context);
         generated.push(existing);
         continue;
       }
@@ -487,7 +526,10 @@ export class DocumentsService {
         }, context));
       } catch (error) {
         if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2002") throw error;
-        generated.push(await this.prisma.document.findFirstOrThrow({ where: { ownerOrganizationId: order.supplierOrganizationId, documentNumber, version: 1 } }));
+        const existing = await this.prisma.document.findFirstOrThrow({ where: { ownerOrganizationId: order.supplierOrganizationId, documentNumber, version: 1 } });
+        await this.get(existing.id, context);
+        if (existing.supplierOrderId !== order.id || existing.checkoutId !== order.checkoutId) throw new ConflictException("Existing document references another order");
+        generated.push(existing);
       }
     }
     return { supplierOrderId: order.id, documents: generated };
@@ -558,6 +600,7 @@ export class DocumentsService {
         orderBy: { version: "desc" },
       });
       if (existing) {
+        await this.get(existing.id, context);
         generated.push(existing);
         continue;
       }
@@ -587,9 +630,13 @@ export class DocumentsService {
         }, context));
       } catch (error) {
         if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2002") throw error;
-        generated.push(await this.prisma.document.findFirstOrThrow({
+        const existing = await this.prisma.document.findFirstOrThrow({
           where: { ownerOrganizationId: order.supplierOrganizationId, documentNumber, version: 1 },
-        }));
+        });
+        await this.get(existing.id, context);
+        const validShipment = existing.shipmentId === shipment.id || (definition.kind !== "WAYBILL" && existing.shipmentId === null);
+        if (existing.supplierOrderId !== order.id || existing.checkoutId !== order.checkoutId || existing.kind !== definition.kind || !validShipment) throw new ConflictException("Existing document references another order or shipment");
+        generated.push(existing);
       }
     }
 
@@ -603,6 +650,7 @@ export class DocumentsService {
     if (!templateId) throw new ConflictException("Document template is missing");
     const template = await this.prisma.documentTemplate.findUnique({ where: { id: templateId } });
     if (!template || template.status !== "ACTIVE") throw new NotFoundException("Active document template not found");
+    await this.assertReferences({ ...current, kind: template.kind });
     const created = await this.prisma.document.create({ data: {
       ownerOrganizationId: current.ownerOrganizationId,
       templateId: template.id,
@@ -800,8 +848,8 @@ export class DocumentsService {
       input.checkoutId ? this.prisma.checkout.findUnique({ where: { id: input.checkoutId }, select: { buyerOrganizationId: true } }) : null,
       input.supplierOrderId ? this.prisma.supplierOrder.findUnique({ where: { id: input.supplierOrderId }, select: { supplierOrganizationId: true, buyerOrganizationId: true, checkoutId: true, paymentStatus: true } }) : null,
       input.shipmentId ? this.prisma.shipment.findUnique({ where: { id: input.shipmentId }, select: { supplierOrderId: true, supplierOrder: { select: { supplierOrganizationId: true, buyerOrganizationId: true, checkoutId: true, paymentStatus: true } } } }) : null,
-      input.paymentIntentId ? this.prisma.paymentIntent.findUnique({ where: { id: input.paymentIntentId }, select: { id: true, status: true, checkoutId: true, buyerOrganizationId: true, allocations: { select: { recipientOrganizationId: true, supplierOrderId: true } } } }) : null,
-      input.paymentTransactionId ? this.prisma.paymentTransaction.findUnique({ where: { id: input.paymentTransactionId }, select: { id: true, status: true, type: true, paymentIntentId: true, paymentIntent: { select: { status: true, checkoutId: true, buyerOrganizationId: true, allocations: { select: { recipientOrganizationId: true, supplierOrderId: true } } } }, paymentAllocation: { select: { recipientOrganizationId: true, supplierOrderId: true } } } }) : null,
+      input.paymentIntentId ? this.prisma.paymentIntent.findUnique({ where: { id: input.paymentIntentId }, select: documentReferenceInclude.paymentIntent.select }) : null,
+      input.paymentTransactionId ? this.prisma.paymentTransaction.findUnique({ where: { id: input.paymentTransactionId }, select: documentReferenceInclude.paymentTransaction.select }) : null,
       input.refundId ? this.prisma.refund.findUnique({ where: { id: input.refundId }, select: { id: true, status: true, paymentIntentId: true, supplierOrderId: true, paymentAllocation: { select: { recipientOrganizationId: true } }, paymentIntent: { select: { buyerOrganizationId: true, checkoutId: true } } } }) : null,
       input.baseAgreementDocumentId ? this.prisma.document.findUnique({ where: { id: input.baseAgreementDocumentId }, select: { id: true, ownerOrganizationId: true, category: true, participants: { select: { organizationId: true, role: true } }, buyerSupplierAgreement: { select: { supplierOrganizationId: true, buyerOrganizationId: true } }, marketplaceAgreement: { select: { supplierOrganizationId: true, operatorOrganizationId: true } } } }) : null,
     ]);
@@ -815,20 +863,21 @@ export class DocumentsService {
     if (input.kind === DocumentKind.CONTRACT_ADDENDUM && !baseAgreement) throw new BadRequestException("Contract addendum requires a base agreement document");
     if (baseAgreement && baseAgreement.category !== DocumentCategory.CONTRACT) throw new BadRequestException("Addendum base must be a contract document");
 
-    const paymentIntent = directPaymentIntent ?? (paymentTransaction ? { id: paymentTransaction.paymentIntentId, ...paymentTransaction.paymentIntent } : null);
+    const paymentIntent = directPaymentIntent ?? (paymentTransaction ? { ...paymentTransaction.paymentIntent, id: paymentTransaction.paymentIntentId } : null);
     if (directPaymentIntent && paymentTransaction && directPaymentIntent.id !== paymentTransaction.paymentIntentId) throw new BadRequestException("Payment references belong to different payment intents");
     if (refund && paymentIntent && refund.paymentIntentId !== paymentIntent.id) throw new BadRequestException("Refund belongs to another payment intent");
     if (order && shipment && shipment.supplierOrderId !== input.supplierOrderId) throw new BadRequestException("Shipment belongs to another supplier order");
     if (order && refund && refund.supplierOrderId !== input.supplierOrderId) throw new BadRequestException("Refund belongs to another supplier order");
     const relatedOrder = order ?? shipment?.supplierOrder ?? null;
+    const referenceError = operationalReferenceError(input, { checkout, supplierOrder: order, shipment,
+      paymentIntent: directPaymentIntent, paymentTransaction, refund });
+    if (referenceError) throw new BadRequestException(referenceError);
     if (relatedOrder && input.checkoutId && relatedOrder.checkoutId !== input.checkoutId) throw new BadRequestException("Document references belong to another checkout");
     if (paymentIntent && input.checkoutId && paymentIntent.checkoutId !== input.checkoutId) throw new BadRequestException("Payment intent belongs to another checkout");
     if (paymentIntent && order && !paymentIntent.allocations.some(({ supplierOrderId }) => supplierOrderId === input.supplierOrderId)) throw new BadRequestException("Payment intent does not include this supplier order");
     if (paymentTransaction?.paymentAllocation && order && paymentTransaction.paymentAllocation.supplierOrderId !== input.supplierOrderId) throw new BadRequestException("Payment transaction belongs to another supplier order");
 
-    const confirmedPayment = relatedOrder?.paymentStatus === "PAID"
-      || paymentTransaction?.status === "SUCCEEDED" && paymentTransaction.type === "CAPTURE"
-      || paymentIntent && ["PARTIALLY_CAPTURED", "CAPTURED", "PARTIALLY_REFUNDED", "REFUNDED"].includes(paymentIntent.status);
+    const confirmedPayment = hasConfirmedDocumentPayment(input, { supplierOrder: order, shipment, paymentIntent: directPaymentIntent, paymentTransaction, refund });
     if (input.kind === DocumentKind.PAYMENT_CONFIRMATION && !confirmedPayment) throw new ConflictException("Payment confirmation requires a confirmed payment event");
     if (input.kind === DocumentKind.REFUND_CONFIRMATION && refund?.status !== "COMPLETED") throw new ConflictException("Refund confirmation requires a completed refund");
 
@@ -850,16 +899,29 @@ export class DocumentsService {
       parties.push({ organizationId: refund.paymentIntent.buyerOrganizationId, role: DocumentPartyRole.RECIPIENT });
       parties.push({ organizationId: refund.paymentAllocation.recipientOrganizationId, role: DocumentPartyRole.ISSUER });
     }
-    if (baseAgreement) {
-      parties.push({ organizationId: baseAgreement.ownerOrganizationId, role: DocumentPartyRole.OWNER });
-      parties.push(...baseAgreement.participants);
-      if (baseAgreement.buyerSupplierAgreement) addOrderParties(baseAgreement.buyerSupplierAgreement);
-      if (baseAgreement.marketplaceAgreement) {
-        parties.push({ organizationId: baseAgreement.marketplaceAgreement.supplierOrganizationId, role: DocumentPartyRole.ISSUER });
-        parties.push({ organizationId: baseAgreement.marketplaceAgreement.operatorOrganizationId, role: DocumentPartyRole.PLATFORM });
+    // A contract must not authorize unrelated operational references, or vice versa.
+    const assertOwnerIsParty = (referenceParties: DocumentParty[]) => {
+      if (referenceParties.length && !referenceParties.some(({ organizationId }) => organizationId === input.ownerOrganizationId)) {
+        throw new BadRequestException("Document owner is not a party to the referenced business records");
       }
+    };
+    assertOwnerIsParty(parties);
+    if (baseAgreement) {
+      const agreementParties: DocumentParty[] = [
+        { organizationId: baseAgreement.ownerOrganizationId, role: DocumentPartyRole.OWNER },
+        ...baseAgreement.participants,
+      ];
+      if (baseAgreement.buyerSupplierAgreement) {
+        agreementParties.push({ organizationId: baseAgreement.buyerSupplierAgreement.supplierOrganizationId, role: DocumentPartyRole.ISSUER });
+        agreementParties.push({ organizationId: baseAgreement.buyerSupplierAgreement.buyerOrganizationId, role: DocumentPartyRole.RECIPIENT });
+      }
+      if (baseAgreement.marketplaceAgreement) {
+        agreementParties.push({ organizationId: baseAgreement.marketplaceAgreement.supplierOrganizationId, role: DocumentPartyRole.ISSUER });
+        agreementParties.push({ organizationId: baseAgreement.marketplaceAgreement.operatorOrganizationId, role: DocumentPartyRole.PLATFORM });
+      }
+      assertOwnerIsParty(agreementParties);
+      parties.push(...agreementParties);
     }
-    if (parties.length && !parties.some(({ organizationId }) => organizationId === input.ownerOrganizationId)) throw new BadRequestException("Document owner is not a party to the referenced business records");
     return uniqueParties(parties);
   }
 }

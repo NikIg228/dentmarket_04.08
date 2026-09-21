@@ -1,4 +1,5 @@
 "use client";
+import { authClientOptionsSchema, localOperatorSessionSchema } from "@marketplace/schemas";
 
 import { ShieldLock20Regular } from "@fluentui/react-icons/svg/shield-lock";
 import {
@@ -14,6 +15,7 @@ import {
   type AdminLoginMode,
   getAdminLoginCopy,
   getAdminProviderAvailability,
+  hasOperatorOrganizationAccess,
 } from "./admin-login-view-model";
 import styles from "./login.module.css";
 
@@ -73,6 +75,10 @@ export default function AdminLogin() {
   const [mode, setMode] = useState<AdminLoginMode>("identity");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [localPasswordEnabled, setLocalPasswordEnabled] = useState(false);
+  const [localEmail, setLocalEmail] = useState("");
+  const [localPassword, setLocalPassword] = useState("");
+  const inFlight = useRef(false);
   const providers = getAdminProviderAvailability({
     googleClientId,
     appleClientId,
@@ -101,11 +107,13 @@ export default function AdminLogin() {
     return payload;
   };
 
-  const exchange = async (provider: Provider, idToken: string) => {
+  const exchange = async (provider: Provider | "LOCAL_PASSWORD", idToken: string) => {
+    if (inFlight.current) return;
+    inFlight.current = true;
     setBusy(true);
     setError("");
     try {
-      const session = await request<PrimarySession>("/auth/social/exchange", {
+      const session = provider === "LOCAL_PASSWORD" ? localOperatorSessionSchema.parse(await request("/auth/local-operator/login", { method: "POST", body: JSON.stringify({ email: localEmail, password: idToken }) })) : await request<PrimarySession>("/auth/social/exchange", {
         method: "POST",
         body: JSON.stringify({ provider, idToken }),
       });
@@ -113,6 +121,7 @@ export default function AdminLogin() {
         throw new Error("Для этого аккаунта не найден доступ к DentMarket.");
       }
       setPrimary(session);
+      setLocalPassword("");
       const response = await fetch(`${apiUrl}/identity/mfa`, {
         headers: { authorization: `Bearer ${session.accessToken}` },
         cache: "no-store",
@@ -149,6 +158,7 @@ export default function AdminLogin() {
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Вход не выполнен");
     } finally {
+      inFlight.current = false;
       setBusy(false);
     }
   };
@@ -170,6 +180,13 @@ export default function AdminLogin() {
 
   useEffect(() => {
     renderGoogle();
+    let active = true;
+    void fetch(`${apiUrl}/auth/client-options`, { cache: "no-store" }).then(async response => {
+      if (!response.ok) return;
+      const options = authClientOptionsSchema.parse(await response.json());
+      if (active) setLocalPasswordEnabled(options.localOperatorPasswordEnabled);
+    }).catch(() => { /* Fail closed: no local form without explicit server capability. */ });
+    return () => { active = false; };
   }, []);
 
   const apple = async () => {
@@ -192,7 +209,8 @@ export default function AdminLogin() {
 
   const verify = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!primary) return;
+    if (!primary || inFlight.current) return;
+    inFlight.current = true;
     setBusy(true);
     setError("");
     try {
@@ -206,20 +224,15 @@ export default function AdminLogin() {
         { method: "POST", body: JSON.stringify({ code }) },
       );
       const organizationResponse = await fetch(
-        `${apiUrl}/organizations/${elevated.activeOrganizationId}`,
+        `${apiUrl}/organizations`,
         {
           headers: { authorization: `Bearer ${elevated.accessToken}` },
         },
       );
-      const organization = (await organizationResponse.json()) as {
-        capabilities?: Array<{ capability: string }>;
-        message?: string;
-      };
+      const organizations: unknown = await organizationResponse.json();
       if (
         !organizationResponse.ok ||
-        !organization.capabilities?.some(
-          ({ capability }) => capability === "MARKETPLACE_OPERATOR",
-        )
+        !hasOperatorOrganizationAccess(organizations, elevated.activeOrganizationId)
       ) {
         throw new Error(
           "Этот раздел доступен только команде DentMarket.",
@@ -233,6 +246,7 @@ export default function AdminLogin() {
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "MFA не подтверждён");
     } finally {
+      inFlight.current = false;
       setBusy(false);
     }
   };
@@ -272,6 +286,12 @@ export default function AdminLogin() {
 
         {mode === "identity" ? (
           <div className={styles.identity}>
+            {localPasswordEnabled ? <form className={styles.form} onSubmit={event => { event.preventDefault(); void exchange("LOCAL_PASSWORD", localPassword); }}>
+              <DmFeedback tone="warning" title="Локальный тестовый вход" description="Email и пароль заранее подготовленного оператора. Затем обязательна двухфакторная проверка. В production этот способ отключён." />
+              <DmField label="Email оператора" required><DmInput type="email" value={localEmail} onChange={(_, data) => setLocalEmail(data.value)} autoComplete="username" required disabled={busy} /></DmField>
+              <DmField label="Пароль оператора" required><DmInput type="password" value={localPassword} onChange={(_, data) => setLocalPassword(data.value)} autoComplete="current-password" maxLength={128} required disabled={busy} /></DmField>
+              <DmButton type="submit" appearance="primary" disabled={busy}>{busy ? "Проверяем аккаунт…" : "Войти с паролем и MFA"}</DmButton>
+            </form> : null}
             {providers.google ? (
               <div ref={googleButton} className={styles.google} />
             ) : null}
@@ -285,7 +305,7 @@ export default function AdminLogin() {
                  Продолжить с Apple
               </DmButton>
             ) : null}
-            {!providers.any ? (
+            {!providers.any && !localPasswordEnabled ? (
               <DmFeedback
                 tone="warning"
                 title="Корпоративный вход пока недоступен"

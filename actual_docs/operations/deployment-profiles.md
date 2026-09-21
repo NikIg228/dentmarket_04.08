@@ -4,7 +4,34 @@
 
 `DEPLOYMENT_PROFILE` управляет реальным NestJS module graph, а не seed-данными
 или декоративным feature flag. Без переменной приложение запускается в
-fail-safe профиле `pilot`.
+fail-safe профиле `pilot`, кроме явного локального launcher, описанного ниже.
+
+## Локальная расширенная демонстрация (ADR 011)
+
+По решению владельца `npm run dev` / `dev:local` и отдельные `dev:buyer`,
+`dev:supplier`, `dev:admin`, `dev:landing` по умолчанию передают `go_live`
+одновременно API и Next.js. Все пять optional блоков доступны в пределах
+существующих прав и реализации. Новые провайдеры и реальные списания не подключаются.
+
+Для ограниченного набора используйте `npm run dev:pilot` либо явный process env
+`DEPLOYMENT_PROFILE=pilot`. Launcher задаёт окружение до старта дочерних
+процессов; `.env` дочернего API не переопределяет уже переданный профиль.
+При конфликтующем `NEXT_PUBLIC_DEPLOYMENT_PROFILE` запуск прекращается, а не
+продолжается с разными flags. При `NODE_ENV=production` launcher запрещён.
+Остановите предыдущий launcher перед переключением. Прямой запуск API,
+CI, Docker и production builds по-прежнему требуют явного выбора профиля.
+
+Regression: `npm run verify:local-profile` и `npm run verify:frontend-profile`.
+Документ: [ADR 011](../architecture/adr/011-local-full-feature-demonstration.md).
+
+Особенность текущего локального Admin: `admin.localhost:3080` требует обычную
+авторизацию; existing dev identity разрешена только на `localhost`/`127.0.0.1`.
+Для изолированной операторской проверки используйте отдельный `dev:admin`
+(предварительно остановив общий launcher) и `http://127.0.0.1:3000`.
+В режиме `dev all` относительный `/api` обслуживает gateway; открытие прямого
+порта Admin из этого режима даёт 404 на API. Не добавлять auth bypass для
+поддомена ради smoke. Единый демонстрационный вход оператора через gateway
+остаётся отдельным локальным onboarding/config outcome, а не закрытым gate.
 
 Отдельный перечень скрытых функций, различия по ролям и условия включения:
 [свод внепилотных функций](../product/DENTMARKET_OUT_OF_PILOT_FEATURES.md).
@@ -19,6 +46,12 @@ production configuration и provider gates. Сам профиль не прев�
 локальный adapter в `LIVE_VERIFIED` интеграцию.
 
 ## Машинная проверка
+
+Это набор профильных процедур, не команда запускать все режимы при каждой
+задаче. План gates и bounded retry берутся из Workflow §4. Перед E2E проверить
+совпадение build/runtime profile, API URL, способ входа и freshness test fixtures.
+Успешные build/config results не повторяются без изменения соответствующих
+входов; незавершённый go_live Admin smoke остаётся отдельным открытым evidence.
 
 ### Frontend build profile (ADR 010)
 
@@ -80,7 +113,8 @@ Gate строит OpenAPI inventory для явных `pilot`/`go_live` и дл�
 ## Stop criteria
 
 - forbidden module или route появился в pilot;
-- отсутствующая переменная включает `go_live`;
+- отсутствующая переменная включает `go_live` в shared contract/прямом API
+  launch (явно утверждённый локальный launcher — исключение ADR 011);
 - pilot потерял обязательный procurement route;
 - go_live потерял явно поддерживаемую optional surface;
 - production окружение полагается на неявный profile default.

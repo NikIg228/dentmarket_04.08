@@ -1,1103 +1,523 @@
 # DentMarket KZ — фундамент backend V2
 
-Статус: рабочий технический документ
-
-Дата аудита: 3 августа 2026
-
-Ветка: `recovery/gate-0`
-
-Базовый коммит аудита: `1b6da4c`
-
-## 1. Решение
-
-Backend **не нужно переписывать с нуля**. Стек и значительная часть доменной логики пригодны для развития. Нужна контролируемая стабилизация существующего модульного монолита:
-
-1. зафиксировать узкое ядро пилота;
-2. сделать API-контракт машиночитаемым;
-3. отделить HTTP API от фоновых работ;
-4. доказать основной путь покупки интеграционными тестами на PostgreSQL;
-5. заморозить enterprise-функции до готовности ядра;
-6. только после этого унифицировать buyer/supplier/admin UI вокруг стабильного API.
-
-Переписывание сейчас уничтожит уже реализованные транзакции, права доступа, миграции, проверки договоров, compliance, резервы и идемпотентность, но не решит главную продуктовую проблему — отсутствие жёсткого приоритета и критериев готовности.
-
-## 2. Целевое назначение backend
-
-DentMarket — B2B-маркетплейс стоматологических товаров Казахстана. Backend должен обеспечить три основных роли.
-
-### Клиника
-
-- войти в организацию с корректными правами;
-- найти товар в едином каталоге;
-- сравнить актуальные предложения поставщиков;
-- положить предложение в корзину;
-- оформить заказ без двойного списания и двойного резерва;
-- видеть статус заказов и документов.
-
-### Поставщик
-
-- пройти допуск к маркетплейсу;
-- сопоставить свой товар с канонической карточкой;
-- опубликовать цену и остаток;
-- получить заказ;
-- подтвердить доступное количество;
-- передать заказ в исполнение.
-
-### Оператор площадки
-
-- управлять организациями и доступами;
-- модерировать каталог и поставщиков;
-- контролировать договоры и compliance;
-- видеть ошибки интеграций и незавершённые операции;
-- иметь полный audit trail критичных действий.
-
-## 3. Проверенный снимок текущего backend
-
-Аудит выполнен по коду, Prisma-схеме, тестам и живому локальному API, а не по статусам в старом ТЗ.
-
-| Область                    |                  Фактическое состояние |
-| -------------------------- | -------------------------------------: |
-| Архитектура                |               NestJS-модульный монолит |
-| База                       |                    PostgreSQL + Prisma |
-| Доменные модули            |                                     29 |
-| Prisma-модели              |                                    148 |
-| Prisma-enum                |                                    116 |
-| Миграции                   |                                     28 |
-| Контроллеры                |                                     41 |
-| HTTP operations в OpenAPI  |                                    287 |
-| Сервисные файлы            |                                     73 |
-| API spec-файлы             |                                     32 |
-| Тесты API в текущем suite  | 104, без условно пропущенных DB-тестов |
-| Плановые задачи внутри API |                                      6 |
-| Пилотный каталог           |                  500 активных карточек |
-| Покупаемая часть           |                50 товаров, 500 офферов |
-| Пилотные стороны           |              10 клиник, 10 поставщиков |
-
-Живой acceptance-flow прошёл: `health → readiness → каталог → сравнение 10 офферов → корзина → checkout → supplier order → inventory reservation → повтор checkout с тем же idempotency key`.
-
-## 4. Что в текущей реализации уже хорошо
-
-### Стек подходит
-
-- `npm workspaces` является каноническим package-manager контрактом monorepo и поддерживается локальными, CI и production-командами.
-- NestJS подходит для большого доменного backend с RBAC, модулями и фоновыми задачами.
-- Prisma и PostgreSQL подходят для транзакционной B2B-торговли.
-- Next.js подходит для buyer, supplier и admin приложений. Разный UI сейчас — проблема дизайн-системы и организации frontend, а не ограничение Next.js.
-- Turbo подходит для сборки нескольких приложений; последовательная production-сборка уже используется для устойчивости по памяти.
-
-Переход на npm, другой backend framework или микросервисы сейчас не даст продуктовой выгоды.
-
-### Доменное ядро не является пустой заготовкой
-
-В `CommerceService` реализованы:
-
-- проверка buyer-организации и доступа оператора;
-- проверка активного договора поставщика с маркетплейсом;
-- проверка публикации оффера, валюты, цены и количества;
-- контроль минимальной партии и шага заказа;
-- выбор свежего остатка и FEFO-лота;
-- транзакционное создание checkout и заказов по поставщикам;
-- резервирование остатка;
-- компенсация резервов и перевод checkout в `FAILED` при ошибке;
-- идемпотентность checkout;
-- outbox- и audit-события.
-
-### Безопасность имеет реальный фундамент
-
-- В development identity может задаваться заголовками для локальной разработки.
-- В JWT-режиме входящие identity-заголовки удаляются и формируются из проверенного токена.
-- Есть issuer/audience/algorithm constraints и режим обязательного MFA.
-- Tenant-доступ проверяется через membership, role и permission.
-- Публичные webhook/callback endpoints имеют отдельные механизмы подписи или токена.
-- Production-конфигурация запрещает development auth и требует ключевые security-параметры.
-
-### Инфраструктурные паттерны уже присутствуют
-
-- Prisma migrations;
-- audit log;
-- inbox/idempotency для webhook;
-- outbox-события в доменных транзакциях;
-- readiness для PostgreSQL, очереди и object storage;
-- локальный и production storage drivers;
-- структурированные логи.
-
-## 5. Главные технические проблемы
-
-### P0. Реальная граница пилота
-
-- [x] `DEPLOYMENT_PROFILE=pilot` формирует отдельный Nest module graph и не
-      импортирует AI, billing, promotions, trust/reviews и smart
-      recommendations.
-- [x] Geo/address routes отделены от прежнего смешанного TrustCommerce module и
-      остаются в procurement core.
-- [x] Отсутствующая переменная fail-safe выбирает `pilot`; production явно
-      указывает `go_live`.
-- [x] `npm run verify:pilot-composition` проверяет фактические modules и OpenAPI
-      routes для default/pilot/go_live; gate включён в CI.
-- [x] Frontend Pilot Composition Gate (2026-09-13, ADR 010): четыре Next.js
-      сборки получают тот же профиль; optional UI и API requests отключены в
-      pilot, а core commerce, документы, geo и аудит сохранены.
-- [x] `verify:frontend-profile` проверяет build configuration всех кабинетов и
-      Landing; unit regressions и `verify:web` 23/23 доказывают local pilot
-      composition на desktop/390 px. Результаты и ограничения — в ADR 010.
-
-Решение и последствия закреплены ADR 009, ADR 010 и
-`actual_docs/operations/deployment-profiles.md`. Runtime-role `api | worker |
-all` остаётся отдельной осью process composition и уже проверяется
-`verify:runtime-split`.
-
-### P0. OpenAPI не является контрактом frontend/backend
-
-В исходном живом Swagger-документе было обнаружено 287 operations, но:
-
-- `requestBody` описан у 0 operations;
-- JSON response schema описана только у одного успешного ответа;
-- component schemas отсутствуют.
-
-Этот baseline устранён для основного потока в B0.2: теперь зарегистрирована 21 именованная component schema, 16 core operations имеют проверенные response contracts, четыре изменяющих endpoint имеют request body contracts, а стандартный error envelope проверяется живым запросом. Остальной широкий API по-прежнему переводится на контракты только по мере попадания в согласованный scope.
-
-Zod действительно валидирует многие запросы во время выполнения, но frontend, QA и Codex не могут по OpenAPI узнать форму запроса и ответа. В итоге интеграция строится по чтению контроллеров, ручным типам и догадкам.
-
-Решение:
-
-- сохранить Zod как единый источник правил;
-- генерировать из него JSON/OpenAPI schemas либо ввести явные transport DTO;
-- не поддерживать две независимые схемы вручную;
-- сначала покрыть 12–20 endpoints основного потока, затем остальной API;
-- генерировать typed API client для web-приложений;
-- проверять breaking changes в CI.
-
-### P0. API одновременно является worker
-
-При отключённом Redis сервисы переходят на inline/database fallback, но cron-задачи продолжают работать в API-процессе. Сейчас это удобно локально, но опасно как production-модель.
-
-Целевая модель:
-
-```mermaid
-flowchart LR
-  WEB["Buyer / Supplier / Admin Web"] --> API["NestJS Core API"]
-  API --> PG[(PostgreSQL)]
-  API --> S3["Object Storage"]
-  API --> OUTBOX["Transactional Outbox"]
-  OUTBOX --> PG
-  WORKER["NestJS Worker"] --> PG
-  WORKER --> REDIS["Redis Queue"]
-  WORKER --> EXT["Email / Payment / Supplier integrations"]
-```
-
-API и worker могут оставаться двумя entrypoint одного репозитория и одного модульного монолита. Микросервисы пока не нужны.
-
-### P0. До текущего изменения не было воспроизводимого доказательства покупки
-
-Старый `verify:search-commerce` использовал legacy slug и фиксированные UUID старого seed. После перехода на чистый каталог он не доказывал работоспособность.
-
-Добавлен `pnpm verify:pilot-backend`, который:
-
-- собирает API;
-- сам запускает его на отдельном порту;
-- проверяет readiness;
-- динамически находит пилотный товар и офферы;
-- проверяет сортировку сравнения;
-- создаёт корзину, checkout, заказ и резерв;
-- проверяет идемпотентность;
-- сверяет итог с PostgreSQL;
-- останавливает API после проверки.
-
-Gate намеренно разрешён только для локальной БД, потому что создаёт один демо-заказ при каждом запуске.
-
-### P1. Outbox не имеет единой семантики обработки
-
-Доменные сервисы корректно пишут много типов `OutboxEvent` транзакционно. Но обнаруженный dispatcher явно публикует только `PaymentCaptured`. Notifications отдельно сканируют недавние события и делают idempotent upsert. Для остальных событий статус `PENDING` может остаться навсегда.
-
-Нужно принять одно решение:
-
-1. `OutboxEvent` — очередь доставки: тогда у каждого типа должен быть consumer, retry, dead-letter и финальный статус;
-2. это event log: тогда статус публикации не должен вводить в заблуждение;
-3. практичный вариант — разделить `DomainEventLog` и `IntegrationOutbox`.
-
-До решения нельзя строить новые интеграции поверх текущего `PENDING` как будто доставка гарантирована.
-
-### P1. Тесты смещены в unit-уровень
-
-104 API-теста проверяют изолированные правила, а обязательный B0.4 gate дополнительно покрывает реальные PostgreSQL-границы:
-
-- параллельное создание активной корзины;
-- два одновременных checkout;
-- гонка за последним остатком;
-- ошибка после DB-транзакции во внешнем резерве;
-- повтор webhook;
-- повтор worker-задачи;
-- tenant isolation.
-
-`pnpm verify:postgres` теперь проверяет checkout concurrency, rollback, idempotency и tenant isolation без Docker. В CI этот же gate выполняется отдельным job на свежем PostgreSQL 17; локально он создаёт собственные fixtures в текущей test-базе и доказывает их полное удаление.
-
-### P1. Seed смешивает базовую платформу и пилот
-
-Активный пилотный каталог содержит ровно 500 карточек, но в физической таблице `Product` после базового seed остаются ещё 5 legacy fixtures. Это не ломает публичный каталог, однако размывает понятие «чистой базы».
-
-Нужно разделить профили:
-
-- `seed:reference` — страны, города, units, permissions;
-- `seed:operator` — локальный оператор;
-- `seed:pilot` — 10 клиник, 10 поставщиков, 500 карточек, 500 офферов;
-- `seed:test` — минимальные фиксированные fixtures для integration tests.
-
-Каждый профиль должен иметь manifest и проверяемые counts.
-
-### P1. Слишком большие сервисы и широкий домен
-
-Примеры размеров:
-
-- imports service — около 1200 строк;
-- integration execution — около 1100 строк;
-- search service — около 850 строк.
-
-Это не повод массово переписывать их. Декомпозиция выполняется только при работе над конкретным потоком: orchestration отделяется от policy, persistence adapter и provider adapter. Рефакторинг без acceptance-test запрещён.
-
-### P1. Наблюдаемость пока не определяет эксплуатационную готовность
-
-Наличие structured logs, Sentry и OTEL-параметров — фундамент, но не SLO. Для пилота нужны минимум:
-
-- request/correlation ID от HTTP до outbox/worker;
-- latency и error rate основных endpoints;
-- число `FAILED` checkout;
-- возраст старейшего outbox event;
-- глубина retry/dead-letter;
-- доля stale inventory;
-- число заказов без резерва;
-- backup/restore runbook и проверка восстановления.
-
-### P2. Нет согласованной политики API lifecycle
-
-Перед подключением внешних клиентов нужно зафиксировать:
-
-- единый error envelope;
-- правила pagination/filter/sort;
-- date/time и money representation;
-- idempotency policy;
-- deprecation policy;
-- API versioning.
-
-Не следует немедленно механически переносить 287 operations в `/api/v1`. Сначала стабилизируется контракт core endpoints, затем вводится версия без массового бессмысленного churn.
-
-## 6. Целевая граница пилота
-
-### Обязательное ядро
-
-1. Identity, organizations, membership, RBAC.
-2. Canonical catalog, categories, search, media.
-3. Suppliers, marketplace agreement, offer publication.
-4. Price, fresh inventory, inventory reservation.
-5. Cart, checkout, supplier order.
-6. Minimal documents and notifications.
-7. Audit log, integration inbox/outbox, health/readiness.
-
-### Разрешено только как зависимость ядра
-
-- минимальный compliance, реально блокирующий публикацию или покупку;
-- минимальный logistics status;
-- mock payment только для демонстрации сценария;
-- imports только для загрузки пилотных данных.
-
-### Заморозить до доказанного пилота
-
-- AI-функции;
-- сложный billing;
-- promotions;
-- расширенные trust/reputation механики;
-- сложные approval chains;
-- широкий набор внешних коннекторов;
-- enterprise support automation;
-- внешние платежи и EDS до отдельной интеграционной готовности.
-
-«Заморозить» означает не удалять, а не добавлять функции и не связывать с ними основной checkout без отдельного решения.
-
-## 7. Backend Definition of Done
-
-Задача backend считается готовой, только если одновременно выполнено следующее:
-
-- описан один пользовательский сценарий и его non-goals;
-- есть Zod/DTO request schema;
-- есть явная response schema;
-- endpoint отражён в OpenAPI;
-- tenant и permission checks проверены тестом;
-- критичная запись выполняется транзакционно;
-- повтор запроса безопасен там, где возможен retry;
-- создаются необходимые audit/outbox события;
-- ошибки имеют стабильные machine-readable codes;
-- unit tests проходят;
-- integration test на PostgreSQL проходит;
-- основной acceptance-gate не регрессировал;
-- миграция имеет путь deploy и rollback/forward-fix;
-- документация обновлена в том же коммите.
-
-Наличие контроллера или UI-кнопки не означает готовность функции.
-
-## 8. План реализации
-
-### B0 — стабилизация фундамента
-
-Цель: сделать текущее ядро измеримым и безопасным для дальнейшей работы.
-
-| Готово | ID   | Задача                       | Результат                                                       | Gate                        |
-| ------ | ---- | ---------------------------- | --------------------------------------------------------------- | --------------------------- |
-| [x]    | B0.1 | Живой pilot backend flow     | Динамический тест покупки                                       | `pnpm verify:pilot-backend` |
-| [x]    | B0.2 | Core API contract            | Полные schemas для catalog/compare/cart/checkout/orders         | `pnpm verify:core-contract` |
-| [x]    | B0.3 | Runtime split                | API не запускает worker jobs; worker имеет отдельный entrypoint | `pnpm verify:runtime-split` |
-| [x]    | B0.4 | PostgreSQL integration suite | Concurrency, rollback, idempotency, tenant isolation            | `pnpm verify:postgres`      |
-| [x]    | B0.5 | Seed profiles                | reference/operator/pilot/test разделены                         | `pnpm verify:seed-profiles` |
-| [x]    | B0.6 | Outbox ADR                   | Однозначные delivery/status/retry правила                       | `pnpm verify:outbox`        |
-
-Выполнено в B0.2:
-
-- [x] Shared Zod response schemas для health, catalog, comparison, cart, checkout и supplier orders.
-- [x] Отдельные типы сырого HTTP request и нормализованного service input.
-- [x] OpenAPI 3.1 components и `$ref` для 16 операций основного потока.
-- [x] Request body, query, path parameter, bearer auth и error schemas.
-- [x] Единый безопасный error envelope с `code`, `requestId`, `path` и `details`.
-- [x] Типизированные методы core-flow в общем `@marketplace/api-client`.
-- [x] Contract-only gate без создания заказа.
-- [x] Runtime-валидация реальных response payloads shared-схемами.
-- [x] Проверка contract gate в GitHub CI.
-- [x] Полный purchase gate после изменения контрактов.
-
-Выполнено в B0.3:
-
-- [x] Явные роли процесса `api | worker | all` и единый capability contract.
-- [x] API запускает HTTP и BullMQ producer без cron и queue consumer.
-- [x] Worker имеет отдельный `start:worker`, запускает cron и BullMQ consumer без HTTP.
-- [x] Роль `all` разрешена только в development/test и используется `dev:local`.
-- [x] Readiness проверяет зависимости и queue capability текущей роли.
-- [x] Local и production Compose запускают API и worker раздельно.
-- [x] Process-level gate проверяет capability matrix, entrypoint guards и production-запрет `all`.
-- [x] Gate добавлен в GitHub CI.
-
-Выполнено в B0.4:
-
-- [x] Реальный HTTP/NestJS/Prisma gate на PostgreSQL вместо искусственной таблицы Testcontainers.
-- [x] Проверка tenant isolation между двумя клиниками через защищённые cart endpoints.
-- [x] Принудительная ошибка внутри checkout-транзакции и доказательство полного rollback.
-- [x] Два конкурентных checkout-запроса с одним idempotency key создают один checkout, заказ и резерв.
-- [x] Две клиники конкурируют за остаток 5 единиц: один checkout завершается, второй получает контролируемый конфликт (с компенсацией, если checkout уже был создан), остаток неотрицательный.
-- [x] Временные товары, офферы, клиники, корзины и SQL trigger удаляются с zero-residue assertion.
-- [x] Docker/Testcontainers не требуются для локального запуска.
-- [x] Отдельный обязательный `postgres-integration` job запускает gate на свежем PostgreSQL 17 в GitHub CI.
-
-Выполнено в B0.5:
-
-- [x] Отдельные idempotent-команды `db:seed:reference`, `db:seed:operator`, `db:seed:test` и `db:seed:pilot`.
-- [x] Reference profile создаёт словари, единицы, права, feature flags и шаблон договора; operator profile создаёт единственного локального оператора с membership.
-- [x] Test profile добавляет только минимальную детерминированную тестовую клинику; `verify:postgres` использует именно его вместо смешанного legacy seed.
-- [x] CI содержит отдельную проверку на чистой PostgreSQL базе: test profile не должен создавать pilot organizations или offers до синхронизации каталога.
-- [x] Pilot profile проверяет 10 клиник, 10 поставщиков, 500 offers и 50 позиций с десятью сравниваемыми offers.
-- [x] Повторный pilot seed обновляет свои записи через upsert и не удаляет offers, на которые уже ссылаются carts или orders.
-- [x] `pnpm verify:seed-profiles` добавлен в CI после синхронизации каталога.
-
-Выполнено в B0.6:
-
-- [x] ADR 005 фиксирует at-least-once delivery, статусы, claim lease, retry,
-      dead-letter и требования идемпотентности.
-- [x] Все события обрабатываются единым dispatcher, а не остаются бессрочно
-      `PENDING` вне `PaymentCaptured`.
-- [x] Conditional claim защищает от двух одновременных worker; просроченный
-      `PROCESSING` lease восстанавливается.
-- [x] Retry использует exponential backoff до одного часа; постоянная ошибка
-      или исчерпание `maxAttempts` переводит событие в `DEAD_LETTER`.
-- [x] Проекция уведомлений и `PaymentCaptured -> ORDER_EXPORT` зарегистрированы
-      как идемпотентные handlers.
-- [x] Миграция `20260818130000_outbox_delivery_semantics` применена как 29-я;
-      dispatcher tests, PostgreSQL regression и runtime split прошли.
-
-Текущий статус: **B0.1–B0.6, B1.1–B1.2, B2.1–B2.4, B3.1–B3.3,
-B4.1–B4.4 и B4.5-R3 реализованы и проходят**.
-High source-code backlog B4.5-R1 закрыт фазами R1A и R1B. B4.5-R2A–R2E
-закрыли organization enumeration, XLSX decompression exhaustion, delayed
-session revocation, notification webhook SSRF, payment side-effect claims,
-pending finalization, signature races, PDF resource budgets и stale inventory.
-Complete-coverage scan `64b65075-d7f3-4c23-b6e2-1535e6067b80` на `8f450ea`
-проверил `1055/1055` файлов и сообщил `0` reportable findings. B4.4 также
-реализован и подтверждён targeted/full backend gates; следующая задача —
-**B4.6: нагрузочный профиль каталога и checkout**.
-
-- [x] P1.2 monetary integrity — manual price override принимает canonical
-      1–20 digit minor-unit string, безопасный legacy integer преобразует в
-      string, отвергает unsafe JavaScript number и пишет Prisma Decimal без
-      преобразования через `Number`.
-- [x] Exact boundary `9007199254740993` подтверждён schema/service regressions,
-      full typecheck/test/build, core contract, PostgreSQL и pilot backend gates.
-
-### B1 — покупка клиникой
-
-| Готово | ID   | Задача                            | Gate                   |
-| ------ | ---- | --------------------------------- | ---------------------- |
-| [x]    | B1.1 | Актуализация корзины              | `pnpm verify:postgres` |
-| [x]    | B1.2 | Flow A: поиск → сохранённый заказ | `pnpm verify:flow-a`   |
-
-B1.2 должен зафиксировать один безусловно рабочий путь:
-
-1. поиск;
-2. карточка;
-3. сравнение;
-4. корзина;
-5. checkout;
-6. заказ;
-7. видимый статус.
-
-Gate: одна клиника оформляет заказы у одного и нескольких поставщиков; повтор и конкурентный запрос не создают дублей и не делают остаток отрицательным.
-
-Выполнено в B1.2:
-
-- [x] Временная клиника с минимальными buyer permissions входит через
-      development identity и полностью удаляется после gate.
-- [x] Buyer находит реальный pilot product и открывает сравнение 10 офферов:
-      8 доступны к заказу, 2 честно показаны недоступными.
-- [x] Отдельные browser-сценарии создают заказ одному поставщику и split-order
-      двум поставщикам.
-- [x] После checkout Buyer видит номера заказов и статус
-      «Ждёт подтверждения».
-- [x] Два параллельных повтора с тем же idempotency key возвращают исходный
-      checkout и не создают дублей.
-- [x] Прямой PostgreSQL assertion проверяет один checkout, ожидаемое число
-      supplier orders и активных резервов, а также неотрицательный остаток.
-- [x] Zero-residue assertion после теста: временные организации, пользователи,
-      корзины, compliance-checks и связанные outbox events отсутствуют.
-- [x] Pilot seed гарантирует 500 действующих `PASSED/ALLOWED/GREEN`
-      compliance-checks для 500 demo-офферов; это проверяет
-      `pnpm verify:seed-profiles`.
-
-### B2 — исполнение поставщиком
-
-| Готово | ID   | Задача                                             | Gate                    |
-| ------ | ---- | -------------------------------------------------- | ----------------------- |
-| [x]    | B2.1 | Полное/частичное подтверждение supplier order      | `pnpm verify:flow-b2`   |
-| [x]    | B2.2 | Статус отгрузки, уведомление клиники и audit trail | `pnpm verify:flow-b2`   |
-| [x]    | B2.3 | Минимальные документы заказа и отгрузки            | PostgreSQL + Playwright |
-| [x]    | B2.4 | Единый архив документов Buyer/Supplier             | PostgreSQL + Playwright |
-
-1. список новых заказов;
-2. подтверждение полного или частичного количества;
-3. корректировка резерва;
-4. смена статуса;
-5. уведомление клиники;
-6. audit trail.
-
-Выполнено в B2.1:
-
-- [x] Поставщик открывает реальный новый заказ и подтверждает всё заказанное
-      количество через production-сборку supplier-web.
-- [x] Частичное подтверждение требует buyer-visible причину по каждой
-      уменьшенной позиции и сохраняет её в `SupplierOrderItem.decisionReason`.
-- [x] Статус полного, частичного и нулевого подтверждения вычисляется единым
-      доменным правилом как `CONFIRMED`, `PARTIALLY_CONFIRMED` или `REJECTED`.
-- [x] Уменьшение количества атомарно пересчитывает item/order/checkout totals,
-      уменьшает локальный резерв и возвращает разницу в balance и lot.
-- [x] Serializable transaction, row lock и retry `P2034` защищают повтор и
-      конкуренцию; одинаковое решение идемпотентно, другое решение конфликтует.
-- [x] Tenant isolation проверена: актор другого поставщика получает `403`.
-- [x] Buyer видит принятые количества, причину изменения и новый итог заказа.
-- [x] `supplier_order.confirmed` audit и `SupplierOrderConfirmed` outbox event
-      фиксируются один раз; event содержит обе организации и данные решения.
-- [x] `pnpm verify:flow-b2` проходит 2/2, а общий `pnpm verify:web` — 12/12 с
-      zero-residue очисткой временных заказов, акторов и резервов.
-- [x] Supplier production CSP использует request-scoped nonce; Playwright
-      выполняется с `bypassCSP=false` и доказывает работу React hydration.
-
-Ограничение B2.1: частичное освобождение внешнего резерва намеренно получает
-контролируемый конфликт до отдельной orchestration-задачи интеграционного
-коннектора.
-
-Выполнено в B2.2:
-
-- [x] Общие Zod-схемы, OpenAPI и `@marketplace/api-client` описывают создание,
-      чтение и versioned transition отгрузки; buyer/supplier order responses
-      возвращают склад, позиции и текущие отгрузки.
-- [x] Поставщик через production-сборку supplier-web создаёт отгрузку только
-      для оплаченного подтверждённого заказа и проходит ручной путь
-      `DRAFT → PLANNED → PACKING → READY → DISPATCHED`.
-- [x] Каждый переход атомарно обновляет shipment и supplier order, записывает
-      `shipment.status_changed` audit и `ShipmentStatusChanged` outbox event.
-- [x] Event содержит buyer/supplier tenant, номера заказа и отгрузки, старый и
-      новый статус, перевозчика и tracking; transactional outbox создаёт
-      идемпотентное in-app уведомление клиники.
-- [x] Buyer через production-сборку видит статус, склад, перевозчика и tracking
-      внутри заказа, а затем видит отдельное уведомление с теми же данными.
-- [x] Tenant isolation возвращает `403` чужому поставщику, а stale version
-      возвращает `409` без второго перехода или лишнего audit/outbox evidence.
-- [x] После B2.3 `pnpm verify:flow-b2` проходит 4/4, `pnpm verify:web` — 14/14; сценарий
-      включает viewport 390 px, проверку отсутствия page overflow и zero-residue
-      очистку shipment/notification/audit/outbox fixtures.
-
-Ограничение B2.2: payment settlement является начальным условием сценария и
-не подменяется shipment-логикой. Закрытие доставки и proof of delivery
-остаются отдельными задачами; document pack закрыт в B2.3 ниже, а внешний
-email-провайдер остаётся отдельным production-readiness gate.
-
-Выполнено в B2.3:
-
-- [x] Общие Zod-схемы, OpenAPI и `@marketplace/api-client` описывают
-      `POST /supplier-orders/:orderId/document-pack` и три документа ответа:
-      спецификацию, счёт и накладную.
-- [x] Комплект формируется только поставщиком заказа или оператором для
-      оплаченного заказа и уже отправленной отгрузки с адресом доставки; чужой
-      supplier tenant получает `403`, неверное состояние — `409`.
-- [x] Денежные значения и состав документов строятся сервером из persisted
-      order/shipment snapshot в PostgreSQL, без доверия произвольным данным UI;
-      деньги форматируются без JavaScript `number`.
-- [x] Reference seed детерминированно создаёт четыре шаблона, включая
-      `ORDER_SPECIFICATION_RU`, `INVOICE_RU` и `WAYBILL_RU`; все seed profiles
-      проходят с 10 клиниками, 10 поставщиками и 500 pilot offers.
-- [x] Повторное формирование идемпотентно возвращает те же три `Document` и не
-      создаёт дополнительные `document.generated` audit или `DocumentGenerated`
-      outbox events.
-- [x] Supplier и Buyer видят один и тот же комплект внутри заказа, скачивают
-      PDF/DOCX с checksum evidence; интерфейс имеет empty/error/success/busy
-      состояния и проходит viewport 390 px без page overflow.
-- [x] `pnpm verify:flow-b2` проходит 4/4, `pnpm verify:web` — 14/14; PostgreSQL
-      проверяет связи checkout/order/shipment, immutable snapshot, checksum,
-      audit/outbox, tenant isolation и zero-residue очистку файлов и записей.
-- [x] `pnpm typecheck`, `pnpm test`, `pnpm verify:core-contract`,
-      `pnpm verify:postgres` и `pnpm verify:seed-profiles` проходят.
-
-Ограничение B2.3: квалифицированная ЭЦП, внешний email, налоговый ЭСФ,
-production object storage и proof of delivery остаются отдельными
-production/legal gates и не имитируются локальным комплектом.
-
-### B2.4 — единый архив документов Buyer/Supplier
-
-Пользовательский результат: клиника и поставщик открывают отдельную страницу
-`/documents`, видят только документы своей организации и общих сделок, находят
-их по периоду, типу, контрагенту и заказу, открывают детали и скачивают
-неизменяемый файл. Поставщик формирует документы на правильном этапе заказа, а
-обе стороны видят подписи, версии и бухгалтерский статус.
-
-Non-goals: бухгалтерские проводки, налоговая отчётность, автоматический ЭСФ/СНТ,
-OCR, полноценная 1С-интеграция и признание mock-подписи юридически значимой.
-
-- [x] Общие Zod-схемы, OpenAPI и `@marketplace/api-client` описывают
-      пагинированный архив, summary, detail и фильтры.
-- [x] `Document` хранит отдельные lifecycle/accounting состояния, дату документа,
-      сумму-snapshot и явных участников; дополнительное соглашение не подменяет
-      новую версию основного договора.
-- [x] Tenant graph учитывает owner, buyer/supplier order parties и стороны
-      buyer-supplier/marketplace agreements; чужая организация получает `403`
-      на write-операции или скрывающий существование ресурса `404` на detail/read.
-- [x] Счёт формируется после подтверждения заказа до оплаты, подтверждение
-      оплаты — только после подтверждённого платёжного события, накладная — после
-      отгрузки; повтор каждого шага идемпотентен.
-- [x] Buyer и Supplier имеют отдельные `/documents` routes с loading, empty,
-      error, permission, filters, pagination, details и download states на
-      desktop и 390 px.
-- [x] Стандартные buyer/supplier роли имеют минимальные document permissions;
-      E2E использует те же роли, а не роль со всеми разрешениями.
-- [x] `npm run typecheck`, `npm test`, `npm run verify:core-contract`,
-      `npm run verify:postgres`, `npm run verify:flow-b2` и целевой Playwright
-      archive-flow проходят до отметки задачи выполненной.
-
-Выполнено в B2.4:
-
-- [x] Миграция `20260906120000_document_archive` добавляет категории,
-      бухгалтерский статус, дату и сумму-snapshot документа, payment/refund
-      references, основание дополнительного соглашения и явных участников.
-- [x] Все 32 миграции применяются к чистой PostgreSQL-базе; `prisma validate`
-      и повторный `npm run verify:postgres` проходят без pending migrations.
-- [x] Archive API возвращает summary, cursor pagination, поиск и фильтры по
-      категории, типу, статусу, периоду, заказу и контрагенту; detail показывает
-      стороны, подписи и цепочку версий.
-- [x] Мультивендорный checkout/payment intent не раскрывает общий документ всем
-      поставщикам: участники выводятся только из конкретного order, allocation,
-      refund или договора; отдельный regression покрывает эту границу.
-- [x] Upload принимает только проверенные PDF/DOCX до 10 МБ через quarantine,
-      сохраняет SHA-256 и immutable evidence; изменение бухгалтерского статуса
-      защищено permission, optimistic lock и audit trail.
-- [x] `npm run typecheck` проходит 15/15 задач, `npm test` — 14/14
-      (`@marketplace/api` 194/194, schemas 48/48), core contract — 301 operation
-      и 48 component schemas, seed profiles — 90 permissions и pilot 10/10/500.
-- [x] `npm run verify:flow-b2` проходит 4/4, целевой archive-flow — 1/1;
-      Buyer/Supplier production builds содержат `/documents`, проходят bundle
-      budgets, а Playwright проверяет tenant isolation и viewport 390 px.
-
-Ограничение B2.4: квалифицированная ЭЦП, юридическая валидация шаблонов,
-production object storage, внешний ЭДО, ЭСФ/СНТ, OCR и полноценная синхронизация
-с 1С остаются отдельными production/legal gates и не заявлены `LIVE_VERIFIED`.
-
-### B3 — catalog operations
-
-| Готово | ID   | Задача                                           | Gate                    |
-| ------ | ---- | ------------------------------------------------ | ----------------------- |
-| [x]    | B3.1 | CSV staging → validation → matching              | integration test        |
-| [x]    | B3.2 | Operator review → publication → Buyer visibility | PostgreSQL + Playwright |
-| [x]    | B3.3 | Откат ошибочного batch без потери raw/evidence   | PostgreSQL + Playwright |
-
-1. импорт поставщика в staging;
-2. validation report;
-3. сопоставление с каноническим товаром;
-4. operator review спорных позиций;
-5. публикация оффера;
-6. откат ошибочного batch.
-
-Выполнено в B3.1:
-
-- [x] Общие Zod response/status-контракты импорта используются типизированным
-      API client; request/response/error-границы операции зарегистрированы в OpenAPI.
-- [x] Реальный UTF-8 CSV проходит upload policy, quarantine и parser;
-      `ImportBatch.checksum` фиксирует исходные байты файла, а raw-строки
-      сохраняются до обработки без потери доказательств.
-- [x] Точное совпадение создаёт подтверждённый mapping и только `DRAFT` offer;
-      неизвестный SKU переходит в `MATCH_PENDING` с `ProductCandidate(PENDING)`,
-      некорректные обязательные поля и цена — в `REJECTED` с явными кодами причин.
-- [x] Цена `9007199254740993` minor units и количество записываются без
-      преобразования через JavaScript `number`, поэтому точность Prisma Decimal
-      не теряется.
-- [x] Завершённый batch возвращает сохранённый результат идемпотентно;
-      атомарный claim `MAPPED → PROCESSING` защищает от конкурентной повторной
-      обработки, чужая организация получает `403`.
-- [x] Повторная обработка не создаёт дубли external items, mapping memory,
-      offers, price history, audit или outbox; автоматическая публикация отсутствует.
-- [x] `pnpm verify:flow-b3` проходит 3/3, детерминированные повторы B3.2 и
-      B3.3 — 10/10 каждый, `pnpm verify:web` — 17/17; PostgreSQL-проверки подтверждают checksum,
-      статусы, связи, audit/outbox, tenant isolation и zero-residue cleanup.
-- [x] `pnpm typecheck`, `pnpm test`, `pnpm verify:core-contract`,
-      `pnpm verify:postgres`, `pnpm verify:runtime-split`, `pnpm verify:outbox`,
-      `pnpm verify:pilot-backend`, `pnpm build` и DB-backed
-      `pnpm verify:security-storage` проходят.
-
-Ограничение B3.1: UI загрузки, operator review, публикация, Buyer visibility и
-rollback не входили в эту фазу. Operator review/publication закрыты B3.2,
-а compensating rollback — B3.3.
-
-Выполнено в B3.2:
-
-- [x] Общие Zod-контракты описывают очередь import review, решение оператора и
-      versioned publication response; OpenAPI и типизированный API client обновлены
-      вместе с сервером.
-- [x] Только marketplace operator может читать очередь импорта и одобрять
-      `ProductCandidate`; permission-bearing supplier получает `403`.
-- [x] Одобрение атомарно создаёт `ACTIVE` product/variant, sale packaging,
-      `DRAFT` offer/publication, точную KZT-цену, свежий остаток, confirmed match и
-      mapping memory; исходные raw/normalized данные остаются связаны с batch.
-- [x] До явной публикации Buyer не видит новую карточку. Publication gate
-      повторно проверяет активного поставщика, product/variant, упаковку, свежую
-      положительную KZT-цену, остаток, действующий договор и compliance.
-- [x] State-changing publish использует `expectedVersion`; stale request
-      получает `409`, повтор уже достигнутого состояния идемпотентен и не создаёт
-      второй audit/outbox. Успешная публикация активирует offer, переводит import row
-      в `PUBLISHED` и синхронно перестраивает Buyer search projection.
-- [x] Admin получил отдельную Fluent UI v9 очередь с loading/empty/error/success,
-      видимыми labels и confirmation dialog. Production CSP использует per-request
-      nonce, а 390 px browser gate подтверждает отсутствие page overflow.
-- [x] `pnpm verify:flow-b3` проходит 3/3, B3.2 repeat — 10/10,
-      `pnpm verify:web` — 17/17; `pnpm typecheck`, `pnpm test`, `pnpm build`,
-      `pnpm verify:core-contract`, `pnpm verify:postgres`,
-      `pnpm verify:runtime-split`, `pnpm verify:outbox`,
-      `pnpm verify:pilot-backend` и DB-backed `pnpm verify:security-storage` проходят.
-
-Ограничение B3.2: текущий действующий marketplace agreement сохранён как
-технический gate до отдельного legal review Product V2. XLSX/PDF import и
-production connectors не входят в фазу; compensating rollback закрыт B3.3.
-
-Выполнено в B3.3:
-
-- [x] Миграция `20260819133000_import_batch_rollback` добавляет состояния
-      `ROLLING_BACK/ROLLED_BACK`, rollback metadata и отдельный статус строк без
-      физического удаления `ImportBatch` или `ImportRow`.
-- [x] Общий Zod-контракт, OpenAPI и типизированный API client описывают reason,
-      optimistic `expectedUpdatedAt`, сохранённые evidence и счётчики компенсации.
-- [x] Serializable transaction атомарно переводит завершённый batch через
-      conditional claim, скрывает и архивирует созданные им offers, деактивирует
-      актуальные цены, обнуляет доступный остаток, отзывает mapping, архивирует
-      созданные product/variant и синхронно перестраивает search projection.
-- [x] Автоматический rollback получает `409`, если request устарел, offer
-      существовал до batch, effect был superseded, либо появились order items или
-      активные reservations; tenant isolation возвращает `403` без частичного effect.
-- [x] Checksum, quarantined upload, raw/normalized rows, прежние validation errors,
-      price history и связи сохраняются. `rollbackEvidence` фиксирует before-snapshot
-      строк, compliance, offers/publication, prices, inventory, mappings и products.
-- [x] Повтор уже завершённого rollback возвращает тот же response, повторно
-      доводит search projection до консистентного состояния и не создаёт второй
-      `import.batch.rolled_back` audit или `ImportBatchRolledBack` outbox event.
-- [x] `pnpm verify:flow-b3` проходит 3/3, B3.3 repeat — 10/10,
-      `pnpm verify:web` — 17/17; отдельный Flow B2 regression — 4/4.
-- [x] `pnpm typecheck`, `pnpm test`, `pnpm build`, `pnpm verify:core-contract`,
-      `pnpm verify:postgres`, `pnpm verify:runtime-split`, `pnpm verify:outbox`,
-      `pnpm verify:pilot-backend` и DB-backed `pnpm verify:security-storage` проходят.
-
-Ограничение B3.3: автоматическая компенсация намеренно не изменяет offer,
-который существовал до batch, и не откатывает данные, уже использованные заказом
-или активной резервацией. Такие случаи получают `409` и требуют отдельного
-операторского remediation workflow. Его observability закрыт в B4.1, а
-восстановимость данных — в B4.2.
-
-### B4 — эксплуатационный минимум
-
-- [x] B4.1 — metrics и alerts;
-- [x] B4.2 — backup/restore rehearsal;
-- [x] B4.3 — dead-letter operations и защищённый replay;
-- [x] B4.4 — rate limiting и production auth runbook;
-- [x] B4.5 — security/dependency scan;
-- [ ] B4.6 — нагрузочный профиль каталога и checkout: локальный controlled-pilot
-      baseline подтверждён, production deployment gates остаются открыты.
-
-Выполнено локально в B4.6 на commit `b45a3df2f7be3f0ce1f3dc37209079d243b370c1`:
-
-- [x] Изолированная PostgreSQL база, 32 migrations, 10 buyer organizations,
-      10 suppliers и 500 offers; cleanup временной базы подтверждён.
-- [x] Authenticated search/compare и 20 cart-to-checkout flows прошли с нулевым
-      error rate; p95 — `420 ms`, `693 ms` и `749 ms` соответственно.
-- [x] Повторный idempotency checkout и scarce-stock concurrency подтверждены;
-      scarce-stock дал `201/409` и available/reserved `1/4`.
-- [x] 60-second soak, PostgreSQL saturation и два `EXPLAIN (ANALYZE, BUFFERS)`
-      уложились в зафиксированные thresholds.
-- [x] Два API instance разделили rate-limit state через isolated Redis-compatible
-      runtime: 12 запросов `200`, 13-й на другом instance — `429`.
-- [ ] Managed Redis failover под нагрузкой и длительный staging soak на
-      representative hardware имеют production evidence.
-
-Команды, thresholds, ограничения и raw evidence описаны в
-`actual_docs/operations/b4-6-load-profile.md`.
-
-Production provider/infrastructure readiness:
-
-- [x] `npm run verify:production-config` требует внешний PSP с подписанным
-      webhook, аутентифицированный ЭЦП gateway, email/SMS, PostgreSQL TLS,
-      `rediss://`, encrypted S3 и observability.
-- [x] `npm run verify:production-readiness-contract` покрывает configuration,
-      placeholder rejection, health-origin binding и evidence validation.
-- [x] `npm run verify:production-connectors` имеет раздельные configuration и
-      reachability результаты и никогда не заявляет business `LIVE_VERIFIED`.
-- [x] `npm run verify:live-evidence` требует 20 реальных сценариев, четыре
-      approvals, свежесть и совпадение полного git SHA.
-- [ ] PSP/ЭЦП/supplier/email/SMS и managed infrastructure остаются внешними
-      gates до появления credentials, deployment contour и receipts.
-
-Runbook и незаполненный template находятся в
-`actual_docs/operations/live-provider-readiness.md` и
-`actual_docs/operations/live-evidence.template.json`.
-
-Выполнено в B4.1:
-
-- [x] Защищённый отдельным `METRICS_BEARER_TOKEN` endpoint `GET /api/metrics`
-      отдаёт Prometheus text exposition; production без независимого token не
-      стартует.
-- [x] HTTP histogram использует только low-cardinality labels `method`, Express
-      route template и `status_code`; tenant/user/UUID/query в labels не попадают.
-- [x] PostgreSQL gauges покрывают checkout statuses, import statuses и rollback
-      age/audit count, а также все метрики ADR 005: outbox depth, oldest age,
-      expired lease, attempts и errors по `eventType`.
-- [x] Семь versioned alert rules фиксируют PromQL, severity, owner, `for`, порог
-      и runbook для API/checkout, outbox и import rollback; 14 synthetic vectors
-      машинно проверяют healthy/firing границы.
-- [x] OTLP exporter одинаково принимает collector base URL и готовый
-      `/v1/traces`, не формируя ошибочный двойной путь.
-- [x] `pnpm verify:observability` подтверждает 4/4 unit, alert catalog,
-      `401/200` metrics auth и реальные PostgreSQL gauges; `pnpm typecheck`,
-      `pnpm test` (API 117/117), `pnpm build`, `pnpm verify:runtime-split`,
-      `pnpm verify:production-config`, `pnpm verify:outbox`,
-      `pnpm verify:core-contract`, `pnpm verify:postgres` и
-      `pnpm verify:pilot-backend` проходят.
-- [x] `pnpm verify:observability` включён в основной PostgreSQL-backed CI job
-      после production build.
-
-Ограничение B4.1: локальный contract и synthetic thresholds доказаны, но
-внешняя доставка alert и production dashboard получают `LIVE_VERIFIED` только
-при deployment monitoring stack.
-
-Выполнено в B4.2:
-
-- [x] `pnpm verify:backup-restore` создаёт custom-format PostgreSQL dump,
-      manifest и SHA-256, затем восстанавливает их только в автоматически созданную
-      БД `dentmarket_restore_drill_*`; source и target сравниваются до restore.
-- [x] Target должен быть новым, помечается уникальным database comment и
-      удаляется только после повторной проверки marker; прикладному пользователю
-      `marketplace` право `CREATEDB` не выдавалось.
-- [x] Source сверяется до и после dump. Все 149 public tables и sequences
-      сравниваются по row count, а все таблицы ниже safety-порога — также по
-      content hash; изменение source во время backup делает gate красным.
-- [x] Object-storage ветка проверена двумя детерминированными файлами разных
-      типов; backup и restore inventory совпали по path, bytes и SHA-256.
-- [x] Restored DB имеет 31 актуальную Prisma migration, запускает API и отдаёт
-      успешные liveness/readiness. Финальный локальный замер: backup 0,887 с,
-      restore 5,362 с, полный drill 23,364 с; после gate осталось 0 drill-баз.
-- [x] Gate добавлен в PostgreSQL CI job с PostgreSQL 17 client через
-      изолированный Docker mode; production legacy verifier больше не выполняет
-      `DROP SCHEMA`, требует отдельную пустую БД и точное подтверждение её имени.
-- [x] `pnpm typecheck`, `pnpm test` (API 117/117), `pnpm build`,
-      `pnpm verify:postgres`, `pnpm verify:production-config`, shell syntax,
-      formatting и `git diff --check` проходят.
-
-Ограничение B4.2: локальный logical dump/restore получает
-`INTEGRATION_VERIFIED`, но не доказывает managed WAL/PITR, S3 versioning,
-retention и restore реального production snapshot. Эти пункты остаются
-deployment evidence; политика сохраняет RPO 15 минут и RTO 4 часа.
-
-Выполнено в B4.3:
-
-- [x] `GET /api/operations/outbox/dead-letter` отдаёт bounded metadata-only
-      очередь с фильтром `eventType` и `limit <= 100`; payload и внутренние
-      worker secrets не раскрываются.
-- [x] `POST /api/operations/outbox/dead-letter/:eventId/replay` доступен только
-      оператору с `MARKETPLACE_OPERATOR` и permissions
-      `operations.outbox.replay`; список защищён `operations.outbox.view`.
-- [x] Replay в Serializable-транзакции условно claim-ит только
-      `DEAD_LETTER`, возвращает событие в `PENDING`, сбрасывает `attempts` и
-      lease/error, не изменяя payload и не выдавая успех при конфликте.
-- [x] `IdempotencyRecord` предотвращает двойной replay и reuse ключа для
-      другого события/причины; `AuditLog` фиксирует actor, tenant, reason,
-      исходные attempts/error и новое состояние.
-- [x] Shared Zod/OpenAPI schemas, typed API-client methods и service regressions
-      покрывают authorization, list filtering, idempotency и non-DLQ rejection.
-- [x] `pnpm verify:outbox` проходит 14/14; `pnpm verify:pilot-backend`
-      подтверждает реальный PostgreSQL/API list → replay → повторный replay,
-      сохранность payload и audit record; `pnpm verify:core-contract` видит
-      295 операций, 19 verified core operations и 42 shared OpenAPI components.
-
-Выполнено в B4.5:
-
-- [x] Standard repository scan `7a5358c7-a6f3-459d-a1fa-8bc22ef5c822`
-      завершён на revision `e24913c9f50643ee602686bc6432a35bfc03473a` и зафиксировал
-      5 high и 4 medium findings. Coverage остаётся partial только для live
-      infrastructure и одного deferred I/O receipt; критичные source paths были
-      покрыты независимым baseline и root review.
-- [x] Production dependency audit изменён с 15 high и 6 moderate на
-      `No known vulnerabilities found`: Next 16.2.11, Sharp 0.35.3,
-      PostCSS 8.5.26, pdfjs-dist 6.2.108 и узкие pnpm overrides для уязвимых
-      transitive ranges.
-- [x] `pnpm typecheck` проходит 12/12, `pnpm test` — API 117/117, schemas
-      38/38, api-client 7/7, Buyer 5/5 и Supplier 1/1; PDF import/render regression
-      проходит на pdfjs-dist 6.2.108.
-- [x] `pnpm build` проходит 8/8: API, Prisma client и четыре Next-приложения
-      собраны на обновлённом dependency graph.
-- [x] `pnpm verify:production-config`, DB-backed
-      `pnpm verify:security-storage`, `pnpm verify:security`,
-      `pnpm verify:postgres`, `pnpm verify:runtime-split` и
-      `pnpm verify:core-contract` проходят.
-- [x] `pnpm verify:web` проходит 17/17. Default suite переведён на один worker,
-      потому что shared PostgreSQL/API fixtures и ограниченная память делали
-      четырёхworkerный запуск недетерминированным; assertions и сценарии не
-      ослаблены.
-- [x] Долговечный отчёт и remediation backlog находятся в
-      `../governance/SECURITY_AUDIT_B4_5_2026-08-19.md`; derived hardening portfolio
-      отдельно описывает центральные platform-authority и outbound-egress controls.
-- [x] B4.5-R1A закрывает три authorization High findings: tenant role
-      non-escalation и legacy grant filtering, operator-only canonical catalog,
-      capability-bound AI roles. Оба invitation acceptance path выполняют
-      accept-time role ownership revalidation до транзакции.
-- [x] Финальный security diff-scan `5d31ee89-1cc1-43dd-a3f6-70b1789ee0a2`
-      проверил 17/17 changed source items с complete coverage и `0 findings`;
-      `pnpm verify:platform-authority` доказал direct/legacy/invitation,
-      catalog child mutation и AI legacy-conversation сценарии на PostgreSQL/API.
-- [x] После R1A повторно проходят dependency audit, typecheck 12/12,
-      API 124/124 и остальные workspace tests, build 8/8, production/security
-      config и storage, PostgreSQL, runtime split, core contract и browser 17/17.
-- [x] B4.5-R1B добавляет единый `OutboundRequestGateway`: HTTPS/443 policy,
-      проверку всех A/AAAA и public IP ranges, DNS pinning, same-origin redirect
-      revalidation, общий deadline, response-size limit и безопасные ошибки.
-- [x] `CUSTOM_API` больше не выполняет прямой `fetch`, а private/loopback,
-      mixed-DNS и alternative-IP destinations отклоняются до чтения ответа;
-      `MOYSKLAD` закреплён за `api.moysklad.ru` и игнорирует tenant base URL.
-- [x] `pnpm verify:outbound-security` проходит 25/25 targeted tests и статический
-      bypass gate; финальный diff-scan `657c3363-632e-42c0-8d08-f09880a55745`
-      проверил 9/9 source items с complete coverage и `0 findings`.
-- [x] После R1B повторно проходят frozen install, dependency audit, typecheck
-      12/12, API 136/136 и остальные workspace tests, build 8/8,
-      production config, DB-backed security storage, live security, PostgreSQL,
-      runtime split, core contract, platform authority и browser 17/17.
-
-- [x] B4.5-R2A закрывает organization enumeration/capability disclosure: `GET
-    /organizations` передаёт actor/tenant context в `OrganizationsService`,
-      а `PlatformAuthorityPolicy` разрешает unscoped capability projection только
-      активному marketplace operator.
-- [x] Supplier/buyer с обычным `organization.view` получает `403` до Prisma
-      `findMany`; operator сохраняет полный список для workbench. Unit regression
-      и PostgreSQL/API scenario `tenant_denied_operator_allowed` покрывают оба
-      исхода.
-- [x] После R2A проходят `pnpm typecheck` (12/12), `pnpm test` (API 138/138,
-      schemas 38/38, api-client 7/7, Buyer 5/5, Supplier 1/1), `pnpm build` (8/8),
-      dependency audit, production config, DB-backed security storage, live
-      security, `pnpm verify:postgres`, `pnpm verify:runtime-split`,
-      `pnpm verify:core-contract`, `pnpm verify:platform-authority`,
-      `pnpm verify:web` (17/17) и `git diff --check`.
-
-- [x] B4.5-R2B ограничивает XLSX ZIP central directory до передачи архива в
-      ExcelJS: не более 2 000 записей, 16 MiB на запись, 64 MiB суммарно и
-      compression ratio 200; ZIP64 sentinel и неконсистентные metadata
-      отклоняются.
-- [x] Добавлены parser и ZIP policy regressions для обычного файла, per-entry /
-      total limits, zip-bomb ratio и ZIP64; malicious metadata отклоняется до
-      вызова ExcelJS.
-- [x] После R2B проходят `pnpm typecheck` (12/12), `pnpm test` (API 143/143,
-      schemas 38/38, api-client 7/7, Buyer 5/5, Supplier 1/1), `pnpm build`
-      (8/8), dependency audit, production config, DB-backed security storage,
-      live security, PostgreSQL, runtime split, core contract,
-      `pnpm verify:platform-authority`, `pnpm verify:outbound-security`,
-      `pnpm verify:web` (17/17) и `git diff --check`.
-
-- [x] B4.5-R2C проверяет каждый JWT `jti` по `AuthSession` до принятия identity
-      headers: пользователь, `ACTIVE` status и `expiresAt` должны совпасть.
-- [x] Отозванные/истёкшие/чужие sessions отклоняются; active sessions не
-      кэшируются, а bounded deny-cache (10 000 ключей, 5 секунд) не задерживает
-      revoke/logout.
-- [x] Unit-regressions покрывают active, revoke, expiration, subject mismatch,
-      cache bound и explicit invalidation; после R2C проходят typecheck 12/12,
-      API 147/147, workspace test, build 8/8, security/DB/runtime/contract и
-      browser gates 17/17.
-
-- [x] B4.5-R2D переводит notification webhook на центральный
-      `OutboundRequestGateway`; tenant destination больше не вызывает прямой
-      `fetch`, private/link-local/reserved targets и небезопасные redirects
-      отклоняются до ответа.
-- [x] Notification adapter tests покрывают signed delivery, private destination
-      и invalid URL; outbound static gate проверяет webhook adapter отдельно от
-      provider-controlled email/SMS endpoints.
-- [x] После R2D проходят typecheck 12/12, API 150/150, workspace test,
-      build 8/8, dependency/security/DB/runtime/contract/authority/outbound и
-      browser gates 17/17.
-
-Ограничение B4.5: dependency finding и source findings закрыты tactical
-patches, focused regressions, полный gate stack и complete-coverage R2E.
-
-- [x] B4.5-R2E Standard scan `64b65075-d7f3-4c23-b6e2-1535e6067b80` завершён
-      на `8f450ea`: `1055/1055` файлов, `8/8` поверхностей, `0` reportable
-      findings; canonical report проиндексирован.
-- [x] Payment, signature, PDF и inventory residual paths закрыты кодом и
-      regression tests.
-- [x] B4.3 — dead-letter operations и защищённый replay завершены:
-      защищённый operator list/replay, отдельные permissions, Serializable
-      idempotency, audit trail и payload-preserving reset в `PENDING`.
-- [x] B4.5-R3 — production fail-closed HTTPS policy закрывает CWE-319 для
-      `OPENAI_BASE_URL`, `SUPABASE_URL`, `S3_ENDPOINT`, EDS/payment/email/SMS,
-      auth-link, Sentry и OTLP endpoints; instrumentation валидирует environment
-      до инициализации exporters, а development/test HTTP остаётся доступным.
-- [x] B4.5-R3 подтверждён `npm run typecheck`, `npm test`, `npm run build`,
-      `npm run verify:production-config`, `npm run verify:outbound-security`,
-      `npm run verify:runtime-split`, `npm run verify:rate-limit-auth`,
-      production dependency audit и независимым security review. ADR 008
-      фиксирует отсутствие неутверждённого cleartext/mTLS исключения.
-
-### B4.4 — rate limiting и production auth runbook
-
-- [x] `RedisThrottlerStorage` использует атомарное Redis-окно и является shared storage
-      для горизонтально масштабируемого API; локальный fallback разрешён только в
-      development/test и не является production HA-механизмом.
-- [x] В production отсутствие или недоступность Redis fail-closed: запрос получает
-      контролируемый `503`, а не незащищённый проход без rate limit.
-- [x] Throttler возвращает стабильный error code `RATE_LIMIT_EXCEEDED` и общий
-      `Retry-After`; лимиты и окна имеют bounded environment contract.
-- [x] Production auth contract требует `AUTH_MODE=jwt`, MFA, issuer/audience,
-      trusted proxy и Redis для `go_live`; эти правила закреплены в
-      `actual_docs/operations/production-auth-runbook.md`.
-- [x] Targeted rate-limit/auth tests, `pnpm typecheck`, `pnpm test`, `pnpm build`,
-      `pnpm verify:rate-limit-auth`, `pnpm verify:production-config`,
-      `pnpm verify:security`, `pnpm verify:postgres`, `pnpm verify:runtime-split`,
-      `pnpm verify:core-contract` и `pnpm verify:pilot-backend` прошли.
-
-Ограничение B4.4: локальные gates подтверждают контракт и поведение приложения.
-Redis HA, alerting и multi-instance soak остаются deployment evidence и входят в
-нагрузочный профиль B4.6.
-
-### B5 — frontend unification
-
-Начинать после B0.2 и стабильного B1. Общая дизайн-система должна использовать общий типизированный API client, общие состояния loading/error/empty и одинаковую терминологию. Marketplace, кабинет клиники, поставщика и оператора сохраняют разные задачи, но не разные визуальные языки.
-
-- [ ] B5.1 — Buyer V2 routes и feature-компоненты поверх подтверждённого B1.
-- [ ] B5.2 — Supplier journey без монолитного route-файла.
-- [ ] B5.3 — Operator P0/P1 work queue и единый visual language.
-
-## 9. Как ставить задачи Codex партнёру
-
-Каждая задача должна помещаться в один пользовательский путь.
-
-Шаблон:
-
-```text
-Цель: что конкретно сможет сделать пользователь.
-Роль: клиника / поставщик / оператор.
-Начальное состояние: какие данные уже есть.
-Основной сценарий: 3–7 шагов.
-Бизнес-правила: конкретные ограничения.
-Non-goals: что в эту задачу не входит.
-API-контракт: request, response, error codes.
-Данные: какие таблицы и миграции допустимы.
-Проверка: unit + PostgreSQL integration + acceptance command.
-Definition of Done: наблюдаемый итог, а не список файлов.
-```
-
-Плохая задача: «сделай систему заказов».
-
-Хорошая задача: «клиника добавляет один опубликованный оффер со свежим остатком в активную корзину; повторное добавление обновляет количество; чужая организация получает 403; добавить request/response schemas и PostgreSQL integration test; платежи и доставка не входят».
-
-## 10. Обязательный workflow разработки
-
-1. Взять один ID из очереди B0–B4.
-2. Сначала написать/уточнить acceptance scenario.
-3. Зафиксировать API contract.
-4. Реализовать минимальное изменение.
-5. Выполнить migration и seed только при необходимости.
-6. Запустить targeted tests.
-7. Запустить `npm run typecheck`.
-8. Запустить `npm test`.
-9. Запустить `npm run verify:pilot-backend` для изменений ядра.
-10. Перед merge запустить `npm run build`.
-11. В одном коммите обновить документацию и verification evidence.
-
-Нельзя одновременно брать новую backend-функцию, редизайн трёх кабинетов и новую интеграцию. Это разные задачи и разные acceptance gates.
-
-## 11. Зафиксированный результат B0.6
-
-Реализован **B0.6 Transactional Outbox**:
-
-- [x] Статусы `PENDING → PROCESSING → PUBLISHED/FAILED/DEAD_LETTER` однозначны.
-- [x] Conditional claim и lease recovery покрыты тестами.
-- [x] Retry/backoff, permanent error и max-attempt DLQ покрыты тестами.
-- [x] Notifications и payment order export подключены через handler registry.
-- [x] ADR, migration, CI gate и эксплуатационные правила обновлены вместе с кодом.
-
-B1.2, B2.1–B2.3, B3.1–B3.3 и B4.1–B4.3 после этого этапа также закрыты.
-Текущая следующая задача зафиксирована в разделе 8:
-**B4.4 — rate limiting и production auth runbook**.
-
-## 12. Команды локальной проверки
-
-```powershell
-npm run db:prepare-pilot
-npm run typecheck
-npm test
-npm run verify:runtime-split
-npm run verify:outbox
-npm run verify:observability
-npm run verify:backup-restore
-npm run verify:postgres
-npm run verify:core-contract
-npm run verify:pilot-backend
-npm run build
-```
-
-Для повседневного запуска:
-
-```powershell
-npm run dev
-```
-
-`verify:pilot-backend` создаёт тестовый заказ и предназначен для локальной пилотной БД. Для удалённой БД команда по умолчанию заблокирована.
-
-### Выполнено в B1.1 — актуализация корзины
-
-- [x] Сохранять подтверждённый снимок цены и доступного остатка при добавлении товара.
-- [x] Возвращать по каждой позиции старую и новую цену, сумму и остаток через `POST /carts/:cartId/validate`.
-- [x] Показывать изменения и недоступность позиции в корзине клиники.
-- [x] Требовать принятия новой цены до checkout.
-- [x] Не резервировать товар на время хранения в корзине; повторно проверять и резервировать его только при checkout.
-- [x] Проверять сценарий на живой PostgreSQL: изменение цены и остатка → diff → `409 CART_REVALIDATION_REQUIRED` → принятие → checkout.
-
-## 13. Итоговая оценка
-
-Текущий backend сложнее, чем нужно пилоту, но не является бесполезным или фиктивным. Его сильная часть — доменные правила, PostgreSQL-модель, транзакции, tenant/RBAC и защитные паттерны. Его слабая часть — управление границами, контракт API, integration evidence и эксплуатационная ясность.
-
-Правильная стратегия: **не переписывать, а вырезать понятное ядро внутри текущего modular monolith, поставить вокруг него жёсткие gates и не развивать остальной scope до завершения базовой покупки**.
-
-### Current security gate override (2026-08-20)
-
-`actual_docs/governance/SECURITY_R2E_2026-08-20.md` is the current R2E
-evidence. The complete-coverage scan `64b65075-d7f3-4c23-b6e2-1535e6067b80`
-on `8f450ea` is green with `0` reportable findings. Keep the R2E checkbox
-checked; B4.3 and B4.4 are complete and the next implementation phase is B4.6. Live
-production infrastructure evidence remains a separate deployment concern.
+Статус: активная очередь незавершённых работ. Reconciliation: 2026-09-14;
+очередь исправлений аудита добавлена 2026-09-15 (§8).
+Кодовый baseline: 3d644963ed72f99a100e180db2d373bc5abeaef9,
+ветка codex/frontend-pilot-composition. Reconciliation baseline был docs-only;
+последующая активация DEMO-01 и её проверки учитываются отдельно в Acceptance Matrix.
+
+## 1. Решение владельца и границы текущей итерации
+
+По запросу владельца от 2026-09-14 сейчас завершаем **ядро и внутренние
+backend-сценарии локально, без подключения внешних сервисов**.
+
+- Сохраняем TypeScript, npm workspaces, NestJS modular monolith, PostgreSQL/Prisma,
+  API/worker, общие Zod/OpenAPI/api-client контракты.
+- Не подключаем PSP, 1С, НУЦ РК/ЭЦП gateway, СДЭК/других перевозчиков,
+  МойСклад, внешние email/SMS и новые сервисы.
+- Сохраняем уже существующие adapters и security guards; не удаляем их и не
+  подменяем mock-успехом реальное подтверждение оплаты/подписи/доставки.
+- Редизайн, инфраструктурный запуск и live acceptance не входят в backend-итерацию.
+  Отдельно владелец разрешил DEMO-01: включение пяти существующих optional
+  блоков в локальном launcher, без новых интеграций и без изменения CORE-09.
+- Итоговый ручной/browser сценарий от регистрации до повторной закупки
+  выполняется **после backend и frontend** (POST-FULL).
+- Приёмка окружения, данных и release candidate выполняется **после backend**
+  (POST-BE). Web acceptance внутри релиза требует также готового frontend.
+- Unit, PostgreSQL, contract и затронутые regression gates выполняются
+  **в каждой фазе сразу**. Отложена итоговая приёмка, не безопасность разработки.
+
+Продуктовые требования: [Product V2](../product/DENTMARKET_PRODUCT_V2.md).
+Правила выполнения: [Development Workflow](../governance/DEVELOPMENT_WORKFLOW.md).
+Статусы и доказательства: [Acceptance Matrix](../governance/PROJECT_ACCEPTANCE_MATRIX.md).
+
+## 2. Завершённый baseline — не очередь на переписывание
+
+Подробные выполненные чек-листы B0.1–B0.6, B1.1–B1.2, B2.1–B2.4,
+B3.1–B3.3, B4.1–B4.5, monetary integrity и pilot composition вынесены в
+[архив](../history/archive/2026-09-14/README.md). Их проверенные инварианты
+сохраняются regression-тестами, а не реализуются повторно.
+
+B4.6 завершён **только в локальной части**. Его production-остаток не закрыт
+и перенесён в POST-BE. B5.1–B5.3 имеют частичные/локальные доказательства,
+но не объявлены полностью завершёнными и остаются в отложенной frontend-очереди.
+
+Проверенный baseline включает cart reprice, точные денежные значения,
+checkout/idempotency/локальные резервы, supplier confirmation, отгрузку,
+документолог, CSV review/publication/rollback, outbox/DLQ, tenant isolation и
+HTTPS policy. Архивная отметка не сертифицирует текущий dirty checkout.
+
+## 3. Итоговая реализация ядра
+
+Клиника и поставщик должны выполнять локальную закупку без обязательного
+обращения к внешнему провайдеру:
+
+1. Пользователь входит в свою организацию с минимальными правами.
+2. Поставщик создаёт/импортирует предложения; публикация требует действующего
+   договора с площадкой и прохождения остальных операторских gates.
+3. Клиника сравнивает упаковки/цены/свежесть, принимает reprice и оформляет заказ.
+4. Поставщик подтверждает количество; система согласованно меняет сумму и резерв.
+5. Счёт, заявка на ручное подтверждение оплаты и решение оператора имеют разные
+   состояния. Имитация оплаты маркируется отдельно.
+6. Поставщик исполняет заказ; получение и частичная доставка фиксируются
+   контролируемыми переходами, а не произвольным редактированием статуса.
+7. Обе стороны видят разрешённые документы, версии, суммы и события.
+8. Повторная закупка создаёт новую корзину с текущими условиями, не копирует
+   старый резерв, платёж или подтверждение цены.
+9. Оператор обрабатывает исключения через защищённые операции, без SQL-правок.
+10. Метрики показывают внутренний результат, отдельно от demo/live evidence.
+
+Это **целевой результат**, не заявление о полной реализации каждого пункта.
+Очередь ниже содержит недостающие контракты, реализацию и доказательства.
+Перед каждым подпунктом проверяем существующий путь; уже работающий код
+сохраняем. Один подпункт с единым инвариантом — отдельный связный change set.
+
+## 4. Активный backend backlog — только незавершённое
+
+Это очередь outcomes, не автоматическое поручение исполнить весь файл.
+Выбирается последний явно разрешённый подпункт/последовательность. До кода
+требуется brief существующей реализации и конкретного пробела; работающий
+baseline не переписывается ради нового task ID. DoD доменной фазы ниже относится
+к изменению/приёмке её логики, а не к docs-only карточке решения. Пределы попыток,
+проверки и условия reuse — Workflow §4; один и тот же gate не запускается
+отдельно для каждого документа, в котором он упомянут.
+
+### CORE-01 — договорный контракт и внутренний допуск
+
+Решение владельца 2026-09-14: действующий договор площадка–поставщик обязателен
+до публикации; optional относится только к buyer–supplier framework agreement.
+CommerceService assertActive marketplace agreement сохраняется и соответствует
+Product V2. Открыта полнота versioned acceptance и доказательств допуска,
+а не повторное обсуждение обязательности договора.
+
+- [ ] CORE-01.1: согласовать task card/decision: версия оферты, actor,
+  organization, время, основание заказа ONE_TIME/FRAMEWORK_AGREEMENT,
+  повторный акцепт и поведение при истечении договора.
+- [ ] CORE-01.2: сверить storage/API acceptance и реализовать только пробелы
+  общего контракта; неизменяемая история, стороны и permissions.
+- [ ] CORE-01.3: доказать локальные правила допуска и отказа: отсутствующий,
+  неподписанный, истёкший/чужой договор блокирует публикацию; действующий допускает
+  только при прохождении остальных gates. Использовать явно тестовые agreement
+  fixtures; не обходить обязательный договор ни в demo, ни в production.
+  Файл договора/галочка/fixture не становятся квалифицированной подписью.
+
+Scope: [agreements](../../apps/api/src/modules/agreements/),
+[buyer-supplier-agreements](../../apps/api/src/modules/buyer-supplier-agreements/),
+[onboarding](../../apps/api/src/modules/onboarding/), commerce, documents, schemas.
+DoD: unit + PostgreSQL negative tenant/replay/stale-version cases, core contract.
+Stop: неизвестна сторона акцепта; предлагается без решения отключить legal gate.
+Юридическое утверждение production-модели остаётся EXT, но не блокирует
+разработку независимых частей ядра.
+
+### CORE-02 — внутренний платёж по счёту без PSP
+
+Исходное состояние: payment intent зависит от provider/merchant accounts;
+mock capture существует. Отдельный принятый end-to-end manual/off-platform
+settlement contract не подтверждён. Загрузка квитанции сама по себе не оплата.
+
+- [ ] CORE-02.1: согласовать минимальную модель: invoice → payment claim →
+  operator review → accepted/rejected; имена состояний здесь концептуальные,
+  не новые утверждённые Prisma enums.
+- [ ] CORE-02.2: protected API заявки и решения, сумма KZT в minor-unit string,
+  ссылка на конкретный supplier order и подтверждение, actor/time/reason,
+  optimistic version, idempotency и audit/outbox.
+- [ ] CORE-02.3: при принятии атомарно согласовать payment/order/document
+  snapshots; не требовать фиктивного merchant onboarding, не создавать
+  PSP capture, платформенную комиссию или payout ради ручного платежа.
+- [ ] CORE-02.4: negative cases: другой tenant, повторное решение, двойной
+  учёт, неверная сумма/валюта, отменённый заказ, подмена документа.
+  Для первой версии предлагается принимать только полную сумму одного
+  supplier order; частичную/избыточную оплату явно отклонять до отдельного
+  согласованного правила, а не молча помечать заказ оплаченным.
+
+Scope: [payments](../../apps/api/src/modules/payments/), commerce, documents,
+shared schemas/api-client. Расширять текущую модель только после проверки её
+инвариантов; не создавать параллельный несогласованный ledger.
+DoD: unit + HTTP/PostgreSQL на изолированных fixtures, core contract,
+order/document regression. В proof явно указано manual/test, не bank verified.
+Stop: paid статус появляется от upload или pending, чужого решения,
+неподтверждённого mock/provider результата либо двойного запроса.
+
+### CORE-03 — завершение заказа, локальные компенсации и повторная закупка
+
+Исходное состояние: confirmation/dispatch проверены, logistics уже содержит
+delivery transitions и proofOfDelivery. Наличие этого кода не доказывает весь
+цикл. Отдельный принятый reorder API в просмотренном commerce controller не найден.
+
+- [ ] CORE-03.1: delivery closure/partial delivery: permissions сторон,
+  допустимые переходы, количества по строкам и нескольким отгрузкам,
+  actor/evidence, согласованные order totals/statuses; повтор и stale conflict.
+- [ ] CORE-03.2: отмена до оплаты и истечение локального резерва: единственное
+  освобождение balance/lot, гонки с confirmation/payment/worker, причина и
+  уведомление. Существующую компенсацию checkout не переписывать.
+- [ ] CORE-03.3: определить разрешённое действие после оплаты/отгрузки:
+  контролируемый запрос/операторское решение или явный отказ в неподдержанном
+  состоянии; не заявлять реальный refund без подтверждения. Автоматические
+  возвраты денег, перевозчик и большой claims-модуль не входят в итерацию.
+- [ ] CORE-03.4: повтор заказа создаёт новую корзину с текущими offer/pack/price/
+  stock, явным списком недоступных позиций и обязательным revalidation;
+  исходные order/payment/reservation snapshots неизменны.
+
+Scope: [commerce](../../apps/api/src/modules/commerce/),
+[logistics](../../apps/api/src/modules/logistics/), inventory, documents.
+DoD: state-machine unit tests, PostgreSQL concurrency/rollback/tenant,
+core contract и существующие Flow B2 regressions при изменении критического UI flow.
+Полный объединённый пользовательский прогон остаётся POST-FULL.
+
+### CORE-04 — полнота локального каталога и файлового импорта
+
+CSV staging/review/publication/rollback уже baseline; новый parser не нужен
+без доказанного недостатка. XLSX предусмотрен продуктом, но его полный путь
+нельзя объявлять завершённым по наличию parser unit tests.
+
+- [ ] CORE-04.1: проверить manual offer create/update и XLSX через тот же
+  preview → validation → matching → review → publication → rollback contract.
+- [ ] CORE-04.2: контрольные 50 поисковых запросов, 100–200 размеченных import
+  строк; явно согласовать search/matching thresholds до отметки готовности.
+- [ ] CORE-04.3: проверить canonical/variant/pack/UOM/media/source/freshness
+  contract для frontend; stale/blocked/no-offer честно недоступны к покупке.
+- [ ] CORE-04.4: внутренний quality report по набору 500 demo-карточек/500
+  offers: counts, дубли, цена/остаток/единицы, происхождение изображений,
+  различие 50 buyable products и полного fixture. Не считать demo data live.
+
+Scope: catalog, offers, pricing, inventory, search, imports/moderation, schemas.
+DoD: contract + PostgreSQL и существующий Flow B3; bounded malformed/large-file
+tests и сохранение raw/rollback evidence. Не добавлять OCR/PDF product scope.
+Реальный whitelist и согласование прав на supplier media — POST-BE/EXT.
+
+### CORE-05 — внутренний жизненный цикл доступа
+
+Auth/session/authority security regressions уже существуют; задача не
+переписывает auth и не подключает социальный вход или внешнюю доставку email.
+
+- [ ] CORE-05.1: локально подтвердить registration → verification → membership/
+  organization selection → login/logout/revoke; истёкшие и повторные tokens,
+  приглашения, смена роли и отключение участника.
+- [ ] CORE-05.2: recovery/token flow проверять контролируемым test transport;
+  не публиковать reset tokens и не превращать тестовый способ в production API.
+- [ ] CORE-05.3: повторно проверить минимальные buyer/supplier/accountant/
+  receiver/operator permissions для новых CORE endpoints, documents и audit;
+  внутренние MFA enrollment/challenge/recovery ограничения также остаются core.
+
+Scope: identity, onboarding, organizations, access-control, schemas.
+DoD: unit + negative HTTP/PostgreSQL, platform authority, rate-limit/auth и
+локальный verify:security gates;
+production prohibition of development headers сохраняется.
+Полный browser sign-off ролей — POST-FULL, live email/social providers — EXT.
+
+### CORE-06 — операторские исключения и внутренние уведомления
+
+Защищённый DLQ replay, import review и in-app shipment notification уже baseline.
+
+- [ ] CORE-06.1: подтвердить work-queue/correction-queue: причина, приоритет,
+  ресурс, разрешённое действие, история; закрытие проблемы идемпотентно.
+- [ ] CORE-06.2: маршруты CORE-02/03 создают одно нужное in-app уведомление;
+  read/unread и tenant access согласованы, нет повторных бизнес-эффектов.
+- [ ] CORE-06.3: неподключённый внешний канал не блокирует локальную покупку
+  и не создаёт бесконечную ошибочную очередь; missing adapter не считается
+  доставленным внешним событием. Сохраняется явный trace результата.
+- [ ] CORE-06.4: operator path для guarded rollback conflict и проблемного
+  заказа без прямых SQL-правок; не добавлять произвольный admin bypass.
+
+Scope: operations, moderation, notifications, outbox, shared contracts.
+DoD: operator/non-operator unit + PostgreSQL, outbox/observability regressions,
+идемпотентность и отсутствие секретов в очереди. Daily browser drill — POST-FULL.
+
+### CORE-07 — минимальные метрики продукта
+
+Есть operational metrics и search analytics, но единая принятая схема
+продуктовых метрик ещё не доказана.
+
+- [ ] CORE-07.1: определить события и server-side counts: создан/подтверждён/
+  получен заказ, повторная закупка, отказ из-за stock/price, сроки подтверждения.
+- [ ] CORE-07.2: отделить test/demo от реальных данных, исключить двойной учёт
+  при retry/replay, закрепить timezone/window и read permissions.
+- [ ] CORE-07.3: защищённая внутренняя сводка/API или воспроизводимый отчёт
+  с проверкой расчётов. Внешняя аналитика и большой dashboard не нужны.
+
+Scope: audit/outbox/search analytics/operations и schemas; не вводить второй
+broker или отдельный аналитический сервис.
+DoD: deterministic unit + PostgreSQL aggregates на известных fixtures,
+contract test, отсутствие PII/high-cardinality identifiers в metrics labels.
+
+### CORE-08 — полнота core contracts и инженерные ограничения
+
+- [ ] CORE-08.1: довести request/response/error/pagination/money/time/version
+  contracts всех используемых CORE-01–07 endpoints, а не всех optional APIs.
+- [ ] CORE-08.2: ввести настоящий lint/static analysis и проверить качество
+  новых slices; текущий lint=tsc не считать отдельным доказательством.
+- [ ] CORE-08.3: завершить npm-only housekeeping: проверить потребителей
+  оставшегося pnpm-lock.yaml, затем отдельным change set убрать конкурирующий
+  lock-контракт; не обновлять весь dependency graph ради документации.
+- [ ] CORE-08.4: проверить route-scoped body/upload limits и memory budget
+  локальных импортов. Уже имеющиеся CSV/XLSX/PDF bounds не переписывать;
+  оптимизировать только воспроизведённый риск.
+- [ ] CORE-08.5: согласовать и проверить server safety независимо от состава
+  feature modules, включая Swagger exposure и production+pilot policy.
+  Текущее расхождение ADR 009 и environment guard не закрыто этой документацией.
+
+DoD: schema/API-client tests, core contract, relevant config/security regressions,
+typecheck/test/build и lint. Architecture decision до cross-cutting изменения.
+Разбиение больших services — только внутри конкретного use case с regression;
+массовый refactor, API version migration и новый framework запрещены.
+
+### CORE-09 — backend completion checkpoint
+
+- [ ] Все CORE-01–08 имеют scoped accepted outcome или явное решение владельца
+  об изменении требований; внешние approvals вынесены в EXT, не подменены pass.
+- [ ] На одной backend revision проходят обязательные команды раздела 6,
+  новые сценарии и все затронутые регрессии; сохранены результаты и ограничения.
+- [ ] Нет известного незакрытого критического риска внутри принятого core scope.
+- [ ] Acceptance Matrix обновлена фактическими evidence; backend готов к
+  подключению/приёмке frontend, но не объявлен production/LIVE_VERIFIED.
+
+## 5. Отложенные незавершённые очереди
+
+| ID | Когда возвращаемся | Что остаётся |
+| --- | --- | --- |
+| POST-BE.1 | После CORE-09 | Clean reproducible checkout, npm ci, migration/seed на чистой БД, согласованный локальный/целевой runtime, проверка данных, Docker images/remote CI и rollback release |
+| POST-BE.2 / B4.6 | После CORE-09 и выбора целевого окружения | Длительный staging soak, shared Redis failover, SQL/load thresholds на representative hardware; локальный baseline сохраняется |
+| POST-BE.3 | После CORE-09; до реального запуска | Monitoring/alerts, storage scanning/access, backup/restore/PITR/retention, recovery drills, release manifest одной revision; внешний provider evidence только в EXT |
+| B5.1–B5.3 | Отдельная frontend-очередь | Финальная приёмка Buyer/Supplier/Admin, route completeness, состояния, доступность; локальные уже проверенные feature slices не переписывать автоматически |
+| POST-FULL | После CORE-09 и завершённого frontend | Регистрация → импорт/публикация → reprice → split order → full/partial confirmation → manual payment → receipt/closure → документы → повтор; operator exceptions и negative tenant cases; итоговый Playwright/manual sign-off |
+| DEMO-01 | Локальная активация проверена 2026-09-14, evidence в Acceptance Matrix §7 | go_live включает все пять блоков, pilot/permissions сохранены. Полнота optional-сценариев, billing UI и единый операторский вход через gateway ещё не приняты; внешние providers не подключены |
+| EXT | По отдельному разрешению, вне текущей реализации | PSP, НУЦ РК/ЭЦП/ЭДО, 1С/МойСклад/custom live supplier, перевозчики, email/SMS, legal approvals, реальные org/data, managed infrastructure receipts и live pilot |
+
+POST-BE может готовиться до окончания frontend, но финальный release с web
+не принимается без POST-FULL. Live production остаётся NO-GO до своих обязательных
+gates; deferred не означает waived. Утверждённый локальный go_live — только
+состав модулей DEMO-01, не обход production guards или признак LIVE_VERIFIED.
+
+Детали: [свод скрытых функций](../product/DENTMARKET_OUT_OF_PILOT_FEATURES.md),
+[load runbook](../operations/b4-6-load-profile.md),
+[live readiness](../operations/live-provider-readiness.md).
+После пилота остаются отдельно: широкий API lifecycle, advanced event
+compatibility/retention, масштабные migrations и worker/provider performance
+budgets. Эти ранее описанные P2-пункты не потеряны и не входят в CORE-09.
+
+## 6. Проверки и правило завершения
+
+Матрица каждой изменяемой фазы выбирается по [Workflow](../governance/DEVELOPMENT_WORKFLOW.md)
+§4. Для TS сохраняются npm run typecheck; npm test; git diff --check;
+для purchase contract — core-contract; для Prisma/checkout/tenant/rollback —
+postgres; для полного purchase outcome — pilot-backend. Эти scripts могут
+создавать fixtures/заказ: только в проверенной disposable test DB с cleanup.
+Docs-only задача не запускает этот runtime набор и не повышает runtime статус.
+
+По риску: npm run verify:runtime-split; npm run verify:outbox;
+npm run verify:observability; npm run verify:platform-authority;
+npm run verify:rate-limit-auth; npm run verify:production-config;
+npm run verify:outbound-security; npm run verify:security-storage.
+Prisma change дополнительно требует prisma validate и чистый upgrade-path.
+Changed critical UI flow требует соответствующего Flow A/B2/B3 или verify:web,
+даже если объединённая приёмка POST-FULL запланирована позже.
+
+CORE-09 минимум: typecheck, test, build, настоящий lint, core-contract,
+postgres, pilot-backend, runtime-split, outbox, observability, production-config,
+rate-limit-auth, platform-authority, security, security-storage, outbound-security,
+pilot-composition и production dependency audit. Конкретные новые тесты
+регистрируются при реализации; несуществующие verify aliases не объявляются.
+
+Красный обязательный gate → остановить фазу, классифицировать причину и
+следовать bounded retry Workflow §4.3, не бесконечно «чинить и повторять»;
+не переходить дальше и не ставить X. В завершённой карточке сохранять
+commit/date/commands/results/limitations. Затем переносить её evidence в
+историю; baseline регрессии остаются действующими.
+
+## 7. Следующая точная задача
+
+Текущий запрос 15.09.2026: разложить аудит на технические документы и начать
+исправления. **AUD-FIX-01 и AUD-FIX-02 приняты** в своих границах; evidence в
+Acceptance Matrix §9, auth state/БД/web UI в этих двух fixes не менялись.
+**AUD-FIX-03.1 / UX-21 — единый серверный logout принят 15.09.2026**:
+общий helper/hook, ошибки и повтор, две вкладки, настоящий JWT revoke/refresh deny.
+**AUD-FIX-03.2: protected registration resume — ACCEPTED 15.09.2026**,
+[execution brief](AUDIT_ACCESS_REMEDIATION_2026-09-15.md#3-aud-fix-03--восстановление-регистрации-и-единый-выход-p1-core-05).
+Регистрация/resume и остальные подпункты выполняются последовательно,
+не параллельно автоматически. После отдельного разрешения исправлен конкретный
+web blocker: same-tab hash-navigation открывает нужную заявку, смена proof
+сбрасывает прежнее состояние и не принимает late inspect response.
+Typecheck/unit/landing build/scoped Playwright5/5 PASS; DB readback каждой роли
+подтвердил один user/org/membership/audit/outbox. Неизменённые API/PG/authority/
+rate-auth evidence переиспользованы. История трёх web failures не стёрта;
+после разрешённого fix новый web запуск прошёл с первой попытки. Acceptance §9.
+**AUD-FIX-03.3: локальная доставка и штатный операторский вход принят 15.09.2026**.
+Standalone startup probe второго checkout прошёл с тем же20s deadline; затем
+local-auth browser3/3, resume browser5/5, final E2E typecheck и visual5screens PASS.
+Прежние root/API/DB/config/authority/build evidence переиспользованы без повторов.
+Failed history сохранена, доказанная причина ранних startup timeouts не заявлена.
+**AUD-FIX-03.4 / AUTH-ORG-LOOKUP-01 принят15.09.2026:** после явного возобновления
+с checkpoint уточнён только negative E2E alert locator. Negative case PASS1/1,
+operator/shared fixture regression PASS3/3, final E2E typecheck PASS. Own-context
+API/schema/client, landing и runtime protections не менялись; API/DB17, root
+test/typecheck, три production builds и два positive handoff PASS переиспользованы.
+Общий AUD-FIX-03 принят в границе четырёх audit fixes, не весь CORE-05/security.
+История трёх ранних failures, паузы и итоговые inputs — Acceptance Matrix §9.
+**AUD-FIX-04: явная коррекция корзины принят16.09.2026.** Scoped browser3/3,
+реальные API/DB readbacks и visual4screens подтвердили explicit edit/remove,
+reprice acceptance, draft/conflict recovery, keyboard/mobile. UI-PORTAL-01
+исправлен минимальным общим CSS guard;110frontend tests/typecheck и4web builds
+PASS, неизменённые backend/PG/core-contract evidence REUSED_PASS.
+**AUD-FIX-05 принят16.09.2026 после bundle remediation**: same-offer package/unit
+prices, exact money, reset/URL/history/pagination/race/retry и supplier fallback.
+Корзина загружается при открытии, её validation сохранена. Buyer bundle PASS:
+1,124,722raw/340,070gzip; Supplier bundle PASS. Финальные typecheck15/15,test14/14,
+scoped catalog6/6 и cart regression3/3 на новой Buyer сборке, API/DB readback,
+visual и integrity PASS. История преждевременной приёмки/404/test-precondition
+сохранена в Matrix, budgets не увеличивались. **AUD-FIX-06 принят16.09.2026**
+после отдельно разрешённого bounded resume. Diagnostic доказал: disabled submit
+уводил фокус в BODY, после409 submitLock уже false, Escape не достигал dialog.
+Минимальный fix возвращает фокус к сообщению ошибки после завершения запроса;
+success path, общие dialog/guards/API/деньги не менялись. Supplier TS/43tests,
+E2E TS, isolated build/bundle PASS. Один targeted run conflict+snapshot2/2 PASS:
+Escape/trigger/reopen, причина и quantity сохранены; новый snapshot требует
+явного restart (помеченная UI simulation, real DB no-write readback).
+5сценариев покрыты совокупно:3ранее принятых неизменённых outcomes +2fresh,
+не новый aggregate5/5run. Audit/outbox не дублируются, исторические суммы и
+резервы сохранены. Причина старого startup timeout не доказана; её не выдаём
+за исправленную. История attempts/API-only diagnosis остаётся в Matrix.
+Закрыто6из9 основных AUD-FIX. Внутри07(документолог) slice07.1 ACCEPTED16.09:
+exact money/upload, восстановление native file/draft и feedback/focus проверены.
+Разрешённый isolated generated-types repair, workspace TS,594unique unit tests
+(146fresh после финальной UI-правки +448reuse), два build/bundle,3/3browser PASS.
+Полный07 открыт: связи/lookup, navigation/detail/accounting errors, demo marking.
+07.2 ACCEPTED16.09: readable selectors, independent base/order tenant validation
+и guard копирования новой версии.24JWT/PG cases и полный verify:postgres PASS;
+TS/617units/builds и final browser5/5 PASS. История blocker/probe сохранена в Matrix;
+07.2[x],07parent[ ], payment lookup/navigation/accounting/demo marking ещё открыты.
+08–09 не начаты. История предыдущих failures и evidence — Matrix §9.
+История failures и ограничения приёмки — Acceptance Matrix §9.
+
+После приоритетных audit fixes остаётся **CORE-01.1 — task card договорного допуска и локального режима без НУЦ РК**:
+сверить существующие acceptance/agreements/commerce contracts, зафиксировать
+наблюдаемые local outcomes и полноту акцепта с уже обязательным договором
+площадка–поставщик. Не снимать agreement gates. Затем CORE-02.1 — принять контракт оплаты по
+счёту без PSP. Это входные решения ядра, не новый аудит всего репозитория.
+
+## 8. Исправления аудита закрытого пилота — 2026-09-15
+
+Единственная очередь и чекбоксы remediation. Три linked briefs ниже содержат
+поведение, scope и тесты, но не дублируют статусы. Evidence — Acceptance Matrix §9.
+Приоритет — security/доступ и достоверность закупки, затем локальная полировка
+текущего UI. Полный редизайн отменён для этой итерации последним решением владельца.
+Существующие CORE/B5 не закрываются от создания документов или одного fix.
+
+- [x] AUD-FIX-01: HTTP log redaction — AUTH-LOG-01, P1; CORE-08.
+  Принят 15.09.2026: focused 10/10, API 205/205, typecheck/test/diff и docs gates;
+  полные CORE-08/security/production gates этим не закрыты.
+- [x] AUD-FIX-02: читаемый PDF — DOC-04, P1; документолог.
+  Принят 15.09.2026: владелец согласовал Noto Sans только для PDF; renderer8/8,
+  API211/211, typecheck/build, compiled PDF/визуально3страницы, docs/diff gates.
+  Старые документы не перегенерированы; qualified signature/legal acceptance не заявлены.
+- [x] AUD-FIX-03: единый logout, protected registration resume и локальная
+  доставка/операторский вход — UX-20/21, audit:DEMO-01/03; CORE-05.
+  Принят15.09.2026 после четырёх slices ниже; полный CORE-05/production не закрыт.
+  - [x] AUD-FIX-03.1 / UX-21: server logout; typecheck/test, обе web-сборки,
+    scoped Playwright6/6 (4UI-only +2JWT), readback2/2REVOKED, diff/docs gates.
+    Cookies/CSRF/tenant guards сохранены; это отдельное evidence logout slice.
+  - [x] AUD-FIX-03.2: защищённое продолжение регистрации — UX-20.
+    ACCEPTED 15.09.2026: API/DB/authority/rate-auth evidence; финальные typecheck,
+    unit (включая4fragment regressions), landing build, scoped Playwright5/5,
+    readback2/2 без дублей, docs/diff/integrity. Смена proof изолирует UI state;
+    существующие password/MFA/tenant/agreement ограничения сохранены. Не полный CORE-05.
+  - [x] AUD-FIX-03.3: локальная доставка и штатный операторский вход — audit:DEMO-01/03.
+    ACCEPTED15.09.2026: full serial test graph14/14, typecheck, API/PG/MFA15/15,
+    config/authority/rate, resume API10/10, landing/admin build и admin bundle;
+    local-auth web3/3, resume web5/5, final E2E typecheck и visual5screens PASS.
+    Scope только local auth; main demo flags и production policy не включались.
+  - [x] AUD-FIX-03.4: AUTH-ORG-LOOKUP-01 — восстановить штатный переход после
+    password login клиники/поставщика через разрешённый organization context;
+    не подменять его operator-only API. Разрешено15.09.2026 как блокер плана.
+    ACCEPTED15.09.2026: negative UI1/1, operator regression3/3 и final E2E
+    typecheck PASS после разрешённого locator fix. API/DB17, normal tenant UI2,
+    root test/typecheck и3web builds REUSED_PASS. Diff/docs/integrity evidence;
+    история неудач сохранена, закрытие не означает полную приёмку кабинетов.
+- [x] AUD-FIX-04: явная коррекция корзины — UX-02, P1; CORE-03/08.
+  ACCEPTED16.09.2026: PATCH/DELETE с expectedVersion, прежней ценой и CAS;
+  явные edit/remove, recovery без потери draft, новый акцепт после коррекции.
+  Scoped Playwright3/3 (desktop1440/mobile390, keyboard, real API/DB), visual4,
+  typecheck15/15,110frontend tests,4production builds и docs/integrity PASS.
+  Final PG5groups/core-contract21/backend units REUSED_PASS по hashes.
+  Реальный UI-PORTAL-01 исправлен и покрыт regression; тестовая потеря HTTP-ответа
+  явно simulated, commit настоящий. История failed attempts/flaky PDF сохранена.
+  Это не полный CORE-03/08, общий verify:web или production/security acceptance.
+- [x] AUD-FIX-05: package/unit price, reset и pagination — UX-01/03/04,
+  согласованность demo packaging; CORE-04/B5.
+  ACCEPTED16.09.2026 после исправления bundle blocker без повышения лимитов.
+  Финальный catalog browser6/6 +cart regression3/3, Buyer/Supplier bundle PASS,
+  typecheck15/15/test14/14, compiled artifacts и source hashes — bundle-integrity.
+  HEAD3d64496 + immutable dirty input manifests/evidence
+  AUD-FIX-05; точные price/packaging/offer labels, URL/reset/history/pagination,
+  latest-request-wins/error retry. Typecheck15/15, root tests14/14 (API274,
+  buyer65,supplier24),2production builds,6unique scoped browser cases и readbacks
+  PASS; repeated test attempts не скрыты, итоговая сборка проверена заново. Основной UI
+  сохранён; фикстуры только audit DB,107собственных offers retired/22sessions revoked.
+  Начальный URL q после JWT в root catalog не сертифицирован; общий verify:web,
+  CORE-04,POST-BE/POST-FULL и production остаются отдельными задачами.
+- [x] AUD-FIX-06: pending/partial статусы, сохранность confirmation draft —
+  UX-09/14; отдельно достижимость RISK-01; CORE-03/B5.
+  ACCEPTED16.09.2026. Pending warning исправлен; draft close/reopen,
+  submitting guard, точный BigInt preview и truthful rejection реализованы.
+  Success focus перенесён в surviving order list после browser regression.
+  Root typecheck15/15 и tests14/14 PASS; финальные Supplier TS/43tests/build/
+  bundle PASS, неизменённые Buyer71tests/build/bundle REUSED_PASS.
+  Browser full/partial/rejected REUSED_PASS: реальный readback,
+  exact суммы/резервы, same-decision retry без audit/outbox дублей.
+  После bounded diagnostic и error-focus fix один targeted run2/2 PASS:
+  настоящий409, автоматический focus, Escape/trigger/reopen, quantity/reason;
+  simulated new snapshot блокирует stale draft до explicit restart без DB writes.
+  Итого5unique cases:3REUSED_PASS+2freshPASS, не новый полный5/5run.
+  Evidence/checkpoint: Matrix §9 и remediation/AUD-FIX-06/checkpoint.md.
+  Final Supplier TS/43tests/build/bundle +E2E TS PASS. Buyer/API/PG/core-contract
+  inputs unchanged; reuse обоснован узким error-only effect. История3failures,
+  startup timeout/API-only diagnosis сохранена; причина старого timeout unknown.
+  Скриншоты и real readbacks проверены; own offers retired/sessions revoked,
+  письма удалены; demo DB/чужие процессы/права не менялись. Production не принят.
+- [ ] AUD-FIX-07: документные связи/сумма, ошибки, навигация/focus/file label,
+  demo marking — UX-06/10/15/16/17, DATA-01, audit:DEMO-02; CORE-01/02/B5.
+  - [x] AUD-FIX-07.1: суммы и форма загрузки — ACCEPTED16.09.2026. Ввод/показ
+    в тенге (`1,25 ₸`), exact minor transport/storage (`125`), Decimal20 bound;
+    file label/format/size, native file/draft retention, pending lock и error focus.
+    Разрешённый repair только isolated generated types, TS equivalent PASS;
+    594unique unit tests (146fresh +448reuse после final UI change), Buyer/Supplier
+    production build/bundle PASS; последний real-JWT browser run3/3 PASS16.0s.
+    Реальные201/403/409, две сохранённые суммы, file hash/download, по1audit/outbox;
+    keyboard/focus и390px supplier viewport. История3TSFAIL, locator FAIL и
+    visual correction native file feedback сохранена, не объявлена первым pass.
+    Test DB только dentmarket_audit_20260914, own sessions revoked/mail cleaned;
+    synthetic docs/files retained. Main dev/рабочая demo DB не менялись.
+    Не повторять неизменённые gates07.1; evidence Matrix §9/accepted-inputs.
+  - [x] AUD-FIX-07.2: выбор заказа/основного договора по номеру/контрагенту —
+      ACCEPTED16.09.2026. Existing API, поиск/empty/error/403, обязательный договор
+      только для допсоглашения, optional order и сохранение выбора/черновика.
+      Исправлен BLOCKER-01: собственный заказ не разрешает чужой договор и наоборот;
+      shared upload/generate validation применяется также к копированию новой версии.
+      Допустимые draft/исторические ссылки и publication agreement gate сохранены.
+      24real-JWT PostgreSQL cases PASS, полный verify:postgres PASS;11workspace
+      typechecks с reuse неизменённых входов,617unique units (153fresh+464reuse
+      после width fix), две production build/bundle PASS; browser attempt2 —5/5
+      PASS27.3s, включая три затронутые07.1 regressions. Desktop1440×900/mobile390×844,
+      keyboard/focus, actual201/403/409, DB/audit/outbox/file checksum readback.
+      Длинные названия больше не расширяют форму;5final screenshots просмотрены.
+      История initial probe FAIL, launcher/import/locator ошибок не удалена.
+      Evidence Matrix §9 / relations/accepted-integrity.json. Main/demo неизменны;
+      own sessions/mail cleaned, synthetic fixtures retained; no commit/push.
+  Payment/refund lookup, navigation/detail/accounting errors, demo marking ещё
+    не начаты;07parent безX.07.2 завершён, следующий slice отдельно согласовать.
+- [ ] AUD-FIX-08: field help, честные admin states/search, responsive fixes —
+  UX-05/07/08/11/12/13/18/19; B5.1–B5.3.
+- [ ] AUD-FIX-09: недостающее targeted покрытие после исправлений; итоговые
+  POST-BE/POST-FULL сохраняют отдельные prerequisites, не выдаются за PASS.
+
+Спецификации:
+
+- [Доступ, регистрация и log security](AUDIT_ACCESS_REMEDIATION_2026-09-15.md).
+- [Закупка, каталог и документолог](AUDIT_PURCHASING_DOCUMENTS_REMEDIATION_2026-09-15.md).
+- [Полировка UX и остаток покрытия](../ui-ux/AUDIT_UX_POLISH_2026-09-15.md).
+
+Каждый compound пункт делится на минимальные slices в своём brief. X означает
+выполнение всех применимых требований и gates пункта, не начало реализации.
+NOT_RUN/BLOCKED исходного аудита не означает отсутствующий код и не разрешает
+создать новую функцию. Audit:DEMO-01/02/03 — IDs аудита, не переопределение
+основного DEMO-01 local full-feature состава. Внешние интеграции, redesign,
+рабочая БД, зависимости и commit/push вне текущего разрешения.

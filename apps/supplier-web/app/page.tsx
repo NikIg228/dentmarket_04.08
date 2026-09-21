@@ -1,5 +1,7 @@
 "use client";
 
+import { confirmationOutcomeMessage } from "./order-confirmation-model";
+
 import { Menu, MenuItem, MenuList, MenuPopover, MenuTrigger } from "@fluentui/react-components";
 import { ArrowSync24Regular } from "@fluentui/react-icons/svg/arrow-sync";
 import { Box24Regular } from "@fluentui/react-icons/svg/box";
@@ -16,11 +18,13 @@ import {
   MarketplaceApiClient,
   frontendFeatures,
   parseSessionHandoff,
+  revokeWorkspaceSession,
   type ApiContext,
   type SessionHandoffEnvelope,
 } from "@marketplace/api-client";
 import {
   AppShell,
+  useSessionLogout,
   DmButton,
   DmFeedback,
   DmSelect,
@@ -31,6 +35,7 @@ import {
 } from "@marketplace/ui";
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { loginUrl } from "./public-links";
 import { SupplierDashboard } from "./features/supplier-workspace/supplier-dashboard";
 import type {
   Balance,
@@ -162,9 +167,11 @@ export default function SupplierWorkspace() {
   const [credentialNumber, setCredentialNumber] = useState("");
   const [credentialFile, setCredentialFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const logout = useSessionLogout({ sessionKey: SESSION_KEY, sessionId: handoff?.sessionId, revoke: () => revokeWorkspaceSession(API_URL, handoff), redirectUrl: loginUrl });
 
   useEffect(() => {
     void (async () => {
@@ -226,6 +233,7 @@ export default function SupplierWorkspace() {
   const refresh = useCallback(
     async (silent = false) => {
       if (!handoffChecked) return;
+      setRefreshing(true);
       if (!silent) setLoading(true);
       setError(null);
       try {
@@ -273,6 +281,7 @@ export default function SupplierWorkspace() {
       } catch (cause) {
         setError(errorMessage(cause));
       } finally {
+        setRefreshing(false);
         if (!silent) setLoading(false);
       }
     },
@@ -365,11 +374,7 @@ export default function SupplierWorkspace() {
     try {
       const confirmed = await api.confirmSupplierOrder(order.id, { decisions });
       await refresh(true);
-      setToast(
-        confirmed.status === "PARTIALLY_CONFIRMED"
-          ? "Заказ подтверждён частично, итог и резерв пересчитаны"
-          : "Заказ подтверждён полностью",
-      );
+      setToast(confirmationOutcomeMessage(confirmed.status));
       return null;
     } catch (cause) {
       return errorMessage(cause);
@@ -630,6 +635,8 @@ export default function SupplierWorkspace() {
 
   return (
     <AppShell
+      {...logout}
+      onLogout={handoff ? logout.onLogout : undefined}
       productName="DentMarket"
       productMark="DM"
       workspaceLabel="Кабинет поставщика"
@@ -678,8 +685,9 @@ export default function SupplierWorkspace() {
             className={styles.refreshButton}
             appearance="subtle"
             icon={<ArrowSync24Regular />}
-            disabled={loading}
-            onClick={() => void refresh()}
+            disabled={loading || refreshing}
+            aria-busy={refreshing}
+            onClick={() => void refresh(true)}
             aria-label="Обновить данные"
           />
         </>

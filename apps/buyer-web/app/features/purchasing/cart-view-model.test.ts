@@ -7,6 +7,8 @@ import type { Cart, CartValidation } from "./types";
 
 const cart: Cart = {
   id: "cart-1",
+  buyerOrganizationId: "buyer-1",
+  version: 2,
   status: "ACTIVE",
   currency: "KZT",
   createdAt: "2026-09-02T00:00:00.000Z",

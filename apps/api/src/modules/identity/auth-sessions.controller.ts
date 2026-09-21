@@ -1,4 +1,6 @@
-import { BadRequestException, Body, Controller, Delete, Get, Headers, Param, Post, Req, Res, UnauthorizedException } from "@nestjs/common";
+import { BadRequestException, Body, Controller, Delete, Get, Header, Headers, Param, Post, Req, Res, UnauthorizedException } from "@nestjs/common";
+import { localOperatorLoginSchema } from "@marketplace/schemas";
+import { ApiCoreBody, ApiCoreProtected, ApiCoreResponse } from "../../platform/openapi/core-openapi";
 import { demoSessionSchema, emailForgotPasswordSchema, emailLoginSchema, emailRegisterSchema, emailResetPasswordSchema, emailTokenSchema, refreshSessionSchema, revokeSessionSchema, socialExchangeSchema, switchSessionOrganizationSchema, unlinkExternalIdentitySchema } from "@marketplace/schemas";
 import { ApiTags } from "@nestjs/swagger";
 import type { Request, Response } from "express";
@@ -33,6 +35,7 @@ export class AuthSessionsController {
   }
 
   @Post("register")
+  @ApiCoreBody("AuthEmailRegisterRequest") @ApiCoreResponse("AuthRegistrationAcceptedResponse", 201) @ApiCoreResponse("ErrorResponse", 503)
   async register(@Body() body: unknown, @Req() request: Request) {
     const parsed = emailRegisterSchema.safeParse(body); if (!parsed.success) throw new BadRequestException(parsed.error.flatten());
     return this.sessions.registerEmail(parsed.data, this.metadata(request));
@@ -55,7 +58,30 @@ export class AuthSessionsController {
   }
 
   @Post("password/forgot")
+  @ApiCoreBody("AuthForgotRequest") @ApiCoreResponse("AuthForgotAcceptedResponse", 201) @ApiCoreResponse("ErrorResponse", 503)
   forgotPassword(@Body() body: unknown) { const parsed = emailForgotPasswordSchema.safeParse(body); if (!parsed.success) throw new BadRequestException(parsed.error.flatten()); return this.sessions.forgotPassword(parsed.data.email); }
+
+  @Get("client-options") @Header("Cache-Control", "no-store")
+  @ApiCoreResponse("AuthClientOptionsResponse")
+  clientOptions() { return this.sessions.clientOptions(); }
+
+  @Get("workspace-context") @Header("Cache-Control", "no-store")
+  @ApiCoreProtected()
+  @ApiCoreResponse("WorkspaceContextResponse")
+  @ApiCoreResponse("ErrorResponse", 401) @ApiCoreResponse("ErrorResponse", 403) @ApiCoreResponse("ErrorResponse", 429)
+  workspaceContext(@Headers("x-user-id") userId: string, @Headers("x-organization-id") organizationId: string) {
+    return this.sessions.workspaceContext(userId, organizationId);
+  }
+
+  @Post("local-operator/login") @Header("Cache-Control", "no-store")
+  @ApiCoreBody("LocalOperatorLoginRequest") @ApiCoreResponse("LocalOperatorSessionResponse", 201)
+  @ApiCoreResponse("ErrorResponse", 400) @ApiCoreResponse("ErrorResponse", 401) @ApiCoreResponse("ErrorResponse", 404) @ApiCoreResponse("ErrorResponse", 429)
+  async localOperatorLogin(@Body() body: unknown, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
+    const parsed = localOperatorLoginSchema.safeParse(body); if (!parsed.success) throw new BadRequestException("Проверьте email и пароль");
+    const result = await this.sessions.loginLocalOperator(parsed.data, this.metadata(request));
+    const csrfToken = randomBytes(32).toString("base64url"); this.setCookies(response, result.refreshToken, csrfToken, result.refreshTokenExpiresAt);
+    return { ...result, refreshToken: undefined, csrfToken };
+  }
 
   @Post("password/reset")
   resetPassword(@Body() body: unknown) { const parsed = emailResetPasswordSchema.safeParse(body); if (!parsed.success) throw new BadRequestException(parsed.error.flatten()); return this.sessions.resetPassword(parsed.data.token, parsed.data.password); }

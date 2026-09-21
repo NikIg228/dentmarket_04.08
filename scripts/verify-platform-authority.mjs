@@ -5,6 +5,7 @@ import { createServer } from "node:net";
 import path from "node:path";
 import process from "node:process";
 import { PrismaClient } from "@prisma/client";
+import { platformAuthorityRuntimeEnvironment } from "./lib/platform-authority-runtime.mjs";
 
 const root = path.resolve(import.meta.dirname, "..");
 const apiDirectory = path.join(root, "apps", "api");
@@ -122,7 +123,7 @@ async function waitUntilReady(timeoutMs = 60_000) {
   const startedAt = Date.now();
   let lastHealth = null;
   while (Date.now() - startedAt < timeoutMs) {
-    if (api.exitCode !== null) {
+    if (api.exitCode !== null || api.signalCode !== null) {
       throw new Error(
         `API exited before readiness with code ${api.exitCode}:\n${logs.join("\n")}`,
       );
@@ -142,13 +143,30 @@ async function waitUntilReady(timeoutMs = 60_000) {
 }
 
 async function stopApi() {
-  if (!api || api.exitCode !== null) return;
+  if (!api || api.exitCode !== null || api.signalCode !== null) return;
   api.kill("SIGTERM");
   await Promise.race([
     new Promise((resolve) => api.once("exit", resolve)),
     new Promise((resolve) => setTimeout(resolve, 5_000)),
   ]);
-  if (api.exitCode === null) api.kill("SIGKILL");
+  if (api.exitCode === null && api.signalCode === null) api.kill("SIGKILL");
+  if (api.exitCode === null && api.signalCode === null) await Promise.race([
+    new Promise((resolve) => api.once("exit", resolve)),
+    new Promise((resolve) => setTimeout(resolve, 5_000)),
+  ]);
+  assert(api.exitCode !== null || api.signalCode !== null, "Owned API did not stop; do not start another profile");
+}
+
+async function startApi(testEnvironment, profile) {
+  assert(!api || api.exitCode !== null || api.signalCode !== null, "Another owned API is still running");
+  logs.length = 0;
+  api = spawn(process.execPath, [apiEntry], {
+    cwd: apiDirectory, windowsHide: true, stdio: ["ignore", "pipe", "pipe"],
+    env: { ...platformAuthorityRuntimeEnvironment(testEnvironment, profile), API_HOST: "127.0.0.1", API_PORT: String(port) },
+  });
+  api.stdout.on("data", rememberLog);
+  api.stderr.on("data", rememberLog);
+  await waitUntilReady();
 }
 
 async function createOrganizationFixture({
@@ -410,19 +428,7 @@ try {
     fixture.categoryIds.push(category.id);
   }
 
-  api = spawn(process.execPath, [apiEntry], {
-    cwd: apiDirectory,
-    windowsHide: true,
-    stdio: ["ignore", "pipe", "pipe"],
-    env: {
-      ...testEnvironment,
-      API_HOST: "127.0.0.1",
-      API_PORT: String(port),
-    },
-  });
-  api.stdout.on("data", rememberLog);
-  api.stderr.on("data", rememberLog);
-  await waitUntilReady();
+  await startApi(testEnvironment, "pilot");
 
   await expectStatus("/organizations", { identity: supplier.identity }, 403);
   const operatorOrganizations = await expectStatus(
@@ -745,6 +751,17 @@ try {
     "Denied catalog child mutations left audit or outbox state",
   );
 
+  for (const actor of [supplier, operator]) {
+    await expectStatus("/ai/conversations", {
+      method: "POST", identity: actor.identity,
+      body: { role: actor === supplier ? "SUPPLIER" : "OPERATOR", title: "R1A pilot must exclude AI" },
+    }, 404);
+  }
+  assert(await prisma.aiConversation.count({ where: { organizationId: { in: fixture.organizationIds } } }) === 0,
+    "Pilot AI denial created conversation side effects");
+  await stopApi();
+  await startApi(testEnvironment, "go_live");
+
   const supplierConversation = await expectStatus(
     "/ai/conversations",
     {
@@ -819,6 +836,7 @@ try {
       {
         status: "passed",
         database: parsedDatabaseUrl.pathname.slice(1),
+        profiles: { coreAuthority: "pilot", pilotAi: "404_without_side_effects", aiAuthority: "go_live_test_without_external_providers" },
         scenarios: {
           rolePermissionEscalation: "denied_without_side_effects",
           globalRoleAssignment:

@@ -9,6 +9,7 @@ import { PlugConnected24Regular } from "@fluentui/react-icons/svg/plug-connected
 import {
   MarketplaceApiClient,
   parseSessionHandoff,
+  revokeWorkspaceSession,
   type ApiContext,
   type DocumentArchiveItem,
   type DocumentArchiveQueryInput,
@@ -19,11 +20,15 @@ import {
   AppShell,
   DocumentArchiveUpload,
   DocumentArchiveWorkspace,
+  documentOrderOptions,
+  documentAgreementOptions,
+  useSessionLogout,
   type DocumentArchiveFilters,
   type DocumentArchiveUploadInput,
   type NavigationItem,
 } from "@marketplace/ui";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { loginUrl } from "../public-links";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:4012/api";
 const SESSION_KEY = "dentmarket:supplier-session";
@@ -61,6 +66,7 @@ export default function SupplierDocumentsPage() {
   const [busyDocumentId, setBusyDocumentId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const logout = useSessionLogout({ sessionKey: SESSION_KEY, sessionId: handoff?.sessionId, revoke: () => revokeWorkspaceSession(API_URL, handoff), redirectUrl: loginUrl });
 
   useEffect(() => {
     void (async () => {
@@ -86,6 +92,11 @@ export default function SupplierDocumentsPage() {
     ? { accessToken: handoff.accessToken }
     : { actorId: handoff?.actorId ?? DEMO_SUPPLIER_USER_ID, organizationId }, [handoff, organizationId]);
   const api = useMemo(() => new MarketplaceApiClient(API_URL, apiContext), [apiContext]);
+  const loadOrderOptions = useCallback(async (query: string) => documentOrderOptions(await api.listSupplierOrders(), organizationId, query), [api, organizationId]);
+  const loadAgreementOptions = useCallback(async (query: string) => {
+    const page = await api.listDocumentArchive({ category: "CONTRACT", q: query || undefined, limit: 100 });
+    return documentAgreementOptions(page.items, organizationId, page.nextCursor !== null);
+  }, [api, organizationId]);
 
   const load = useCallback(async (append = false) => {
     setLoading(true);
@@ -147,7 +158,7 @@ export default function SupplierDocumentsPage() {
     } finally { setBusyDocumentId(null); }
   };
 
-  return <AppShell productName="DentMarket KZ" productMark="DM" workspaceLabel="Кабинет поставщика" userName={handoff?.displayName ?? "Demo Dental Supply"} userMeta={handoff?.organizationDisplayName ?? "Поставщик"} navigation={navigation} activeNavigation="documents" contextLabel="Документолог" onNavigate={(id) => { if (id !== "documents") window.location.assign("/"); }} onLogout={() => { window.sessionStorage.removeItem(SESSION_KEY); window.location.assign("/"); }}>
+  return <AppShell productName="DentMarket KZ" productMark="DM" workspaceLabel="Кабинет поставщика" userName={handoff?.displayName ?? "Demo Dental Supply"} userMeta={handoff?.organizationDisplayName ?? "Поставщик"} navigation={navigation} activeNavigation="documents" contextLabel="Документолог" onNavigate={(id) => { if (id !== "documents") window.location.assign("/"); }} {...logout}>
     <DocumentArchiveWorkspace
       roleLabel="поставщик"
       organizationId={organizationId}
@@ -158,7 +169,7 @@ export default function SupplierDocumentsPage() {
       loading={loading}
       error={error}
       busyDocumentId={busyDocumentId}
-      uploadAction={<DocumentArchiveUpload kinds={["INVOICE", "PAYMENT_CONFIRMATION", "REFUND_CONFIRMATION", "CONTRACT_ADDENDUM", "WAYBILL", "ACCEPTANCE_ACT", "TAX_CLOSING_DOCUMENT", "WARRANTY", "CERTIFICATE", "OTHER"]} busy={uploading} onUpload={upload} />}
+      uploadAction={<DocumentArchiveUpload key={organizationId} kinds={["INVOICE", "PAYMENT_CONFIRMATION", "REFUND_CONFIRMATION", "CONTRACT_ADDENDUM", "WAYBILL", "ACCEPTANCE_ACT", "TAX_CLOSING_DOCUMENT", "WARRANTY", "CERTIFICATE", "OTHER"]} busy={uploading} onUpload={upload} loadOrderOptions={loadOrderOptions} loadAgreementOptions={loadAgreementOptions} />}
       onFiltersChange={setFilters}
       onApplyFilters={() => { setAppliedFilters(filters); setNextCursor(null); }}
       onResetFilters={() => { setFilters(initialFilters); setAppliedFilters(initialFilters); setNextCursor(null); }}

@@ -98,7 +98,9 @@ function assertOpenApiContract(openApi) {
       "CartItemResponse",
       "AddCartItemRequest",
     ],
-    ["/api/carts/{cartId}/reprice", "post", "201", "CartResponse"],
+    ["/api/carts/{cartId}/items/{itemId}", "patch", "200", "CartResponse", "UpdateCartItemRequest"],
+    ["/api/carts/{cartId}/items/{itemId}", "delete", "200", "CartResponse", "CartVersionRequest"],
+    ["/api/carts/{cartId}/reprice", "post", "201", "CartResponse", "RepriceCartRequest"],
     ["/api/carts/{cartId}/validate", "post", "200", "CartValidationResponse"],
     [
       "/api/carts/{cartId}/checkout",

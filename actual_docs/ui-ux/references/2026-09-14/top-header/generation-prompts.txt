@@ -1,0 +1,121 @@
+DentMarket Quiet Editorial — five desktop references with shared top header
+Date: 2026-09-14
+Method: built-in ImageGen. One edited catalogue master, then four edits referencing that master.
+Owner decision: no sidebar; all navigation in top header; header hides during scrolling.
+Scope: raster design references and documentation only; no frontend implementation.
+Input style reference: ../reference-b-quiet-editorial.png
+
+## 01-catalog.png
+Original generated image: C:\Users\user\.codex\generated_images\019fc298-67f6-77c3-bd13-456defdc513c\exec-5bbf4656-e5c5-4a6d-ba32-38569eff7b4a.png
+Reference image: ../reference-b-quiet-editorial.png
+Prompt:
+Use case: ui-mockup / edit of the attached DentMarket Quiet Editorial reference.
+Create the final desktop visual-reference screen 01, CATALOGUE, at exactly 1536 x 1024, flat front-on screenshot, no device, no montage. Preserve the refined warm-white #FAF9F5, graphite text #242B27, deep emerald #00543E, quiet Manrope-like Cyrillic typography and fine separators of the reference. This is a proposed interface, not a production screenshot.
+
+OWNER-APPROVED STRUCTURAL CHANGE: REMOVE ALL SIDEBARS AND ALL LEFT VERTICAL FILTER COLUMNS. Use the entire main content width. All page navigation must live in ONE common top header. No second navigation sidebar, no floating vertical menu. Catalogue filters become a compact HORIZONTAL toolbar beneath the title.
+
+CANONICAL GLOBAL HEADER, to be reused unchanged on four later screens:
+A single 96px tall warm-white horizontal header, fixed composition from x48 to x1488, fine bottom border at y96.
+Left: plain text "DentMarket", dark graphite, 26px semibold. Next a small location icon and "Алматы". Middle-left a 390px-wide search field, rounded 6px, thin grey border, placeholder "Название, артикул или производитель". Middle-right text navigation links "Каталог", "Заказы", "Документы", "Ещё" with small chevron. Then cart outline icon and "Корзина · 3". Right user outline icon, "Демо-клиника" and chevron.
+Use compact 14px labels so ALL HEADER ELEMENTS fit comfortably, never wrap, preserve legibility. Underline "Каталог" with subtle emerald active marker. No extra header, logo symbol, theme switcher, breadcrumbs, account panel or black bar. Header is VISIBLE at the top-of-page state; auto-hide scroll behavior is documented separately, NOT represented with fake diagram arrows.
+Every subsequent page must preserve the header geometry/style and positions, only active section and authorized role/account labels can differ.
+Main page margins 48px, width 1440px. Title band starts y130: title "Каталог материалов", right small neutral label "Демонстрационные данные". Subline "Сравнивайте предложения поставщиков".
+Horizontal filter toolbar y212: dropdowns "Категория", "Поставщик", "Цена", checkbox "В наличии", right sorting "По релевантности". Selected-filter chips below; no sidebar anywhere.
+Below, 4 equal open product columns separated ONLY by quiet fine rules, no heavy rounded boxes. One complete first row and a partial second row. Large softly lit dental packshots on pale neutral image panels with no real manufacturer branding. Align all prices, technical detail baselines and actions.
+First-row exact demo products:
+1 "Композит универсальный A2", "Упаковка · 4 г", "18 900 ₸ / уп.", "Демо-поставщик 01", "В наличии: 24 уп."
+2 "Эндодонтические файлы", "Упаковка · 6 шт.", "7 450 ₸ / уп.", "Демо-поставщик 02", "В наличии: 18 уп."
+3 "Перчатки нитриловые M", "Упаковка · 100 шт.", "3 250 ₸ / уп.", "Демо-поставщик 03", "В наличии: 60 уп."
+4 "Боры алмазные", "Упаковка · 5 шт.", "12 600 ₸ / уп.", "Демо-поставщик 01", "В наличии: 32 уп."
+Each shows modest "Обновлено 12 мин назад", underlined "Сравнить предложения", quantity "− 1 +" and emerald button "В корзину". Price and stock clearly belong to displayed supplier offer. Avoid irrelevant badges or fake verification scores. Focus on premium whitespace, harmonious proportions, readable Cyrillic, practical controls. No oversized marketing hero, grain/noise overlays, glows, glass, animation imagery, sidebar, gold effects or decorative charts. No extra count claims. Preserve the requested unit-price semantics and exact values. Do not add style captions above the header.
+
+## 02-product-offers.png
+Original generated image: C:\Users\user\.codex\generated_images\019fc298-67f6-77c3-bd13-456defdc513c\exec-96841635-dbc8-4e67-9c07-04aae505214a.png
+Reference image: 01-catalog.png
+Prompt:
+Use case: ui-mockup. EDIT the supplied DentMarket catalogue master into ONE different desktop page of the SAME application. Output exactly 1536x1024. Flat front-on UI screenshot style.
+CRITICAL INVARIANT: KEEP THE ENTIRE SHARED HEADER from y0 to y75 visually unchanged: identical DentMarket wordmark, icon style, size, positions, search box at x336, navigation, dividers, cart action and account. Do not redesign, scale, move or redraw a different header. Only change the active navigation underline as directed and explicitly permitted supplier identity/action text. Top header contains ALL global page links: "Каталог", "Заказы", "Документы", "Ещё", "Корзина · 3". Header is visible at top-of-page, no scroll-state diagrams.
+NO SIDEBAR, NO VERTICAL NAVIGATION anywhere. Change ONLY the main working content under y75. Preserve 46px outer gutters, warm-white Quiet Editorial palette, graphite type, deep forest emerald primary actions, Manrope-like Cyrillic type hierarchy, 6px controls, light thin dividers, understated backgrounds and restrained rounded corners. Text must be sharp, readable, exact Russian. Numeric sums must be arithmetically correct. Keep "Демонстрационные данные" as a small neutral label at top right of the working area. Avoid big nested cards, decorative dashboards, fake verification, green medical shields, certificates, external provider success, heavy shadows, gradients, off-brand fonts. A draft is not signed; uploaded proof is not paid.
+Do not copy the catalogue title, filters, product grid or sidebar. Render only the requested new page. All functional zones belong to the main content, never a new app shell. No extra decorative frame, top style caption or device.
+SCREEN 02: PRODUCT AND OFFER COMPARISON. Header active "Каталог", buyer account unchanged.
+Main body: small breadcrumb "Каталог / Терапия"; heading "Композит универсальный A2", subtitle "Сравните цену за одинаковую упаковку". Upper zone a tasteful composite syringe packshot in a pale flat panel on the left (about 360x250, part of page content, NOT a sidebar). To its right a concise product facts block: "Оттенок A2", "Упаковка 4 г", "Артикул CMP-A2-4", "Единица закупки: упаковка". Separate adjacent line "Выберите предложение поставщика"; avoid displaying one product-wide universal stock or price.
+Lower full-width zone headed "Предложения поставщиков", subtitle "3 предложения · одинаковая упаковка".
+Premium full-width comparison table columns "Поставщик", "Упаковка", "Цена за уп.", "Остаток", "Обновлено", "Количество", action.
+Rows exact:
+"Демо-поставщик 01" | "4 г" | "18 900 ₸" | "24 уп." | "12 мин назад" | "− 1 +" | "В корзину"
+"Демо-поставщик 02" | "4 г" | "19 400 ₸" | "16 уп." | "8 мин назад" | "− 1 +" | "В корзину"
+"Демо-поставщик 03" | "4 г" | "18 700 ₸" | "Нет актуальных данных" | "Данные устарели" | "—" | disabled "Недоступно".
+First row subtly selected, no superlative cheapest/recommended badge. Last row understated amber warning, textual explanation "Предложение нельзя заказать до обновления остатка". Unavailable stale offer not purchasable. Lower text tabs or sections "Характеристики", "Описание". Plenty of breathing room, no need to fill every pixel. Selected offer price/pack/stock unmistakably belong to its supplier.
+
+## 03-cart-reprice.png
+Original generated image: C:\Users\user\.codex\generated_images\019fc298-67f6-77c3-bd13-456defdc513c\exec-d81e154b-93b8-44d9-af43-cb1577d8f462.png
+Reference image: 01-catalog.png
+Prompt:
+Use case: ui-mockup. EDIT the supplied DentMarket catalogue master into ONE different desktop page of the SAME application. Output exactly 1536x1024. Flat front-on UI screenshot style.
+CRITICAL INVARIANT: KEEP THE ENTIRE SHARED HEADER from y0 to y75 visually unchanged: identical DentMarket wordmark, icon style, size, positions, search box at x336, navigation, dividers, cart action and account. Do not redesign, scale, move or redraw a different header. Only change the active navigation underline as directed and explicitly permitted supplier identity/action text. Top header contains ALL global page links: "Каталог", "Заказы", "Документы", "Ещё", "Корзина · 3". Header is visible at top-of-page, no scroll-state diagrams.
+NO SIDEBAR, NO VERTICAL NAVIGATION anywhere. Change ONLY the main working content under y75. Preserve 46px outer gutters, warm-white Quiet Editorial palette, graphite type, deep forest emerald primary actions, Manrope-like Cyrillic type hierarchy, 6px controls, light thin dividers, understated backgrounds and restrained rounded corners. Text must be sharp, readable, exact Russian. Numeric sums must be arithmetically correct. Keep "Демонстрационные данные" as a small neutral label at top right of the working area. Avoid big nested cards, decorative dashboards, fake verification, green medical shields, certificates, external provider success, heavy shadows, gradients, off-brand fonts. A draft is not signed; uploaded proof is not paid.
+Do not copy the catalogue title, filters, product grid or sidebar. Render only the requested new page. All functional zones belong to the main content, never a new app shell. No extra decorative frame, top style caption or device.
+SCREEN 03: CART WITH PRICE AND STOCK CHANGES. Header marks cart as active, account unchanged.
+Main heading "Корзина", subline "3 позиции · 3 поставщика"; keep same title size/margins.
+Below title a calm amber information strip, not alarming red whole page: "Условия изменились у 2 позиций". Text "Проверьте новую цену и доступное количество".
+Main body contains a wide clean table (about 1020px) and a narrow ORDER SUMMARY content block at the right (about 340px). The summary is not navigation/sidebar, only in-page order totals. Table labels "Товар / поставщик", "Цена за уп.", "Количество", "Остаток", "Сумма".
+Rows:
+1 "Композит универсальный A2", "Демо-поставщик 01 · 4 г", old price "17 900 ₸" struck through and new "18 900 ₸" prominent with text "Цена изменилась"; requested quantity "− 2 +"; available "24 уп."; new line total "37 800 ₸". Tiny matching composite thumbnail.
+2 "Эндодонтические файлы", "Демо-поставщик 02 · 6 шт.", price "7 450 ₸"; quantity "− 3 +" with a clear error; stock line "Было 8 уп. → стало 2 уп."; line total for STILL REQUESTED three packs "22 350 ₸". Inline explanation "Запрошено 3 уп., доступно 2. Уменьшите количество." No automatic silent quantity change.
+3 "Перчатки нитриловые M", "Демо-поставщик 03 · 100 шт.", price "3 250 ₸"; quantity "− 1 +"; stock "60 уп."; total "3 250 ₸".
+Summary exact: "Предварительная сумма", old "61 400 ₸" struck through, new "63 400 ₸", delta "+2 000 ₸". Text "Сумма пересчитается после изменения количества". Primary action "Принять изменения" (price/stock acknowledgement does NOT fix insufficient quantity); checkout action visibly disabled "Оформить заказ". Adjacent explicit explanation "Недостаточно остатка у 1 позиции". No payment provider, no shipping estimate, no fake order completion. Every item quantity remains unchanged until user edits; no claim that all stock is reserved. Bottom understated text "Остаток проверяется повторно перед оформлением". Clear old-versus-new price AND old-versus-new stock are core visual focus.
+
+## 04-supplier-order.png
+Original generated image: C:\Users\user\.codex\generated_images\019fc298-67f6-77c3-bd13-456defdc513c\exec-c5173c2a-def8-4d03-9d36-4c6e3d6213da.png
+Reference image: 01-catalog.png
+Prompt:
+Use case: ui-mockup. EDIT the supplied DentMarket catalogue master into ONE different desktop page of the SAME application. Output exactly 1536x1024. Flat front-on UI screenshot style.
+CRITICAL INVARIANT: KEEP THE ENTIRE SHARED HEADER from y0 to y75 visually unchanged: identical DentMarket wordmark, icon style, size, positions, search box at x336, navigation, dividers, cart action and account. Do not redesign, scale, move or redraw a different header. Only change the active navigation underline as directed and explicitly permitted supplier identity/action text. Top header contains ALL global page links: "Каталог", "Заказы", "Документы", "Ещё", "Корзина · 3". Header is visible at top-of-page, no scroll-state diagrams.
+NO SIDEBAR, NO VERTICAL NAVIGATION anywhere. Change ONLY the main working content under y75. Preserve 46px outer gutters, warm-white Quiet Editorial palette, graphite type, deep forest emerald primary actions, Manrope-like Cyrillic type hierarchy, 6px controls, light thin dividers, understated backgrounds and restrained rounded corners. Text must be sharp, readable, exact Russian. Numeric sums must be arithmetically correct. Keep "Демонстрационные данные" as a small neutral label at top right of the working area. Avoid big nested cards, decorative dashboards, fake verification, green medical shields, certificates, external provider success, heavy shadows, gradients, off-brand fonts. A draft is not signed; uploaded proof is not paid.
+Do not copy the catalogue title, filters, product grid or sidebar. Render only the requested new page. All functional zones belong to the main content, never a new app shell. No extra decorative frame, top style caption or device.
+SCREEN 04: SUPPLIER ORDER / PARTIAL CONFIRMATION PREVIEW.
+Role-specific permitted header changes ONLY: active "Заказы"; account label at far right becomes "Демо-поставщик". At the same header action slot currently showing cart, replace cart icon/text with neutral box icon and "Предложения". Keep header heights, positions, all other links, fonts and styling identical. Buyer checkout must not be offered as a supplier action.
+Main heading "Заказ № DM-0264"; neutral status "Ожидает подтверждения"; top-right small label "Демонстрационные данные". Subtitle "Покупатель: Демо-клиника 01 · 14 сентября, 10:40".
+A thin horizontal lifecycle line "Новый → Подтверждение → Отгрузка → Получение", only current confirmation step emphasized, no later step complete.
+Full-width elegant editable confirmation table with columns "Товар", "Цена за уп.", "Заказано", "Подтверждаем", "Сумма".
+Rows:
+"Композит универсальный A2 · 4 г" | "18 900 ₸" | "2 уп." | numeric field "2" | "37 800 ₸"
+"Эндодонтические файлы · 6 шт." | "7 450 ₸" | "3 уп." | numeric field "2" | "14 900 ₸"
+"Перчатки нитриловые M · 100 шт." | "3 250 ₸" | "1 уп." | numeric field "1" | "3 250 ₸".
+Second row has inline amber message "Количество уменьшено: 3 → 2" and visible labelled reason field "Причина" with "Недостаточный остаток".
+Bottom of table show exact summary "До подтверждения: 63 400 ₸", "После подтверждения: 55 950 ₸", "Изменение: −7 450 ₸". Prominent primary "Подтвердить частично", secondary "Отмена". Explain "Перед отправкой решения проверьте количества и причину изменения".
+Lower working content two quiet compact areas "Документы заказа" with "Спецификация · Черновик" and "История" with "10:40 — Заказ создан". No invoice marked paid, no shipping confirmation, no qualified signature indicators. This is a proposed main-page editing layout for an existing confirmation flow, not evidence of implementation.
+
+## 05-documents.png
+Original generated image: C:\Users\user\.codex\generated_images\019fc298-67f6-77c3-bd13-456defdc513c\exec-fbc512dc-4455-4629-8645-6bcb43291f5f.png
+Reference image: 01-catalog.png
+Prompt:
+Use case: ui-mockup. EDIT the supplied DentMarket catalogue master into ONE different desktop page of the SAME application. Output exactly 1536x1024. Flat front-on UI screenshot style.
+CRITICAL INVARIANT: KEEP THE ENTIRE SHARED HEADER from y0 to y75 visually unchanged: identical DentMarket wordmark, icon style, size, positions, search box at x336, navigation, dividers, cart action and account. Do not redesign, scale, move or redraw a different header. Only change the active navigation underline as directed and explicitly permitted supplier identity/action text. Top header contains ALL global page links: "Каталог", "Заказы", "Документы", "Ещё", "Корзина · 3". Header is visible at top-of-page, no scroll-state diagrams.
+NO SIDEBAR, NO VERTICAL NAVIGATION anywhere. Change ONLY the main working content under y75. Preserve 46px outer gutters, warm-white Quiet Editorial palette, graphite type, deep forest emerald primary actions, Manrope-like Cyrillic type hierarchy, 6px controls, light thin dividers, understated backgrounds and restrained rounded corners. Text must be sharp, readable, exact Russian. Numeric sums must be arithmetically correct. Keep "Демонстрационные данные" as a small neutral label at top right of the working area. Avoid big nested cards, decorative dashboards, fake verification, green medical shields, certificates, external provider success, heavy shadows, gradients, off-brand fonts. A draft is not signed; uploaded proof is not paid.
+Do not copy the catalogue title, filters, product grid or sidebar. Render only the requested new page. All functional zones belong to the main content, never a new app shell. No extra decorative frame, top style caption or device.
+SCREEN 05: DOCUMENT ARCHIVE / ДОКУМЕНТОЛОГ. Buyer account unchanged, active header "Документы".
+Main title "Документы", subtitle "Договоры, счета и документы по заказам", neutral top-right "Демонстрационные данные". Main primary top action "Загрузить документ", smaller "Обновить".
+Under heading restrained inline count summary (NOT big metric cards): "Всего 6" • "Требуют внимания 2" • "За сентябрь 6".
+Full-width horizontal categories "Все", "Договоры", "Оплата", "Отгрузка", "Закрывающие". Then search field "Название, номер или заказ", filters "Статус", "Период", "Контрагент". No left navigation/filter rail and no side preview drawer.
+Full-width highly legible table: "Документ", "Контрагент / заказ", "Дата", "Сумма", "Статус", "Версия", row action.
+Six rows:
+"Счёт на оплату № 0264" | "Демо-поставщик 01 · DM-0264" | "14.09.2026" | "55 950 ₸" | "Сформирован" | "v1" | "Открыть"
+"Подтверждение оплаты" | "Демо-поставщик 01 · DM-0264" | "14.09.2026" | "55 950 ₸" | "Требует проверки" | "v1" | "Открыть"
+"Рамочный договор № 014" | "Демо-поставщик 01" | "10.09.2026" | "—" | "Черновик" | "v2" | "Открыть"
+"Спецификация № 0264" | "Демо-поставщик 01 · DM-0264" | "14.09.2026" | "55 950 ₸" | "Сформирован" | "v2" | "Открыть"
+"Накладная № 0258" | "Демо-поставщик 02 · DM-0258" | "12.09.2026" | "38 800 ₸" | "Загружен" | "v1" | "Открыть"
+"Дополнительное соглашение № 1" | "Демо-поставщик 01" | "13.09.2026" | "—" | "Требует проверки" | "v1" | "Открыть".
+Use short textual status tags with subdued amber for attention and neutral for formed/uploaded/draft. No signed/verified checkmarks or bank verified claims.
+Under table, an inline selected-document detail strip shows "Счёт № 0264 · Версия 1", "PDF · 184 КБ", button "Скачать PDF", link "История версий". Small note "Загрузка квитанции не подтверждает оплату". Balanced empty space, crisp columns and quiet typography rather than a wall of cards. Demonstrate a shared archive design reusable by supplier with its own tenant data; do not add a second page in this image.
+
+## Inspection notes
+All five images were visually inspected. Global header layout is shared; active nav changes by page.
+The supplier image intentionally changes organization identity and the buyer cart action to supplier offers in the same header slot; permissions are not bypassed to force identical text.
+These are independent illustrative scenarios, not a coherent single multi-supplier order fixture or a tested end-to-end transaction.
+Cart old total: 2*17900 + 3*7450 + 3250 = 61400 KZT.
+Cart new requested total: 2*18900 + 3*7450 + 3250 = 63400 KZT; insufficient stock still blocks checkout.
+Supplier confirmation preview: 2*18900 + 2*7450 + 3250 = 55950 KZT; reduction 7450 KZT.
+Document state wording, product media, amounts and metadata are illustrative and not backend enum declarations or legally valid documents.
+Header auto-hide, keyboard access, mobile layouts, focus management, responsive overflow, exact typography/tokens and API behavior are NOT proven by these static references.
+No pixel-identical raster guarantee: the final shared header must be implemented as one component and verified via deterministic visual tests.

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { usePopupDismiss } from "./use-popup-dismiss";
 import styles from "./city-location.module.css";
 
 const STORAGE_KEY = "dentmarket:city";
@@ -68,6 +69,15 @@ export function CityLocation() {
   const [candidate, setCandidate] = useState<string | null>(null);
   const [detecting, setDetecting] = useState(false);
   const detailsRef = useRef<HTMLDetailsElement>(null);
+  const [open, setOpen] = useState(false);
+  const close = useCallback((reason: "outside" | "escape" | "selection") => {
+    if (detailsRef.current) {
+      detailsRef.current.open = false;
+      setOpen(false);
+      if (reason !== "outside") detailsRef.current.querySelector("summary")?.focus();
+    }
+  }, []);
+  usePopupDismiss(detailsRef, open, close);
 
   useEffect(() => {
     const saved = window.localStorage.getItem(STORAGE_KEY);
@@ -124,13 +134,13 @@ export function CityLocation() {
     setCity(selected.name);
     setCityId(selected.id);
     setCandidate(null);
-    detailsRef.current?.removeAttribute("open");
+    close("selection");
     window.dispatchEvent(
       new CustomEvent("dentmarket:city-changed", { detail: selected }),
     );
   };
   return (
-    <details ref={detailsRef} className={styles.wrap}>
+    <details ref={detailsRef} className={styles.wrap} onToggle={(event) => setOpen(event.currentTarget.open)}>
       <summary className={styles.current} aria-label="Выберите город">
         <span className={styles.pin}>⌖</span>
         <span>
@@ -171,6 +181,7 @@ export function CityLocation() {
         ) : (
           <select
             className={styles.select}
+            aria-label="Город доставки"
             value={city ?? ""}
             onChange={(event) =>
               event.target.value && choose(event.target.value)
@@ -184,17 +195,13 @@ export function CityLocation() {
             ))}
           </select>
         )}
-        <a
+        <button
           className={styles.close}
-          href=""
-          onClick={(event) => {
-            if (!detailsRef.current) return;
-            event.preventDefault();
-            detailsRef.current.open = false;
-          }}
+          type="button"
+          onClick={() => close("selection")}
         >
           Не сейчас
-        </a>
+        </button>
       </div>
     </details>
   );

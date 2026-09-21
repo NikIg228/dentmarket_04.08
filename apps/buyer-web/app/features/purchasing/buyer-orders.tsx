@@ -147,8 +147,8 @@ export function BuyerOrders({
                         </td>
                         <td data-label="Создан">{formatDate(order.createdAt, true)}</td>
                       </tr>
-                      {hasPartialDecision(order) ? (
-                        <tr className={styles.detailRow}>
+                      {hasPartialDecision(order) || order.status === "REJECTED" ? (
+                        <tr className={styles.detailRow} data-testid={`order-decision-${order.id}`}>
                           <td colSpan={6}>
                             <OrderDecisionDetails order={order} />
                           </td>

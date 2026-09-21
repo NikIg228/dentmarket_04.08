@@ -1,5 +1,19 @@
 # Production go-live checklist
 
+## Очередь выполнения — 2026-09-14
+
+Этот runbook остаётся действующим, но сейчас не исполняется: владелец выбрал
+завершение локального backend core без новых внешних интеграций.
+Приёмка окружения/данных/release — POST-BE после CORE-09; финальная web-приёмка
+требует также завершённого frontend и POST-FULL. Provider/legal проверки — EXT
+по отдельному разрешению. См. [Foundation](../backend/DENTMARKET_BACKEND_FOUNDATION_V2.md).
+
+Отложенное не закрыто и не отменено. Локальный demo/manual результат не является
+production payment/signature/delivery evidence. Все обязательные safety guards
+и проверки каждой изменяемой фазы сохраняются. Перечень провайдеров ниже —
+условия соответствующих включаемых интеграций, не требование подключить
+одновременно 1С, МойСклад и всех перевозчиков для завершения core.
+
 ## Already automated
 
 - `npm run typecheck`

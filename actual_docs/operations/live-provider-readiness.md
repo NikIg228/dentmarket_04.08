@@ -1,5 +1,16 @@
 # Live provider and infrastructure readiness
 
+## Планирование — 2026-09-14
+
+Внешние провайдеры отложены в EXT; текущая реализация ограничена внутренним
+ядром. Приёмка окружения и релиза начинается после backend completion
+(POST-BE), объединённый пользовательский прогон — после backend и frontend
+(POST-FULL). Очередь: [Foundation](../backend/DENTMARKET_BACKEND_FOUNDATION_V2.md).
+Ни один live checkbox не закрыт этой актуализацией. Требования production
+не ослабляются, конфигурационные контракты продолжают проверяться локально
+без вызова внешнего провайдера. Документ не разрешает включить расширенный
+runtime ради обхода условий демонстрации.
+
 ## Назначение
 
 Этот runbook отделяет три разных уровня доказательства production-готовности:
@@ -18,7 +29,7 @@
 
 ## Текущий статус
 
-- [x] Production environment fail-closed требует PSP webhook secret,
+- [x] Production + go_live environment fail-closed требует PSP webhook secret,
       аутентифицированный ЭЦП gateway, email/SMS и TLS для PostgreSQL/Redis.
 - [x] Configuration и reachability preflight не выводит секреты, запрещает
       redirect и привязывает bearer token к origin business endpoint.

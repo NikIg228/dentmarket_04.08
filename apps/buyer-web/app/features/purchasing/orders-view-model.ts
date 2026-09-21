@@ -12,7 +12,15 @@ export function isOrderReviewable(status: string) {
   return REVIEWABLE_STATUSES.has(status);
 }
 
-export function hasPartialDecision(order: SupplierOrder) {
+type DecisionOrder = Pick<SupplierOrder, "status" | "items">;
+const DECIDED_STATUSES = new Set([
+  "CONFIRMED", "PARTIALLY_CONFIRMED", "AWAITING_PAYMENT", "PAID", "ASSEMBLING",
+  "READY_TO_SHIP", "SHIPPED", "IN_TRANSIT", "DELIVERED", "PARTIALLY_FULFILLED", "RETURN_DISPUTE",
+]);
+
+export function hasPartialDecision(order: DecisionOrder) {
+  // acceptedQuantity starts at zero before a supplier has made any decision.
+  if (!DECIDED_STATUSES.has(order.status)) return false;
   return order.items.some(
     (item) =>
       item.acceptedQuantity !== null &&

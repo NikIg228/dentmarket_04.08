@@ -16,6 +16,7 @@ import { ProductCorrectionsPanel } from "../../product-corrections-panel";
 import styles from "../../page.module.css";
 import type { Offer } from "./types";
 import { statusTone } from "./view-model";
+import { offerPackaging } from "./offer-packaging";
 
 export function SupplierOffers({
   api,
@@ -60,6 +61,7 @@ export function SupplierOffers({
             ]}
           >
             {offers.map((offer) => {
+              const packaging = offerPackaging(offer);
               const activePrice = offer.prices.find(
                 (price) => price.status === "ACTIVE",
               );
@@ -72,12 +74,10 @@ export function SupplierOffers({
                     </small>
                   </td>
                   <td data-label="Упаковка">
-                    {offer.packaging?.name ?? "Не назначена"}
+                    {packaging.name}
                     <br />
                     <small>
-                      {offer.packaging
-                        ? `${offer.packaging.quantityInBaseUnit} ${offer.packaging.unit.symbol}`
-                        : "Уточните фасовку перед публикацией"}
+                      {packaging.detail}
                     </small>
                   </td>
                   <td data-label="Публикация">

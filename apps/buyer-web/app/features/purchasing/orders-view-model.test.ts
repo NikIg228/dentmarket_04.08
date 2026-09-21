@@ -50,7 +50,17 @@ describe("buyer orders view model", () => {
   });
 
   it("detects supplier quantity changes", () => {
-    expect(hasPartialDecision(order())).toBe(true);
+    expect(hasPartialDecision(order({ status: "PARTIALLY_CONFIRMED" }))).toBe(true);
+  });
+
+  it.each(["DRAFT", "AWAITING_CONFIRMATION", "RESERVED", "REJECTED", "CANCELLED"])(
+    "%s is not a partial decision even when accepted quantity is zero",
+    (status) => expect(hasPartialDecision(order({ status, items: order().items.map(item => ({ ...item, acceptedQuantity: "0" })) }))).toBe(false),
+  );
+
+  it("distinguishes full confirmation and preserves partial decisions after shipment", () => {
+    expect(hasPartialDecision(order({ status: "CONFIRMED", items: order().items.map(item => ({ ...item, acceptedQuantity: item.quantity })) }))).toBe(false);
+    expect(hasPartialDecision(order({ status: "SHIPPED" }))).toBe(true);
   });
 
   it("only enables reviews for terminal buyer-visible states", () => {

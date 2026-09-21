@@ -9,6 +9,7 @@ import { List24Regular } from "@fluentui/react-icons/svg/list";
 import {
   MarketplaceApiClient,
   parseSessionHandoff,
+  revokeWorkspaceSession,
   type ApiContext,
   type DocumentArchiveItem,
   type DocumentArchiveQueryInput,
@@ -19,11 +20,15 @@ import {
   AppShell,
   DocumentArchiveUpload,
   DocumentArchiveWorkspace,
+  documentOrderOptions,
+  documentAgreementOptions,
+  useSessionLogout,
   type DocumentArchiveFilters,
   type DocumentArchiveUploadInput,
   type NavigationItem,
 } from "@marketplace/ui";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { loginUrl } from "../public-links";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:4012/api";
 const SESSION_KEY = "dentmarket:buyer-session";
@@ -61,6 +66,7 @@ export default function BuyerDocumentsPage() {
   const [busyDocumentId, setBusyDocumentId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const logout = useSessionLogout({ sessionKey: SESSION_KEY, sessionId: handoff?.sessionId, revoke: () => revokeWorkspaceSession(API_URL, handoff), redirectUrl: loginUrl });
 
   useEffect(() => {
     void (async () => {
@@ -86,6 +92,11 @@ export default function BuyerDocumentsPage() {
     ? { accessToken: handoff.accessToken }
     : { actorId: handoff?.actorId ?? DEMO_BUYER_USER_ID, organizationId }, [handoff, organizationId]);
   const api = useMemo(() => new MarketplaceApiClient(API_URL, apiContext), [apiContext]);
+  const loadOrderOptions = useCallback(async (query: string) => documentOrderOptions(await api.listBuyerOrders(organizationId), organizationId, query), [api, organizationId]);
+  const loadAgreementOptions = useCallback(async (query: string) => {
+    const page = await api.listDocumentArchive({ category: "CONTRACT", q: query || undefined, limit: 100 });
+    return documentAgreementOptions(page.items, organizationId, page.nextCursor !== null);
+  }, [api, organizationId]);
 
   const load = useCallback(async (append = false) => {
     setLoading(true);
@@ -149,7 +160,7 @@ export default function BuyerDocumentsPage() {
     } finally { setBusyDocumentId(null); }
   };
 
-  return <AppShell productName="DentMarket KZ" productMark="DM" workspaceLabel="Кабинет клиники" userName={handoff?.displayName ?? "Demo Dental Clinic"} userMeta={handoff?.organizationDisplayName ?? "Клиника"} navigation={navigation} activeNavigation="documents" contextLabel="Документолог" onNavigate={(id) => { if (id !== "documents") window.location.assign("/"); }} onLogout={() => { window.sessionStorage.removeItem(SESSION_KEY); window.location.assign("/login"); }}>
+  return <AppShell productName="DentMarket KZ" productMark="DM" workspaceLabel="Кабинет клиники" userName={handoff?.displayName ?? "Demo Dental Clinic"} userMeta={handoff?.organizationDisplayName ?? "Клиника"} navigation={navigation} activeNavigation="documents" contextLabel="Документолог" onNavigate={(id) => { if (id !== "documents") window.location.assign("/"); }} {...logout}>
     <DocumentArchiveWorkspace
       roleLabel="клиника"
       organizationId={organizationId}
@@ -160,7 +171,7 @@ export default function BuyerDocumentsPage() {
       loading={loading}
       error={error}
       busyDocumentId={busyDocumentId}
-      uploadAction={<DocumentArchiveUpload kinds={["PAYMENT_CONFIRMATION", "CONTRACT_ADDENDUM", "ACCEPTANCE_ACT", "OTHER"]} busy={uploading} onUpload={upload} />}
+      uploadAction={<DocumentArchiveUpload key={organizationId} kinds={["PAYMENT_CONFIRMATION", "CONTRACT_ADDENDUM", "ACCEPTANCE_ACT", "OTHER"]} busy={uploading} onUpload={upload} loadOrderOptions={loadOrderOptions} loadAgreementOptions={loadAgreementOptions} />}
       onFiltersChange={setFilters}
       onApplyFilters={() => { setAppliedFilters(filters); setNextCursor(null); }}
       onResetFilters={() => { setFilters(initialFilters); setAppliedFilters(initialFilters); setNextCursor(null); }}

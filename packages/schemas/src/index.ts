@@ -718,7 +718,17 @@ export const addCartItemSchema = z.object({
 
 export const checkoutCartSchema = z.object({
   idempotencyKey: z.string().trim().min(8).max(160),
+  expectedVersion: z.number().int().positive().optional(),
 });
+
+export const cartVersionSchema = z.object({ expectedVersion: z.number().int().positive() }).strict();
+export const updateCartItemSchema = cartVersionSchema.extend({
+  quantity: z.number().positive().max(1_000_000).multipleOf(0.000001),
+});
+export const repriceCartSchema = z.object({ expectedVersion: z.number().int().positive().optional() }).strict();
+export type UpdateCartItemRequest = z.infer<typeof updateCartItemSchema>;
+export type CartVersionRequest = z.infer<typeof cartVersionSchema>;
+export type RepriceCartRequest = z.infer<typeof repriceCartSchema>;
 
 export const confirmSupplierOrderSchema = z.object({
   decisions: z.array(z.object({
@@ -1309,3 +1319,6 @@ export type {
   ConnectorReservationResult,
 } from "./integration-contracts.js";
 export * from "./deployment-profile";
+export * from "./registration-resume.js";
+export * from "./local-auth.js";
+export * from "./workspace-context.js";

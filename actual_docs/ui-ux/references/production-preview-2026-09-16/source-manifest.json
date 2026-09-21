@@ -1,0 +1,347 @@
+{
+  "time": "2026-09-15T20:25:17.405Z",
+  "head": "3d644963ed72f99a100e180db2d373bc5abeaef9",
+  "originals": [
+    {
+      "name": "01-supplier-order.png",
+      "source": "C:/Users/user/Desktop/Изображение Codex 14 сент. 2026 г., 19_23_11.png",
+      "sha256": "25935ca2ef2a7706db481c0b7b3a90ae9027876c6749f2caf95ae33904a56f3c",
+      "width": 1536,
+      "height": 1024,
+      "role": "OWNER_DIRECTION",
+      "pixelModified": false
+    },
+    {
+      "name": "02-cart-reprice.png",
+      "source": "C:/Users/user/Desktop/Изображение Codex 14 сент. 2026 г., 19_23_04.png",
+      "sha256": "16ca10e0777ab1bd121b1db6cc79a64f8ed63e717c7f6f0045aacd2cceadd826",
+      "width": 1536,
+      "height": 1024,
+      "role": "OWNER_DIRECTION",
+      "pixelModified": false
+    },
+    {
+      "name": "03-product-offers.png",
+      "source": "C:/Users/user/Desktop/Изображение Codex 14 сент. 2026 г., 19_22_51.png",
+      "sha256": "961848a0afc4a3eec6c26667f8d2200f579f6e0fc701e93a398a88d2bab2518d",
+      "width": 1536,
+      "height": 1024,
+      "role": "OWNER_DIRECTION",
+      "pixelModified": false
+    },
+    {
+      "name": "04-catalog.png",
+      "source": "C:/Users/user/Desktop/Изображение Codex 14 сент. 2026 г., 19_22_42.png",
+      "sha256": "dbafd27eccbd0ec244d5a9eba0ef4a560e94e3010e7eb1a9a9769fe3c5558458",
+      "width": 1536,
+      "height": 1024,
+      "role": "OWNER_DIRECTION",
+      "pixelModified": false
+    }
+  ],
+  "fonts": [
+    {
+      "name": "438aa629764e75f3-s.woff2",
+      "source": "apps\\buyer-web\\.next\\static\\media\\438aa629764e75f3-s.woff2",
+      "sha256": "e8c0b39992f06b3dc9a9834494088014859f363bf6ca8792b6bb07e17c7965f3"
+    },
+    {
+      "name": "875ae681bfde4580-s.p.woff2",
+      "source": "apps\\buyer-web\\.next\\static\\media\\875ae681bfde4580-s.p.woff2",
+      "sha256": "95a493061fe0a8d0d027c2892747134ba747141112d3be4d5022e70ab7d3a1a6"
+    },
+    {
+      "name": "51251f8b9793cdb3-s.woff2",
+      "source": "apps\\buyer-web\\.next\\static\\media\\51251f8b9793cdb3-s.woff2",
+      "sha256": "40af11327fe5308166c6cb5787808b042db6da889abf602f0a4876c49675d87e"
+    },
+    {
+      "name": "e857b654a2caa584-s.woff2",
+      "source": "apps\\buyer-web\\.next\\static\\media\\e857b654a2caa584-s.woff2",
+      "sha256": "bab757f8a0a1bc04055ee98cb5777f3254aab11f6d222366e1f40a36f390506a"
+    },
+    {
+      "name": "cc978ac5ee68c2b6-s.woff2",
+      "source": "apps\\buyer-web\\.next\\static\\media\\cc978ac5ee68c2b6-s.woff2",
+      "sha256": "ce093b341d9c10658ee1eaa85c5f8042ff3307bc6ccfc5f405616eb437f0009e"
+    },
+    {
+      "name": "4c9affa5bc8f420e-s.p.woff2",
+      "source": "apps\\buyer-web\\.next\\static\\media\\4c9affa5bc8f420e-s.p.woff2",
+      "sha256": "e310b55a7fd9677f5e3555e6c6c4d064fa1f1d24393f0ddbe217cea12a8c432f"
+    }
+  ],
+  "inputs": [
+    {
+      "file": "apps/landing-web/app/page.tsx",
+      "sha256": "2a58e4f03740d0669cb901fae3caec812789d74f0b6dd0209d054c53cbff3449"
+    },
+    {
+      "file": "apps/buyer-web/app/about/page.tsx",
+      "sha256": "e1b9a6ca93511c0f96778a00eeec695ce10f268c606c62ce9b6873ba655ced21"
+    },
+    {
+      "file": "apps/buyer-web/app/suppliers/page.tsx",
+      "sha256": "d8a7d1e1ad9365b4d3dfbf4f994eea8cf4c5dc985d327d1a338444532a4b8425"
+    },
+    {
+      "file": "apps/buyer-web/app/catalog/page.tsx",
+      "sha256": "b547871ab382d797aa981cf312d097e85029fd3bae85bb5b5d2a6ccf4c2489d5"
+    },
+    {
+      "file": "apps/buyer-web/app/products/[id]/page.tsx",
+      "sha256": "2634bfe5dc27e14f0084f52fa3b73feb80d1e9a6c9aed29f52ccbdeddba7b4bb"
+    },
+    {
+      "file": "apps/buyer-web/app/features/purchasing/buyer-cart.tsx",
+      "sha256": "ee602c8e0b50797c010e8fb70ebb74d6aae418ab810334ce0ca8d34f7165a179"
+    },
+    {
+      "file": "actual_docs/product/DENTMARKET_PRODUCT_V2.md",
+      "sha256": "934442dda138e65ca49ceee13b786fc4cae03b7a5e1f98a0da39394e2d854987"
+    },
+    {
+      "file": "apps/buyer-web/app/features/purchasing/buyer-orders.tsx",
+      "sha256": "ae3c41583b2a658b1f919b2d32ff4baa96a9e3394e84ae191ff86cce1c995e08"
+    },
+    {
+      "file": "apps/buyer-web/app/order-decision-details.tsx",
+      "sha256": "0d79e2fef59f383ea7e165fa94758581549dc79b645077a98ec18fa4f8ce65ba"
+    },
+    {
+      "file": "apps/buyer-web/app/documents/page.tsx",
+      "sha256": "a02e636940b63b36925ba6ae009b31efa327c03fd53d2a4c9a9157f54d8a5996"
+    },
+    {
+      "file": "packages/ui/src/document-archive.tsx",
+      "sha256": "a724674469f381f83d2fc55e1433369a542cb8cc239b27d2c991d3d1357d70f1"
+    },
+    {
+      "file": "apps/buyer-web/app/buyer-services-panel.tsx",
+      "sha256": "6cc664c09bbfd54c68d87946882a7950b4a66659d7bfaa94939d853a9ace95df"
+    },
+    {
+      "file": "apps/buyer-web/app/page.tsx",
+      "sha256": "3d5932237aea423f3a09fd3c26ac8511cb021949a4dfbd9f50e1ea447ff624a2"
+    },
+    {
+      "file": "apps/buyer-web/app/smart-commerce-panel.tsx",
+      "sha256": "840805455e4acef21ea62d4d01e5f8f3147a03b4670b391f12cfa56b983ddb9e"
+    },
+    {
+      "file": "actual_docs/backend/DENTMARKET_BACKEND_FOUNDATION_V2.md",
+      "sha256": "8a84574182040499fe21ec46009ee536cb909cd9b959f08943c1079406f82643"
+    },
+    {
+      "file": "apps/supplier-web/app/features/supplier-workspace/supplier-dashboard.tsx",
+      "sha256": "1001f9d789ebabb519819f6b86c2fb9c7bd2d7621a6b7a14404513f0e5bcbca3"
+    },
+    {
+      "file": "apps/supplier-web/app/onboarding-progress.tsx",
+      "sha256": "af67f960e172a1a7e828a78bcecc6900473ad624c04b07d01c7a955e05ce6efd"
+    },
+    {
+      "file": "apps/supplier-web/app/features/supplier-workspace/supplier-orders.tsx",
+      "sha256": "854f93d54c0cf430ba0916aeb7eb87e79b2fae545263124355f1aeaf58a46252"
+    },
+    {
+      "file": "apps/supplier-web/app/order-confirmation-panel.tsx",
+      "sha256": "7ef830da124185e7a1449ebe01b9a191949922bf3623b0e9dc78b0aada1864e9"
+    },
+    {
+      "file": "apps/supplier-web/app/shipment-panel.tsx",
+      "sha256": "c382d50018ec8dbed8ddfa3df4a1f40083035633f802bdf96a40dc773979502f"
+    },
+    {
+      "file": "apps/supplier-web/app/features/supplier-workspace/supplier-offers.tsx",
+      "sha256": "50014f63d7c5915fe8e35da1698afdc9239560c9fb926373bda1d3fd3fba2e31"
+    },
+    {
+      "file": "apps/supplier-web/app/features/supplier-workspace/supplier-inventory.tsx",
+      "sha256": "2a783d668f7a0c4a28f31a4225993c0cbab8dfad87b5e2d01c27b8ee7c336297"
+    },
+    {
+      "file": "apps/supplier-web/app/features/supplier-workspace/supplier-integrations.tsx",
+      "sha256": "d557de4b7f250b6f675ac34b9c472b79c04d70193a00957c68d243458d818de6"
+    },
+    {
+      "file": "apps/supplier-web/app/connector-onboarding.tsx",
+      "sha256": "c60a57fee0c3111cf244c3ff1c2b99f837c3f777b5f6f9292309e07c2662e2bb"
+    },
+    {
+      "file": "apps/supplier-web/app/features/supplier-workspace/supplier-compliance.tsx",
+      "sha256": "663a069b0cc29e720028901cae065affb3aa1f795cb79cce87e857274942e5c2"
+    },
+    {
+      "file": "apps/supplier-web/app/marketplace-agreement-panel.tsx",
+      "sha256": "1411e77e1e57f2f97a653c176da8f7da709b5e78ea7bcd12a434f7d05335155b"
+    },
+    {
+      "file": "apps/supplier-web/app/product-corrections-panel.tsx",
+      "sha256": "dca15b170bb6a3155523495c81e470af100c8839e0d5c9810281cb356388e20f"
+    },
+    {
+      "file": "apps/supplier-web/app/documents/page.tsx",
+      "sha256": "e9b68d640bbd27cce1c7e41f0d44e40ba992b126a7df976e3263b9805a221302"
+    },
+    {
+      "file": "apps/supplier-web/app/promotions-panel.tsx",
+      "sha256": "7425ff0d359dcfaba6de2bd706c37b7127af054d406d9fea0363e0495faf63d5"
+    },
+    {
+      "file": "apps/supplier-web/app/supplier-trust-panel.tsx",
+      "sha256": "669d9812975c94054518d8c0e03f96cba5000dab3ebd58ca403ec53472242122"
+    },
+    {
+      "file": "actual_docs/product/DENTMARKET_OUT_OF_PILOT_FEATURES.md",
+      "sha256": "2342430b8bca608e44578a09879accbdf9664daa40d1980b3c6e7e00c3f14771"
+    },
+    {
+      "file": "apps/admin-web/app/operation-queue.tsx",
+      "sha256": "ead36333f523ad1fab258df49fe65eba786b2f7c5014052249676dad94a36f43"
+    },
+    {
+      "file": "apps/admin-web/app/resource-lists.tsx",
+      "sha256": "37bd4b5de925c085f1e8a0c7bf3bc5f4aef0e24bcf846fff789a95b87c5e0a02"
+    },
+    {
+      "file": "apps/admin-web/app/organization-quick-create.tsx",
+      "sha256": "deac5b1ee9d6923e5c1ca68fa90601bc27933cd12862102636b051c93bf9684b"
+    },
+    {
+      "file": "apps/admin-web/app/foundation-management.tsx",
+      "sha256": "8fbc71ce7002af955f90bb4911392f8585407446e32380c108373a2c48a14e51"
+    },
+    {
+      "file": "apps/admin-web/app/catalog-foundation.tsx",
+      "sha256": "34b4051abe8f70bf3cbd48009331afd2416dc9a9c26c0c8cefcc7ca039d38b50"
+    },
+    {
+      "file": "apps/admin-web/app/catalog-quality.tsx",
+      "sha256": "82babb8ff2efc22e483b47430d2aba2822fd3c13811d918dafc983acf9b7abbe"
+    },
+    {
+      "file": "apps/admin-web/app/product-correction-queue.tsx",
+      "sha256": "7c9167cf0441770358e694ffc0ba90499582dc9c01780711f3d6a169ce0363f8"
+    },
+    {
+      "file": "apps/admin-web/app/catalog-import-review.tsx",
+      "sha256": "b055b177d56fe1131cb25e261fbbed220b5f9660203b4ca1cc967bd576ecc264"
+    },
+    {
+      "file": "apps/admin-web/app/supplier-operations.tsx",
+      "sha256": "96f4ec87e0959c87d22af390c56fc4ace672d3ef497a1b29e14d798e5a9a7366"
+    },
+    {
+      "file": "apps/admin-web/app/integration-operations.tsx",
+      "sha256": "862b450be8bbf099a9bbbdbaad4577167baf107f637241612204ada9d35fb6e9"
+    },
+    {
+      "file": "apps/admin-web/app/connector-readiness-registry.tsx",
+      "sha256": "f7c458c7d8bf13367a4c919e09d42ec5d90e7f22e1a6be34e9b5bd5f9991cf4c"
+    },
+    {
+      "file": "apps/admin-web/app/agreement-operations.tsx",
+      "sha256": "7031fb6d46c2938ad5885320159a59eaa0641a61ec08245a8989e08442766152"
+    },
+    {
+      "file": "apps/admin-web/app/supplier-controls.tsx",
+      "sha256": "b822e3de94579852129c5e98e0ac2916c74ce2609a89b6d3cc482636ddd7df60"
+    },
+    {
+      "file": "apps/admin-web/app/platform-assurance.tsx",
+      "sha256": "24c853655b20e663346256ac3a42fbe3fd33b31e6ec065ec6e8979bfefb79214"
+    },
+    {
+      "file": "apps/admin-web/app/trust-operations.tsx",
+      "sha256": "88eb9a990f07d690b009805a0aab7f773155debf530e7a80e26ab56c87056291"
+    },
+    {
+      "file": "apps/admin-web/app/audit-operations.tsx",
+      "sha256": "adfe229c281d25b46a871f55056eec7774554aabab53be0a1e6fc1962d109155"
+    },
+    {
+      "file": "apps/admin-web/app/platform-settings.tsx",
+      "sha256": "f3f37416d14381ed55bb640587392c837a56637944c935ad7508b312c8ed945f"
+    },
+    {
+      "file": "apps/admin-web/app/live-metrics.tsx",
+      "sha256": "f73173d10c8069ccb2a73c813dba5d41dd3a6e048e7f9af2561058dba616c6ed"
+    },
+    {
+      "file": "apps/landing-web/app/login/page.tsx",
+      "sha256": "5f8290ef3aebe759328b4709a034c6f468a899b48259f119924b1b6d4aca6bb0"
+    },
+    {
+      "file": "apps/landing-web/app/register/page.tsx",
+      "sha256": "68efaae1c2d1d375d7ee56d3dd3aa439bbcb145e9b9d921885fc54e8b720ec5b"
+    },
+    {
+      "file": "apps/landing-web/app/register/resume/page.tsx",
+      "sha256": "45091f680e81c0bd2cae1ccfb4c039d8aed6750dae623100556809232045fdc5"
+    },
+    {
+      "file": "apps/landing-web/app/verify-email/page.tsx",
+      "sha256": "6a550188328207869ffb6e8c416a7e244c0893a78f7252c9f55012d2a858dee7"
+    },
+    {
+      "file": "apps/landing-web/app/reset-password/page.tsx",
+      "sha256": "3b230a272b2bee8afc1506523dd38ef68b7e810be906ac9e681cb5b7c6c8d1db"
+    },
+    {
+      "file": "apps/admin-web/app/login/page.tsx",
+      "sha256": "ce0e1810aaa9394f59109384d8c6297f7b161cea7f86aee2e51e49edf943be4a"
+    },
+    {
+      "file": "apps/landing-web/app/legal/terms/page.tsx",
+      "sha256": "aa10da0ebf6723bfb8400b723ba340d033b2213dc9d84dfd8012ff47e592ae9b"
+    },
+    {
+      "file": "apps/landing-web/app/legal/privacy/page.tsx",
+      "sha256": "ff974b48db651fc28dcbba14ae93a88e4d2d8889958b511daaf67e411696720a"
+    },
+    {
+      "file": "actual_docs/ui-ux/UI_UX_IMPLEMENTATION_STANDARD.md",
+      "sha256": "0781316796769630f16c7a5f27e0dd49eda7ce2add7a7dc24156fc1cc7d05567"
+    },
+    {
+      "file": "AGENTS.md",
+      "sha256": "6b2ce038bd932b2533f8cd62d1c9dbc9bbdf5c3a00ade8a7cba4ac0bf26cbfd5"
+    },
+    {
+      "file": "actual_docs/governance/DEVELOPMENT_WORKFLOW.md",
+      "sha256": "69fe6bc42db0e503c87e33b5a401b2e9512e0cb8eeac7a527dc74d2a8b2da73e"
+    },
+    {
+      "file": "actual_docs/ui-ux/DENTMARKET_UI_UX_CONSOLIDATION_STANDARD.md",
+      "sha256": "54fa5c99aee9adce9765907d3eb730b0009d4f0e2dd43b7d2ecfd204e58e546a"
+    },
+    {
+      "file": "packages/ui/src/styles.css",
+      "sha256": "a33c47c460ce21043ecf477a2f6f03862a2094d0831a44b40f39163e26653807"
+    }
+  ],
+  "routes": [
+    "apps/landing-web/app/register/resume/page.tsx",
+    "apps/admin-web/app/login/page.tsx",
+    "apps/admin-web/app/page.tsx",
+    "apps/buyer-web/app/about/page.tsx",
+    "apps/buyer-web/app/catalog/page.tsx",
+    "apps/buyer-web/app/documents/page.tsx",
+    "apps/buyer-web/app/login/page.tsx",
+    "apps/buyer-web/app/page.tsx",
+    "apps/buyer-web/app/products/[id]/page.tsx",
+    "apps/buyer-web/app/suppliers/page.tsx",
+    "apps/landing-web/app/legal/privacy/page.tsx",
+    "apps/landing-web/app/legal/terms/page.tsx",
+    "apps/landing-web/app/login/page.tsx",
+    "apps/landing-web/app/page.tsx",
+    "apps/landing-web/app/register/page.tsx",
+    "apps/landing-web/app/reset-password/page.tsx",
+    "apps/landing-web/app/verify-email/page.tsx",
+    "apps/supplier-web/app/documents/page.tsx",
+    "apps/supplier-web/app/page.tsx"
+  ],
+  "pages": 78,
+  "notes": "Read-only source snapshot. Existing font assets reused locally; separate distribution licensing check before publication."
+}

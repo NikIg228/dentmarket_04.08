@@ -11,6 +11,8 @@ import type {
   CheckoutCartInput,
   ConfirmSupplierOrderInput,
   CreateCartInput,
+  UpdateCartItemRequest,
+  CartVersionRequest,
 } from "@marketplace/schemas";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../platform/prisma/prisma.service";
@@ -31,6 +33,7 @@ import {
   type CartLineSnapshot,
 } from "./commerce-rules";
 import { MarketplaceAgreementsService } from "../agreements/marketplace-agreements.service";
+import { documentReferenceInclude, hasConsistentDocumentReferences, withoutReferenceRelations } from "../documents/document-reference-graph";
 
 @Injectable()
 export class CommerceService {
@@ -417,13 +420,55 @@ export class CommerceService {
   }
 
   private async requireCart(cartId: string, context: SupplierActorContext) {
+    const owner = await this.prisma.cart.findUnique({ where: { id: cartId }, select: { buyerOrganizationId: true } });
+    if (!owner) throw new NotFoundException("Cart not found");
+    await this.assertBuyerAccess(owner.buyerOrganizationId, context);
     const cart = await this.prisma.cart.findUnique({
       where: { id: cartId },
-      include: { items: { include: { offer: true } }, checkout: true },
+      include: { items: { include: { offer: { include: { supplier: { include: { organization: true } }, productVariant: { include: { product: true } } } } } }, checkout: true },
     });
     if (!cart) throw new NotFoundException("Cart not found");
-    await this.assertBuyerAccess(cart.buyerOrganizationId, context);
     return cart;
+  }
+
+  private cartConflict() {
+    return new ConflictException({ code: "CART_VERSION_CONFLICT", message: "Корзина изменилась или уже оформляется. Обновите корзину и проверьте изменения перед повтором." });
+  }
+
+  private assertCartVersion(cart: { version: number; status: string; checkout: unknown }, version = cart.version) {
+    if (cart.status !== "ACTIVE" || cart.checkout || cart.version !== version) throw this.cartConflict();
+  }
+
+  private async claimCartVersion(tx: Prisma.TransactionClient, cartId: string, version: number) {
+    // Parent row is the serialization point for all item writes and checkout.
+    const claimed = await tx.cart.updateMany({
+      where: { id: cartId, version, status: "ACTIVE", checkout: { is: null } },
+      data: { version: { increment: 1 } },
+    });
+    if (claimed.count !== 1) throw this.cartConflict();
+  }
+
+  async changeItem(cartId: string, itemId: string, input: UpdateCartItemRequest | CartVersionRequest, context: SupplierActorContext) {
+    const cart = await this.requireCart(cartId, context);
+    this.assertCartVersion(cart, input.expectedVersion);
+    const item = cart.items.find(candidate => candidate.id === itemId);
+    const quantity = "quantity" in input ? input.quantity : undefined;
+    if (!item && quantity !== undefined) throw new NotFoundException("Позиция не найдена в этой корзине");
+    // Retrying an already satisfied operation at the CURRENT version is a no-op.
+    if (!item || (quantity !== undefined && item.quantity.eq(quantity))) return cart;
+    return this.prisma.$transaction(async tx => {
+      await this.claimCartVersion(tx, cart.id, input.expectedVersion);
+      if (quantity === undefined) await tx.cartItem.delete({ where: { id: item.id } });
+      else await tx.cartItem.update({ where: { id: item.id }, data: {
+        quantity, totalPriceMinor: calculateLineTotal(item.unitPriceMinor.toString(), quantity),
+        // Keep the accepted price/rules snapshot. Validation must expose later changes.
+      } });
+      await tx.auditLog.create({ data: { ...context, action: quantity === undefined ? "cart.item.removed" : "cart.item.quantity_changed", entityType: "Cart", entityId: cart.id,
+        before: { itemId, quantity: item.quantity.toString(), version: cart.version },
+        after: { itemId, quantity: quantity === undefined ? null : String(quantity), version: cart.version + 1 },
+      } });
+      return tx.cart.findUniqueOrThrow({ where: { id: cart.id }, include: { items: { include: { offer: { include: { supplier: { include: { organization: true } }, productVariant: { include: { product: true } } } } } }, checkout: true } });
+    });
   }
 
   async addItem(
@@ -432,8 +477,7 @@ export class CommerceService {
     context: SupplierActorContext,
   ) {
     const cart = await this.requireCart(cartId, context);
-    if (cart.status !== "ACTIVE")
-      throw new ConflictException("Only an active cart can be changed");
+    this.assertCartVersion(cart);
     const resolved = await this.resolveOffer(
       cart.buyerOrganizationId,
       input.offerId,
@@ -442,6 +486,7 @@ export class CommerceService {
       cart.currency,
     );
     return this.prisma.$transaction(async (tx) => {
+      await this.claimCartVersion(tx, cartId, cart.version);
       const item = await tx.cartItem.upsert({
         where: { cartId_offerId: { cartId, offerId: input.offerId } },
         update: {
@@ -464,10 +509,6 @@ export class CommerceService {
           priceRuleId: resolved.decision.ruleId,
           pricingSnapshot: resolved.pricingSnapshot,
         },
-      });
-      await tx.cart.update({
-        where: { id: cartId },
-        data: { version: { increment: 1 } },
       });
       await tx.auditLog.create({
         data: {
@@ -553,15 +594,14 @@ export class CommerceService {
       requiresAcceptance: items.some(
         ({ requiresAcceptance }) => requiresAcceptance,
       ),
-      canCheckout: items.every(({ canCheckout }) => canCheckout),
+      canCheckout: items.length > 0 && items.every(({ canCheckout }) => canCheckout),
       items,
     };
   }
 
-  async reprice(cartId: string, context: SupplierActorContext) {
+  async reprice(cartId: string, context: SupplierActorContext, expectedVersion?: number) {
     const cart = await this.requireCart(cartId, context);
-    if (cart.status !== "ACTIVE")
-      throw new ConflictException("Only an active cart can be repriced");
+    this.assertCartVersion(cart, expectedVersion);
     const attempts = await Promise.all(
       cart.items.map(async (item) => {
         try {
@@ -585,6 +625,7 @@ export class CommerceService {
     );
     if (resolved.length === 0) return this.requireCart(cartId, context);
     await this.prisma.$transaction(async (tx) => {
+      await this.claimCartVersion(tx, cartId, cart.version);
       for (const line of resolved)
         await tx.cartItem.update({
           where: { id: line.item.id },
@@ -597,10 +638,6 @@ export class CommerceService {
             pricingSnapshot: line.result.pricingSnapshot,
           },
         });
-      await tx.cart.update({
-        where: { id: cartId },
-        data: { version: { increment: 1 } },
-      });
       await tx.auditLog.create({
         data: {
           ...context,
@@ -639,6 +676,7 @@ export class CommerceService {
     }
     if (cart.status !== "ACTIVE")
       throw new ConflictException("Cart is not active");
+    this.assertCartVersion(cart, input.expectedVersion);
     if (cart.items.length === 0) throw new BadRequestException("Cart is empty");
     const validation = await this.validateCart(cartId, context);
     if (validation.requiresAcceptance)
@@ -691,6 +729,7 @@ export class CommerceService {
     try {
       created = await this.prisma.$transaction(
         async (tx) => {
+          await this.claimCartVersion(tx, cartId, cart.version);
           const checkout = await tx.checkout.create({
             data: {
               cartId,
@@ -799,8 +838,9 @@ export class CommerceService {
       );
     } catch (error) {
       if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        ["P2002", "P2034"].includes(error.code)
+        error instanceof ConflictException ||
+        (error instanceof Prisma.PrismaClientKnownRequestError &&
+        ["P2002", "P2034"].includes(error.code))
       ) {
         const raced = await this.prisma.checkout.findUnique({
           where: { cartId },
@@ -915,6 +955,7 @@ export class CommerceService {
             },
             paymentAllocation: true,
             documents: {
+              include: documentReferenceInclude,
               where: { kind: { in: ["ORDER_SPECIFICATION", "INVOICE", "WAYBILL"] } },
               orderBy: [{ kind: "asc" }, { version: "desc" }],
             },
@@ -931,12 +972,13 @@ export class CommerceService {
     });
     if (!checkout) throw new NotFoundException("Checkout not found");
     await this.assertBuyerAccess(checkout.buyerOrganizationId, context);
-    return checkout;
+    return { ...checkout, supplierOrders: checkout.supplierOrders.map((order) => ({ ...order,
+      documents: order.documents.filter(hasConsistentDocumentReferences).map(withoutReferenceRelations) })) };
   }
 
   async supplierOrders(context: SupplierActorContext, checkoutId?: string) {
     const operator = await this.isOperator(context.organizationId);
-    return this.prisma.supplierOrder.findMany({
+    const orders = await this.prisma.supplierOrder.findMany({
       where: {
         ...(checkoutId ? { checkoutId } : {}),
         ...(operator
@@ -971,12 +1013,14 @@ export class CommerceService {
           orderBy: { createdAt: "desc" },
         },
         documents: {
+          include: documentReferenceInclude,
           where: { kind: { in: ["ORDER_SPECIFICATION", "INVOICE", "WAYBILL"] } },
           orderBy: [{ kind: "asc" }, { version: "desc" }],
         },
       },
       orderBy: { createdAt: "desc" },
     });
+    return orders.map((order) => ({ ...order, documents: order.documents.filter(hasConsistentDocumentReferences).map(withoutReferenceRelations) }));
   }
 
   async buyerOrders(
@@ -984,7 +1028,7 @@ export class CommerceService {
     context: SupplierActorContext,
   ) {
     await this.assertBuyerAccess(buyerOrganizationId, context);
-    return this.prisma.supplierOrder.findMany({
+    const orders = await this.prisma.supplierOrder.findMany({
       where: { buyerOrganizationId },
       include: {
         supplier: true,
@@ -1008,12 +1052,14 @@ export class CommerceService {
           orderBy: { createdAt: "desc" },
         },
         documents: {
+          include: documentReferenceInclude,
           where: { kind: { in: ["ORDER_SPECIFICATION", "INVOICE", "WAYBILL"] } },
           orderBy: [{ kind: "asc" }, { version: "desc" }],
         },
       },
       orderBy: { createdAt: "desc" },
     });
+    return orders.map((order) => ({ ...order, documents: order.documents.filter(hasConsistentDocumentReferences).map(withoutReferenceRelations) }));
   }
 
   async confirmSupplierOrder(

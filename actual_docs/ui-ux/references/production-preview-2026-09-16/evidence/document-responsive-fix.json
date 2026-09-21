@@ -1,0 +1,70 @@
+{
+  "reason": "PDF preview intrinsic width overflow at 768",
+  "attempt": 2,
+  "checks": [
+    {
+      "id": "buyer-document-detail",
+      "pdfScroll": 558,
+      "pdfWidth": 343,
+      "scroll": 375,
+      "width": 390,
+      "pass": true
+    },
+    {
+      "id": "supplier-document-detail",
+      "pdfScroll": 558,
+      "pdfWidth": 343,
+      "scroll": 375,
+      "width": 390,
+      "pass": true
+    },
+    {
+      "id": "buyer-document-detail",
+      "pdfScroll": 705,
+      "pdfWidth": 705,
+      "scroll": 753,
+      "width": 768,
+      "pass": true
+    },
+    {
+      "id": "supplier-document-detail",
+      "pdfScroll": 705,
+      "pdfWidth": 705,
+      "scroll": 753,
+      "width": 768,
+      "pass": true
+    },
+    {
+      "id": "buyer-document-detail",
+      "pdfScroll": 647,
+      "pdfWidth": 647,
+      "scroll": 1009,
+      "width": 1024,
+      "pass": true
+    },
+    {
+      "id": "supplier-document-detail",
+      "pdfScroll": 647,
+      "pdfWidth": 647,
+      "scroll": 1009,
+      "width": 1024,
+      "pass": true
+    },
+    {
+      "id": "buyer-document-detail",
+      "pdfScroll": 1065,
+      "pdfWidth": 1065,
+      "scroll": 1521,
+      "width": 1536,
+      "pass": true
+    },
+    {
+      "id": "supplier-document-detail",
+      "pdfScroll": 1065,
+      "pdfWidth": 1065,
+      "scroll": 1521,
+      "width": 1536,
+      "pass": true
+    }
+  ]
+}

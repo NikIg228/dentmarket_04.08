@@ -4,6 +4,11 @@
 
 Принято и локально проверено 2026-09-13. Production deployment не заявлен.
 
+Дополнение 2026-09-14: локальный launcher из [ADR 011](011-local-full-feature-demonstration.md)
+явно передаёт go_live; отсутствие профиля в shared config по-прежнему означает
+pilot. Закрытый task card ниже — evidence исторического slice, не задание
+повторить его. Выбор и reuse gates — Workflow §4.
+
 ## Решение
 
 Все четыре Next.js приложения получают публичный профиль при сборке из

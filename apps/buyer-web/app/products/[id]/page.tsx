@@ -8,6 +8,7 @@ import mediaCatalog from "../../data/public-catalog-media.json";
 import { PublicHeader } from "../../public-header";
 import styles from "./page.module.css";
 import ProductOfferActions from "./product-offer-actions";
+import { formatCatalogMoney } from "../../catalog/catalog-view-model";
 
 type CatalogProduct = (typeof catalog.products)[number];
 type PublicComparison = Awaited<
@@ -28,8 +29,9 @@ type DetailProduct = {
     supplier: { id: string; name: string };
     supplierSku: string | null;
     priceMinor: string | null;
+    normalizedPriceMinor?: string | null;
     currency: string;
-    packaging?: { name: string };
+    packaging?: { name: string; quantityInBaseUnit?: string; unit?: string | null };
     available: boolean;
     deliveryMethods: string[];
     verifiedDocuments: boolean;
@@ -67,6 +69,7 @@ function fromFallback(product: CatalogProduct): DetailProduct {
       supplier: offer.supplier,
       supplierSku: offer.supplierSku,
       priceMinor: offer.priceMinor,
+      normalizedPriceMinor: offer.normalizedPriceMinor,
       currency: offer.currency,
       packaging: offer.packaging,
       available: offer.available,
@@ -103,8 +106,9 @@ function fromComparison(comparison: PublicComparison): DetailProduct {
       },
       supplierSku: offer.supplierSku,
       priceMinor: offer.price.amountMinor,
+      normalizedPriceMinor: offer.price.normalizedPriceMinor,
       currency: offer.price.currency,
-      packaging: { name: offer.packaging.name },
+      packaging: { name: offer.packaging.name, quantityInBaseUnit: offer.packaging.quantityInBaseUnit, unit: offer.packaging.unit },
       available: offer.availability.some(
         ({ quantityAvailable }) => Number(quantityAvailable) > 0,
       ),
@@ -270,20 +274,15 @@ export default async function ProductPage({
                       <strong>{offer.supplier.name}</strong>
                       <span>
                         {offer.packaging?.name
-                          ? `Фасовка: ${offer.packaging.name}`
+                          ? `Фасовка: ${offer.packaging.name}${offer.packaging.quantityInBaseUnit && offer.packaging.unit ? ` · ${offer.packaging.quantityInBaseUnit} ${offer.packaging.unit}` : ""}`
                           : "Условия уточняются"}
                       </span>
                     </div>
                     <div className={styles.offerRight}>
                       <strong>
-                        {offer.priceMinor == null
-                          ? "Цена по запросу"
-                          : new Intl.NumberFormat("ru-KZ", {
-                              style: "currency",
-                              currency: offer.currency,
-                              maximumFractionDigits: 0,
-                            }).format(Number(offer.priceMinor) / 100)}
+                        {formatCatalogMoney(offer.priceMinor, offer.currency)} за упаковку / единицу продажи
                       </strong>
+                      <span>{offer.normalizedPriceMinor && offer.packaging?.unit ? `${formatCatalogMoney(offer.normalizedPriceMinor, offer.currency)} за 1 ${offer.packaging.unit}` : "Цена за базовую единицу уточняется"}</span>
                       <span
                         className={
                           offer.available ? styles.available : styles.onRequest

@@ -1,9 +1,11 @@
 import { MessageBar, MessageBarBody } from "@fluentui/react-components";
 import { formatMoney } from "@marketplace/ui";
 import styles from "./order-decision-details.module.css";
+import { hasPartialDecision } from "./features/purchasing/orders-view-model";
 
 type OrderDecisionDetailsProps = {
   order: {
+    status: string;
     subtotalAmountMinor: string;
     currency: string;
     items: Array<{
@@ -11,12 +13,14 @@ type OrderDecisionDetailsProps = {
       quantity: string;
       acceptedQuantity: string | null;
       decisionReason: string | null;
+      status: string;
       offer: { productVariant: { product: { canonicalName: string } } };
     }>;
   };
 };
 
 export function OrderDecisionDetails({ order }: OrderDecisionDetailsProps) {
+  if (!hasPartialDecision(order) && order.status !== "REJECTED") return null;
   const changedItems = order.items.filter(
     (item) =>
       item.acceptedQuantity !== null &&
@@ -29,8 +33,9 @@ export function OrderDecisionDetails({ order }: OrderDecisionDetailsProps) {
     <div className={styles.root}>
       <MessageBar intent="warning">
         <MessageBarBody>
-          Поставщик изменил состав заказа. Проверьте принятые количества и
-          причины до следующего шага.
+          {order.status === "REJECTED"
+            ? "Поставщик отклонил заказ. Причины отказа указаны ниже."
+            : "Поставщик изменил состав заказа. Проверьте принятые количества и причины до следующего шага."}
         </MessageBarBody>
       </MessageBar>
       <div className={styles.summary}>

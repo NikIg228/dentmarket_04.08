@@ -10,7 +10,7 @@ import {
   formatMoney,
   formatStatus,
 } from "@marketplace/ui";
-import { Fragment } from "react";
+import { Fragment, useEffect, useState } from "react";
 import {
   OrderConfirmationPanel,
   type OrderConfirmationDecision,
@@ -34,6 +34,17 @@ export function SupplierOrders({
   ) => Promise<string | null>;
   onChanged: () => Promise<void>;
 }) {
+  const [focusOrderId, setFocusOrderId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!focusOrderId) return;
+    // The confirmation trigger unmounts on success. Restore focus from its
+    // surviving parent, after the updated row and dialog removal are committed.
+    const frame = requestAnimationFrame(() => {
+      document.getElementById(`supplier-order-${focusOrderId}`)?.focus();
+      setFocusOrderId(null);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [focusOrderId, orders]);
   return (
     <div className="mp-stack">
       <PageHeader
@@ -62,7 +73,7 @@ export function SupplierOrders({
           >
             {orders.map((order) => (
               <Fragment key={order.id}>
-                <tr>
+                <tr id={`supplier-order-${order.id}`} tabIndex={-1}>
                   <td data-label="Заказ">
                     <strong>{order.orderNumber}</strong>
                     <small>{formatDate(order.createdAt, true)}</small>
@@ -85,7 +96,11 @@ export function SupplierOrders({
                     {order.status === "AWAITING_CONFIRMATION" ? (
                       <OrderConfirmationPanel
                         order={order}
-                        onConfirm={(decisions) => onConfirm(order, decisions)}
+                        onConfirm={async (decisions) => {
+                          const error = await onConfirm(order, decisions);
+                          if (!error) setFocusOrderId(order.id);
+                          return error;
+                        }}
                       />
                     ) : (
                       <span className="mp-muted">Решение принято</span>

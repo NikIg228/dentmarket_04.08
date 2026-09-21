@@ -20,7 +20,10 @@ import { ArrowSync24Regular } from "@fluentui/react-icons/svg/arrow-sync";
 import { Dismiss24Regular } from "@fluentui/react-icons/svg/dismiss";
 import { Document24Regular } from "@fluentui/react-icons/svg/document";
 import { Search24Regular } from "@fluentui/react-icons/svg/search";
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
+import { documentDateValid, documentUploadError, documentUploadFileError, formatDocumentAmount, parseDocumentAmount } from "./document-upload-model";
+import { DocumentRelationSelect } from "./document-relation-select";
+import type { DocumentRelationLoader, DocumentRelationOption } from "./document-relations";
 
 export type DocumentArchiveParticipantView = {
   organizationId: string;
@@ -125,13 +128,7 @@ const statusLabels: Record<string, string> = {
 };
 
 const formatDate = (value: string) => new Intl.DateTimeFormat("ru-KZ", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(value));
-const formatMoney = (minor: string | null, currency: string | null) => {
-  if (!minor || !currency) return "—";
-  const amount = Number(minor) / 100;
-  return Number.isSafeInteger(Number(minor))
-    ? new Intl.NumberFormat("ru-KZ", { style: "currency", currency, maximumFractionDigits: 2 }).format(amount)
-    : `${minor} ${currency}`;
-};
+const formatMoney = formatDocumentAmount;
 
 function DocumentStatus({ value }: { value: string }) {
   const tone = ["SIGNED", "GENERATED", "RECONCILED", "REVIEWED"].includes(value)
@@ -173,10 +170,14 @@ export function DocumentArchiveUpload({
   kinds,
   busy,
   onUpload,
+  loadOrderOptions,
+  loadAgreementOptions,
 }: {
   kinds: string[];
   busy: boolean;
   onUpload: (input: DocumentArchiveUploadInput) => Promise<void>;
+  loadOrderOptions: DocumentRelationLoader;
+  loadAgreementOptions: DocumentRelationLoader;
 }) {
   const [open, setOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
@@ -184,80 +185,118 @@ export function DocumentArchiveUpload({
   const [title, setTitle] = useState("");
   const [documentNumber, setDocumentNumber] = useState("");
   const [documentDate, setDocumentDate] = useState(new Date().toISOString().slice(0, 10));
-  const [supplierOrderId, setSupplierOrderId] = useState("");
+  const [selectedOrder, setSelectedOrder] = useState<DocumentRelationOption | null>(null);
+  const [selectedAgreement, setSelectedAgreement] = useState<DocumentRelationOption | null>(null);
   const [referenceId, setReferenceId] = useState("");
   const [amount, setAmount] = useState("");
   const [currency, setCurrency] = useState("KZT");
   const [requiredSignatureCount, setRequiredSignatureCount] = useState("0");
   const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const submitLock = useRef(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const errorRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  // Dialog unmounts its native input on close. Restore the already user-selected
+  // in-memory File so native feedback and the retained draft tell the same story.
+  const attachFileInput = (node: HTMLInputElement | null) => {
+    fileInputRef.current = node;
+    if (node && file && node.files?.[0] !== file) {
+      const selection = new DataTransfer();
+      selection.items.add(file);
+      node.files = selection.files;
+    }
+  };
+  const fileId = useId();
+  const pending = busy || submitting;
+  const parsedAmount = parseDocumentAmount(amount);
+  const fileError = file ? documentUploadFileError(file) : null;
+  const close = () => {
+    if (submitLock.current || busy) return;
+    setOpen(false);
+    window.requestAnimationFrame(() => triggerRef.current?.focus());
+  };
+  useEffect(() => { if (open && error && !pending) errorRef.current?.focus(); }, [open, error, pending]);
 
   const submit = async () => {
-    if (!file || !title.trim() || !documentNumber.trim()) return;
-    if (["CONTRACT_ADDENDUM", "REFUND_CONFIRMATION"].includes(kind) && !referenceId.trim()) {
-      setError("Для выбранного типа документа укажите ID связанного основания.");
+    if (submitLock.current || busy || !file || !title.trim() || !documentNumber.trim()) return;
+    if (kind === "CONTRACT_ADDENDUM" && !selectedAgreement || kind === "REFUND_CONFIRMATION" && !referenceId.trim()) {
+      setError(kind === "CONTRACT_ADDENDUM" ? "Выберите основной договор из списка." : "Для выбранного типа документа укажите ID связанного основания.");
       return;
     }
-    if (file.size > 10_000_000) {
-      setError("Размер файла не должен превышать 10 МБ.");
-      return;
-    }
+    const validationError = documentUploadFileError(file) ?? parsedAmount.error
+      ?? (!documentDateValid(documentDate) ? "Укажите корректную дату документа." : null)
+      ?? (parsedAmount.minor !== undefined && !/^[A-Z]{3}$/.test(currency) ? "Укажите трёхбуквенный код валюты, например KZT." : null);
+    if (validationError) { setError(validationError); return; }
     const extension = file.name.split(".").pop()?.toLowerCase();
     if (extension !== "pdf" && extension !== "docx") {
       setError("Поддерживаются только PDF и DOCX.");
       return;
     }
+    submitLock.current = true; setSubmitting(true);
     try {
       setError(null);
-      const normalizedAmount = amount.replace(/[\s,.]/g, "");
       await onUpload({
         kind,
         format: extension === "pdf" ? "PDF" : "DOCX",
         title: title.trim(),
         documentNumber: documentNumber.trim(),
         documentDate: new Date(`${documentDate}T00:00:00.000Z`).toISOString(),
-        supplierOrderId: supplierOrderId.trim() || undefined,
+        supplierOrderId: selectedOrder?.id,
         paymentIntentId: kind === "PAYMENT_CONFIRMATION" ? referenceId.trim() || undefined : undefined,
         refundId: kind === "REFUND_CONFIRMATION" ? referenceId.trim() || undefined : undefined,
-        baseAgreementDocumentId: kind === "CONTRACT_ADDENDUM" ? referenceId.trim() || undefined : undefined,
-        amountMinor: normalizedAmount || undefined,
-        currency: normalizedAmount ? currency : undefined,
+        baseAgreementDocumentId: kind === "CONTRACT_ADDENDUM" ? selectedAgreement?.id : undefined,
+        amountMinor: parsedAmount.minor,
+        currency: parsedAmount.minor !== undefined ? currency : undefined,
         fileName: file.name,
         contentBase64: await fileToBase64(file),
         requiredSignatureCount: Number(requiredSignatureCount),
       });
       setOpen(false);
+      setSuccess(true);
+      window.requestAnimationFrame(() => triggerRef.current?.focus());
       setFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
       setTitle("");
       setDocumentNumber("");
-      setSupplierOrderId("");
+      setSelectedOrder(null);
+      setSelectedAgreement(null);
       setReferenceId("");
       setAmount("");
       setRequiredSignatureCount("0");
     } catch (uploadError) {
-      setError(uploadError instanceof Error ? uploadError.message : "Не удалось загрузить документ");
-    }
+      setError(documentUploadError(uploadError));
+    } finally { submitLock.current = false; setSubmitting(false); }
   };
 
   return <>
-    <Button appearance="primary" icon={<Document24Regular />} onClick={() => setOpen(true)}>Загрузить документ</Button>
-    <Dialog open={open} onOpenChange={(_, data) => setOpen(data.open)}>
+    <Button ref={triggerRef} appearance="primary" icon={<Document24Regular />} onClick={() => { setSuccess(false); setOpen(true); }}>Загрузить документ</Button>
+    {success ? <span role="status">Документ загружен в архив.</span> : null}
+    <Dialog open={open} onOpenChange={(_, data) => { if (!data.open) close(); }}>
       <DialogSurface className="dm-document-dialog">
         <DialogBody>
           <DialogTitle>Новый документ</DialogTitle>
           <DialogContent className="dm-document-upload-form">
+            <p>Черновик сохраняется при закрытии окна, пока вы остаётесь на этой странице. Во время загрузки дождитесь результата.</p>
+            <fieldset disabled={pending} style={{border:0,padding:0,margin:0,display:"contents"}}>
             <Field label="Тип документа" required><Select value={kind} onChange={(_, data) => setKind(data.value)}>{kinds.map((value) => <option key={value} value={value}>{kindLabels[value] ?? value}</option>)}</Select></Field>
-            <Field label="Название" required><Input value={title} onChange={(_, data) => setTitle(data.value)} /></Field>
-            <div className="dm-document-upload-row"><Field label="Номер" required><Input value={documentNumber} onChange={(_, data) => setDocumentNumber(data.value)} /></Field><Field label="Дата документа" required><Input type="date" value={documentDate} onChange={(_, data) => setDocumentDate(data.value)} /></Field></div>
-            <Field label="ID заказа" hint="Необязательно. UUID заказа связывает файл с закупкой."><Input value={supplierOrderId} onChange={(_, data) => setSupplierOrderId(data.value)} /></Field>
-            {kind === "CONTRACT_ADDENDUM" ? <Field label="ID основного договора" required hint="Дополнительное соглашение всегда связано с исходным договором."><Input value={referenceId} onChange={(_, data) => setReferenceId(data.value)} /></Field> : null}
+            <Field label="Название" required hint="От 2 до 240 символов"><Input maxLength={240} value={title} onChange={(_, data) => setTitle(data.value)} /></Field>
+            <div className="dm-document-upload-row"><Field label="Номер" required><Input maxLength={120} value={documentNumber} onChange={(_, data) => setDocumentNumber(data.value)} /></Field><Field label="Дата документа" required validationState={documentDateValid(documentDate) ? "none" : "error"} validationMessage={documentDateValid(documentDate) ? undefined : "Укажите корректную дату документа."}><Input type="date" value={documentDate} onChange={(_, data) => setDocumentDate(data.value)} /></Field></div>
+            <DocumentRelationSelect label="Связанный заказ" searchLabel="Поиск заказа" hint="Необязательно. Выбор связывает документ с закупкой, но не подтверждает её оплату." disabled={pending} selected={selectedOrder} onSelect={setSelectedOrder} load={loadOrderOptions} />
+            {kind === "CONTRACT_ADDENDUM" ? <DocumentRelationSelect label="Основной договор" searchLabel="Поиск договора" required hint="Для допсоглашения выберите исходный договор. Связь с записью архива не подтверждает действие договора или подпись." disabled={pending} selected={selectedAgreement} onSelect={setSelectedAgreement} load={loadAgreementOptions} /> : null}
             {kind === "PAYMENT_CONFIRMATION" ? <Field label="ID платежа" hint="Необязательно, если связанный заказ уже имеет подтверждённую оплату."><Input value={referenceId} onChange={(_, data) => setReferenceId(data.value)} /></Field> : null}
             {kind === "REFUND_CONFIRMATION" ? <Field label="ID возврата" required><Input value={referenceId} onChange={(_, data) => setReferenceId(data.value)} /></Field> : null}
-            <div className="dm-document-upload-row"><Field label="Сумма в тиынах" hint="Например, 125000 = 1 250 ₸"><Input inputMode="numeric" value={amount} onChange={(_, data) => setAmount(data.value)} /></Field><Field label="Валюта"><Input maxLength={3} value={currency} onChange={(_, data) => setCurrency(data.value.toUpperCase())} /></Field></div>
+            <div className="dm-document-upload-row"><Field label={`Сумма (${currency || "валюта"})`} hint="В основных единицах: для KZT — тенге. Например, 1 250,50. Не более двух знаков после запятой." validationState={parsedAmount.error ? "error" : "none"} validationMessage={parsedAmount.error}><Input inputMode="decimal" value={amount} onChange={(_, data) => setAmount(data.value)} /></Field><Field label="Валюта"><Input maxLength={3} value={currency} onChange={(_, data) => setCurrency(data.value.toUpperCase())} /></Field></div>
             <Field label="Требуемые подписи"><Select value={requiredSignatureCount} onChange={(_, data) => setRequiredSignatureCount(data.value)}><option value="0">Не требуются</option><option value="1">Одна</option><option value="2">Две</option></Select></Field>
-            <Field label="Файл PDF или DOCX" required><input className="dm-document-file-input" type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={(event) => setFile(event.target.files?.[0] ?? null)} /></Field>
-            {error ? <div className="dm-document-message dm-document-message-error" role="alert">{error}</div> : null}
+            <Field label={{children:"Файл PDF или DOCX",htmlFor:fileId}} required hint="PDF или DOCX, непустой файл до 10 МБ (10 000 000 байт). Сервер дополнительно проверит содержимое." validationState={fileError ? "error" : "none"} validationMessage={fileError}>
+              <input ref={attachFileInput} id={fileId} aria-label="Файл PDF или DOCX" className="dm-document-file-input" type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
+              {file ? <span>Выбран: {file.name}</span> : null}
+            </Field>
+            </fieldset>
+            {error ? <div ref={errorRef} tabIndex={-1} className="dm-document-message dm-document-message-error" role="alert" aria-label="Ошибка загрузки документа">{error}</div> : null}
           </DialogContent>
-          <DialogActions><Button appearance="primary" disabled={busy || !file || !title.trim() || !documentNumber.trim()} onClick={() => void submit()}>{busy ? "Загружаем…" : "Загрузить"}</Button><Button onClick={() => setOpen(false)}>Отмена</Button></DialogActions>
+          <DialogActions><Button appearance="primary" disabled={pending || !!fileError || !!parsedAmount.error || !file || title.trim().length < 2 || !documentNumber.trim() || !documentDateValid(documentDate) || kind === "CONTRACT_ADDENDUM" && !selectedAgreement} onClick={() => void submit()}>{pending ? "Загружаем…" : "Загрузить"}</Button><Button disabled={pending} onClick={close}>Закрыть, сохранив черновик</Button></DialogActions>
         </DialogBody>
       </DialogSurface>
     </Dialog>

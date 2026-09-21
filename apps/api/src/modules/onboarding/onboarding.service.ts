@@ -206,8 +206,9 @@ export class OnboardingService {
     }
   }
 
-  async claim(registrationToken: string, user: VerifiedRegistrationUser) {
-    const registration = await this.prisma.registrationIntent.findUnique({
+  async claim(registrationToken: string, user: VerifiedRegistrationUser, transaction?: Prisma.TransactionClient) {
+    const database = transaction ?? this.prisma;
+    const registration = await database.registrationIntent.findUnique({
       where: { tokenHash: hashToken(registrationToken) },
     });
     if (!registration)
@@ -227,7 +228,7 @@ export class OnboardingService {
     if (registration.status !== "PENDING")
       throw new ConflictException("Заявка больше не активна.");
     if (registration.expiresAt <= new Date()) {
-      await this.prisma.registrationIntent.update({
+      await database.registrationIntent.update({
         where: { id: registration.id },
         data: { status: "EXPIRED" },
       });
@@ -239,7 +240,7 @@ export class OnboardingService {
       throw new BadRequestException("Войдите с email, указанным в заявке.");
     const permissionCodes =
       ownerPermissions[registration.capability as "BUYER" | "SUPPLIER"];
-    const permissionCount = await this.prisma.permission.count({
+    const permissionCount = await database.permission.count({
       where: { code: { in: permissionCodes } },
     });
     if (permissionCount !== permissionCodes.length)
@@ -247,13 +248,14 @@ export class OnboardingService {
         "Каталог прав платформы не готов к onboarding.",
       );
     const now = new Date();
-    return this.prisma.$transaction(
-      async (tx) => {
+    const complete = async (tx: Prisma.TransactionClient) => {
         const claimed = await tx.registrationIntent.updateMany({
           where: {
             id: registration.id,
             status: "PENDING",
             organizationId: null,
+            tokenHash: hashToken(registrationToken),
+            expiresAt: { gt: now },
           },
           data: { status: "CLAIMED", claimedAt: now, claimedByUserId: user.id },
         });
@@ -383,9 +385,8 @@ export class OnboardingService {
           organizationId: organization.id,
           capability: registration.capability,
         };
-      },
-      { maxWait: 15_000, timeout: 45_000 },
-    );
+      };
+    return transaction ? complete(transaction) : this.prisma.$transaction(complete, { maxWait: 15_000, timeout: 45_000 });
   }
 
   async completeDevelopment(registrationToken: string) {

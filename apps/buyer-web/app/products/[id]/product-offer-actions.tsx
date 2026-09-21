@@ -11,19 +11,20 @@ import {
   DmDialog,
   StatusTag,
   errorMessage,
-  formatMoney,
 } from "@marketplace/ui";
 import { useMemo, useRef, useState } from "react";
 import type { Cart } from "../../features/purchasing/types";
 import { loginUrl } from "../../public-links";
 import styles from "./page.module.css";
+import { formatCatalogMoney } from "../../catalog/catalog-view-model";
 
 type Offer = {
   id: string;
   supplier: { name: string };
-  priceMinor: number | string | null;
+  priceMinor: string | null;
+  normalizedPriceMinor?: string | null;
   currency: string;
-  packaging?: { name: string };
+  packaging?: { name: string; quantityInBaseUnit?: string; unit?: string | null };
   available: boolean;
   deliveryMethods?: string[];
   verifiedDocuments?: boolean;
@@ -144,7 +145,9 @@ export default function ProductOfferActions({ offers }: { offers: Offer[] }) {
                     <span>{deliveryLabel(offer.deliveryMethods)}</span>
                   </div>
                   <div className={styles.compareOfferSide}>
-                    <strong>{formatMoney(offer.priceMinor, offer.currency)}</strong>
+                    <strong>{formatCatalogMoney(offer.priceMinor, offer.currency)} за упаковку / единицу продажи</strong>
+                    <span>{offer.normalizedPriceMinor && offer.packaging?.unit ? `${formatCatalogMoney(offer.normalizedPriceMinor, offer.currency)} за 1 ${offer.packaging.unit}` : "Цена за базовую единицу уточняется"}</span>
+                    <small>В корзину добавляется 1 единица продажи{offer.packaging?.quantityInBaseUnit && offer.packaging.unit ? ` (${offer.packaging.quantityInBaseUnit} ${offer.packaging.unit})` : ""}.</small>
                     <StatusTag tone={offer.available ? "success" : "warning"}>
                       {offer.available ? "В наличии" : "Под заказ"}
                     </StatusTag>

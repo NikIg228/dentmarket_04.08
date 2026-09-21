@@ -1,3 +1,4 @@
+import { workspaceContextSchema } from "@marketplace/schemas";
 export type AuthCapability = "BUYER" | "SUPPLIER";
 
 export type AuthSession = {
@@ -132,32 +133,21 @@ export async function openWorkspace(
     throw new Error("У аккаунта нет активной организации");
   }
 
-  let capability = session.capability;
-  let organizationDisplayName = session.organizationDisplayName;
-  if (!capability || (preferredCapability && capability !== preferredCapability)) {
-    const response = await fetch(`${apiUrl}/organizations/${organizationId}`, {
-      headers: { authorization: `Bearer ${session.accessToken}` },
-      cache: "no-store",
-    });
-    const organization = (await response.json().catch(() => null)) as {
-      displayName?: string;
-      capabilities?: Array<{ capability: string }>;
-      message?: string;
-      requestId?: string;
-    } | null;
-    if (!response.ok) {
-      throw new AuthRequestError(
-        organization?.message ?? "Не удалось определить организацию",
-        organization?.requestId,
-      );
-    }
-    organizationDisplayName = organization?.displayName;
-    capability = pickCapability(
-      organization?.capabilities?.map((item) => item.capability) ?? [],
-      session.capability,
-      preferredCapability,
-    );
+  const response = await fetch(`${apiUrl}/auth/workspace-context`, {
+    headers: { authorization: `Bearer ${session.accessToken}` },
+    cache: "no-store",
+  });
+  const payload: unknown = await response.json().catch(() => null);
+  if (!response.ok) {
+    const failure = payload as ApiErrorPayload | null;
+    throw new AuthRequestError(apiErrorMessage(failure, response.status), failure?.requestId);
   }
+  const parsed = workspaceContextSchema.safeParse(payload);
+  if (!parsed.success || parsed.data.organizationId !== organizationId) {
+    throw new Error("Не удалось подтвердить активную организацию. Войдите заново.");
+  }
+  const organizationDisplayName = parsed.data.organizationDisplayName;
+  const capability = pickCapability(parsed.data.capabilities, session.capability, preferredCapability);
 
   if (!capability) {
     throw new Error("Для аккаунта не найден кабинет клиники или поставщика");

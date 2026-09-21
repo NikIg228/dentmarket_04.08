@@ -37,7 +37,9 @@
 html, body { margin: 0; min-height: 100%; background: var(--dm-page-surface); }
 body { background: var(--colorNeutralBackground2, #f7f7f8); color: var(--colorNeutralForeground1, #242424); }
 button, input, select, textarea { font: inherit; }
-.mp-provider { min-height: 100dvh; background: var(--colorNeutralBackground2); }
+/* Fluent copies provider classes to portal hosts. Page geometry must not turn
+   an empty tooltip/popover host into a viewport-sized input-blocking layer. */
+.mp-provider:not([data-portal-node]) { min-height: 100dvh; background: var(--colorNeutralBackground2); }
 
 .mp-shell { min-height: 100dvh; display: grid; grid-template-columns: 250px minmax(0, 1fr); }
 .mp-sidebar { position: sticky; top: 0; z-index: 20; min-height: 100dvh; display: flex; flex-direction: column; padding: 20px 14px 14px; border-right: 1px solid var(--colorNeutralStroke2); background: var(--colorNeutralBackground1); }

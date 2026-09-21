@@ -6,7 +6,18 @@ export const frontendDeploymentProfile: DeploymentProfile =
 export const frontendFeatures = deploymentFeatures(frontendDeploymentProfile);
 
 import type {
+  WorkspaceContext,
+  AuthClientOptions, AuthRegistrationAccepted, AuthForgotAccepted, AuthEmailRegistration, LocalOperatorLogin, LocalOperatorSession,
+  RegistrationResumeRequest,
+  RegistrationResumeProof,
+  RegistrationResumeComplete,
+  RegistrationResumeRequested,
+  RegistrationResumeDetails,
+  RegistrationResumeCompleted,
   AddCartItemRequest,
+  UpdateCartItemRequest,
+  CartVersionRequest,
+  RepriceCartRequest,
   ApproveImportProductCandidateInput,
   CartItemResponse,
   CartResponse,
@@ -97,6 +108,39 @@ export function parseSessionHandoff(
     return value;
   } catch {
     return null;
+  }
+}
+
+/** Revoke the handoff's session, never an unrelated refresh-cookie session. */
+export async function revokeWorkspaceSession(
+  apiUrl: string,
+  session: { sessionId?: string; accessToken?: string } | null,
+): Promise<void> {
+  if (!session?.sessionId || !session.accessToken) {
+    throw new Error("Не удалось определить серверную сессию. Выход не подтверждён.");
+  }
+  let response: Response;
+  try {
+    response = await fetch(`${apiUrl.replace(/\/$/, "")}/auth/sessions/${encodeURIComponent(session.sessionId)}/revoke`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${session.accessToken}` },
+      // Existing bearer endpoint: no identity headers, refresh cookies or
+      // fallback to logout of a potentially different cookie-bound session.
+      credentials: "omit",
+      body: JSON.stringify({ reason: "user_logout" }),
+      signal: AbortSignal.timeout(10_000),
+    });
+  } catch {
+    throw new Error("Не удалось связаться с сервером. Выход не подтверждён — проверьте соединение и повторите.");
+  }
+  if (!response.ok) {
+    throw new Error(response.status === 401
+      ? "Сервер не подтвердил выход: доступ к сессии истёк или уже отозван. Повторите попытку; при повторной ошибке обратитесь в поддержку."
+      : "Сервер не подтвердил выход. Повторите попытку.");
+  }
+  const result = await response.json().catch(() => null) as { id?: string; status?: string } | null;
+  if (result?.id !== session.sessionId || result.status !== "REVOKED") {
+    throw new Error("Сервер не подтвердил отзыв текущей сессии. Повторите попытку.");
   }
 }
 
@@ -198,6 +242,20 @@ export class MarketplaceApiClient {
   get<T>(path: string) {
     return this.request<T>(path);
   }
+  requestRegistrationResume(input: RegistrationResumeRequest) {
+    return this.post<RegistrationResumeRequested>("/auth/registration/resume/request", input);
+  }
+  authClientOptions() { return this.get<AuthClientOptions>("/auth/client-options"); }
+  workspaceContext() { return this.get<WorkspaceContext>("/auth/workspace-context"); }
+  registerEmail(input: AuthEmailRegistration) { return this.post<AuthRegistrationAccepted>("/auth/register", input); }
+  requestPasswordReset(email: string) { return this.post<AuthForgotAccepted>("/auth/password/forgot", { email }); }
+  loginLocalOperator(input: LocalOperatorLogin) { return this.post<LocalOperatorSession>("/auth/local-operator/login", input); }
+  inspectRegistrationResume(input: RegistrationResumeProof) {
+    return this.post<RegistrationResumeDetails>("/auth/registration/resume/inspect", input);
+  }
+  completeRegistrationResume(input: RegistrationResumeComplete) {
+    return this.post<RegistrationResumeCompleted>("/auth/registration/resume/complete", input);
+  }
   post<T>(path: string, body?: unknown) {
     return this.request<T>(path, {
       method: "POST",
@@ -269,8 +327,16 @@ export class MarketplaceApiClient {
     return this.post<CartItemResponse>(`/carts/${cartId}/items`, input);
   }
 
-  repriceCart(cartId: string) {
-    return this.post<CartResponse>(`/carts/${cartId}/reprice`);
+  updateCartItem(cartId: string, itemId: string, input: UpdateCartItemRequest) {
+    return this.patch<CartResponse>(`/carts/${cartId}/items/${itemId}`, input);
+  }
+
+  removeCartItem(cartId: string, itemId: string, input: CartVersionRequest) {
+    return this.request<CartResponse>(`/carts/${cartId}/items/${itemId}`, { method: "DELETE", body: JSON.stringify(input) });
+  }
+
+  repriceCart(cartId: string, input: RepriceCartRequest = {}) {
+    return this.post<CartResponse>(`/carts/${cartId}/reprice`, input);
   }
 
   validateCart(cartId: string) {

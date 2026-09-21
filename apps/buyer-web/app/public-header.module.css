@@ -216,7 +216,8 @@
 }
 
 .suggestions button:hover,
-.suggestions button:focus-visible {
+.suggestions button:focus-visible,
+.suggestions button[aria-selected="true"] {
   outline: 0;
   background: var(--dm-brand-surface);
   color: var(--dm-brand-deep);

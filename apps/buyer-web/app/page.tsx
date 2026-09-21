@@ -1,5 +1,7 @@
 "use client";
 
+import dynamic from "next/dynamic";
+
 import {
   Button,
   Checkbox,
@@ -26,6 +28,7 @@ import {
   MarketplaceApiClient,
   frontendFeatures,
   parseSessionHandoff,
+  revokeWorkspaceSession,
   type ApiContext,
   type SessionHandoffEnvelope,
 } from "@marketplace/api-client";
@@ -38,6 +41,7 @@ import {
   PageHeader,
   Section,
   StatusTag,
+  useSessionLogout,
   errorMessage,
   formatDate,
   formatMoney,
@@ -54,7 +58,6 @@ import {
 import styles from "./page.module.css";
 import { BuyerServicesPanel } from "./buyer-services-panel";
 import { BuyerServicesMenu } from "./buyer-services-menu";
-import { BuyerCart } from "./features/purchasing/buyer-cart";
 import { BuyerOrders } from "./features/purchasing/buyer-orders";
 import type {
   Cart,
@@ -66,6 +69,7 @@ import { SmartCommercePanel } from "./smart-commerce-panel";
 import { PublicHeader } from "./public-header";
 import { loginUrl } from "./public-links";
 import { canonicalSearchQuery } from "./catalog-search";
+import { formatCatalogMoney } from "./catalog/catalog-view-model";
 import type {
   ProductVariantOption,
   SearchMedia,
@@ -78,6 +82,13 @@ import {
   rankCompareOffers,
   rankSearchOffers,
 } from "./catalog-ranking";
+
+// Keep cart validation in the cart chunk; opening the catalog must not eagerly
+// download the CommonJS schema graph. Validation itself remains unchanged.
+const BuyerCart = dynamic(
+  () => import("./features/purchasing/buyer-cart").then((module) => module.BuyerCart),
+  { loading: () => <LoadingState label="Загружаем корзину" /> },
+);
 
 const BUYER_ID = "00000000-0000-4000-8000-000000000030";
 const BUYER_USER_ID = "00000000-0000-4000-8000-000000000500";
@@ -841,28 +852,7 @@ export default function BuyerWorkspace({
       window.removeEventListener("dentmarket:city-changed", onCityChanged);
   }, [loadSearch, query, sort]);
 
-  const logout = useCallback(async () => {
-    const apiUrl = API_URL;
-    if (handoff?.sessionId && handoff.actorId && handoff.accessToken) {
-      try {
-        await fetch(`${apiUrl}/auth/sessions/${handoff.sessionId}/revoke`, {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-            authorization: `Bearer ${handoff.accessToken}`,
-            "x-user-id": handoff.actorId,
-          },
-          body: JSON.stringify({ reason: "user_logout" }),
-        });
-      } catch {
-        // Local cleanup still guarantees that the current browser loses access.
-      }
-    }
-    window.sessionStorage.removeItem(SESSION_KEY);
-    setHandoff(null);
-    setActive("catalog");
-    window.location.assign("/");
-  }, [handoff]);
+  const logout = useSessionLogout({ sessionKey: SESSION_KEY, sessionId: handoff?.sessionId, revoke: () => revokeWorkspaceSession(API_URL, handoff), redirectUrl: LOGIN_URL });
 
   useEffect(() => {
     if (handoffChecked) void refresh();
@@ -1065,7 +1055,7 @@ export default function BuyerWorkspace({
     setBusy("reprice");
     setError(null);
     try {
-      await api.post(`/carts/${activeCart.id}/reprice`);
+      await api.repriceCart(activeCart.id, { expectedVersion: cartValidation?.cartVersion ?? activeCart.version });
       const nextCarts = await api.get<Cart[]>(`/buyers/${buyerId}/carts`);
       const nextActive =
         nextCarts.find((cart) => cart.status === "ACTIVE") ?? null;
@@ -1081,7 +1071,7 @@ export default function BuyerWorkspace({
 
   const checkout = async () => {
     if (!activeCart) return;
-    if (!cartValidation?.canCheckout) {
+    if (!cartValidation?.canCheckout || cartValidation.cartVersion !== activeCart.version) {
       setError(
         cartValidation?.requiresAcceptance
           ? "Сначала примите обновлённые цены в корзине"
@@ -1094,6 +1084,7 @@ export default function BuyerWorkspace({
     try {
       await api.post(`/carts/${activeCart.id}/checkout`, {
         idempotencyKey: `buyer-ui-${activeCart.id}`,
+        expectedVersion: cartValidation.cartVersion,
       });
       const [nextCarts, nextOrders] = await Promise.all([
         api.get<Cart[]>(`/buyers/${buyerId}/carts`),
@@ -1742,7 +1733,7 @@ export default function BuyerWorkspace({
                   (offer.verifiedDocuments ?? true) &&
                   offer.confirmationMode !== "MANUAL",
               );
-              const normalizedPrice = best?.normalizedPriceMinor;
+              const normalizedPrice = best?.packaging.unit ? best.normalizedPriceMinor : null;
               const productImage = mediaSource(product.media?.[0]);
               const promotion = bestPromotionPercent(product);
               const priceDifference = priceDifferencePercent(product);
@@ -1822,19 +1813,19 @@ export default function BuyerWorkspace({
                     <div className={styles.offerSummary}>
                       <strong>
                         {best
-                          ? `от ${formatMoney(best.priceMinor, best.currency ?? "KZT")}`
+                          ? `${formatCatalogMoney(best.priceMinor, best.currency ?? "KZT")} за упаковку / единицу продажи`
                           : "Цена по запросу"}
                       </strong>
                       {normalizedPrice ? (
                         <span>
-                          от{" "}
-                          {formatMoney(
+                          {formatCatalogMoney(
                             normalizedPrice,
                             best?.currency ?? "KZT",
                           )}{" "}
-                          за {best?.packaging.unit ?? "ед."}
+                          за 1 {best?.packaging.unit}
                         </span>
                       ) : null}
+                      {best ? <small>{best.packaging.name ?? "Фасовка уточняется"} · {best.packaging.quantityInBaseUnit} {best.packaging.unit ?? "баз. ед."} · {best.supplier.name}</small> : null}
                       {isPublic ? (
                         <span>
                           {product.offers.length
@@ -2351,19 +2342,19 @@ export default function BuyerWorkspace({
                           </div>
                           <div className={styles.sellerPrice}>
                             <strong>
-                              {formatMoney(
+                              {formatCatalogMoney(
                                 offer.price.amountMinor,
                                 offer.price.currency,
-                              )}
+                              )} за упаковку / единицу продажи
                             </strong>
                             <small>
-                              {formatMoney(
+                              {formatCatalogMoney(
                                 offer.price.normalizedPriceMinor,
                                 offer.price.currency,
                               )}{" "}
-                              за {offer.price.normalizedUnit}
+                              за 1 {offer.price.normalizedUnit}
                             </small>
-                            <small>{offer.packaging.name}</small>
+                            <small>{offer.packaging.name} · {offer.packaging.quantityInBaseUnit} {offer.packaging.unit}</small>
                           </div>
                           <div className={styles.sellerDelivery}>
                             <strong
@@ -2444,6 +2435,9 @@ export default function BuyerWorkspace({
 
   const renderCart = () => (
     <BuyerCart
+      api={api}
+      onCartChanged={(next) => { setCarts((previous) => previous.map(cart => cart.id === next.id ? next : cart)); setCartValidation(null); }}
+      onValidated={setCartValidation}
       cart={activeCart}
       validation={cartValidation}
       validationLoading={cartValidationLoading}
@@ -2649,7 +2643,8 @@ export default function BuyerWorkspace({
               ? "Поддержка"
               : undefined
       }
-      onLogout={handoff ? () => void logout() : undefined}
+      {...logout}
+      onLogout={handoff ? logout.onLogout : undefined}
       onNavigate={(item) => {
         if (item === "documents" && handoff) window.location.assign("/documents");
         else if (!handoff && item !== "catalog") window.location.assign(LOGIN_URL);

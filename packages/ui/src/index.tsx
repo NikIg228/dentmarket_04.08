@@ -1,6 +1,8 @@
 "use client";
 
 export * from "./document-archive";
+export * from "./document-relations";
+export { useSessionLogout } from "./use-session-logout";
 
 import {
   Avatar,
@@ -313,6 +315,8 @@ type AppShellProps = {
   contextLabel?: string;
   onNavigate: (id: string) => void;
   onLogout?: () => void;
+  logoutPending?: boolean;
+  logoutError?: string | null;
   actions?: ReactNode;
   children: ReactNode;
 };
@@ -328,6 +332,8 @@ export function AppShell({
   contextLabel,
   onNavigate,
   onLogout,
+  logoutPending = false,
+  logoutError,
   actions,
   children,
 }: AppShellProps) {
@@ -410,9 +416,11 @@ export function AppShell({
             <Button
               appearance="subtle"
               icon={<SignOut24Regular />}
-              aria-label="Выйти"
-              title="Выйти"
-              onClick={onLogout}
+              aria-label={logoutPending ? "Выходим…" : "Выйти"}
+              title={logoutPending ? "Выходим…" : "Выйти"}
+              disabled={logoutPending}
+              aria-busy={logoutPending}
+              onClick={() => { closeMobileMenu(); onLogout(); }}
             />
           ) : null}
         </div>
@@ -462,7 +470,10 @@ export function AppShell({
             </Tooltip>
           </div>
         </header>
-        <main className="mp-content">{children}</main>
+        <main className="mp-content">
+          {logoutError ? <div role="alert"><p>{logoutError}</p><Button disabled={logoutPending} onClick={onLogout}>Повторить выход</Button></div> : null}
+          {children}
+        </main>
       </div>
     </div>
   );

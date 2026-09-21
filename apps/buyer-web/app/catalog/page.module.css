@@ -162,6 +162,7 @@
 .filterNote span { font-size: 11px; line-height: 1.5; }
 
 .results { min-width: 0; }
+.pagination { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; margin-top: 24px; }
 .resultsToolbar { display: flex; align-items: end; justify-content: space-between; gap: 20px; margin-bottom: 20px; }
 .resultsToolbar h2 { margin: 5px 0 0; color: var(--dm-text-primary); font-size: 25px; letter-spacing: -.035em; }
 .resultsToolbar p { margin: 5px 0 0; color: var(--dm-text-muted); font-size: 12px; }

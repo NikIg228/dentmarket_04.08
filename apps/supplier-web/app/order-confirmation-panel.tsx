@@ -8,40 +8,15 @@ import {
   DmField,
   DmInput,
   DmTextarea,
-  formatMoney,
 } from "@marketplace/ui";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import styles from "./order-confirmation-panel.module.css";
-
-export type OrderConfirmationDecision = {
-  itemId: string;
-  acceptedQuantity: number;
-  reason?: string;
-};
-
-export type ConfirmableOrder = {
-  id: string;
-  orderNumber: string;
-  subtotalAmountMinor: string;
-  currency: string;
-  items: Array<{
-    id: string;
-    quantity: string;
-    unitPriceMinor: string;
-    offer: { productVariant: { product: { canonicalName: string } } };
-  }>;
-};
-
-type Draft = Record<string, { acceptedQuantity: string; reason: string }>;
-
-function initialDraft(order: ConfirmableOrder): Draft {
-  return Object.fromEntries(
-    order.items.map((item) => [
-      item.id,
-      { acceptedQuantity: item.quantity, reason: "" },
-    ]),
-  );
-}
+import {
+  confirmationPreview, confirmationQuantity, confirmationSnapshot,
+  formatConfirmationMoney, initialConfirmationDraft,
+  type ConfirmableOrder, type OrderConfirmationDecision,
+} from "./order-confirmation-model";
+export type { ConfirmableOrder, OrderConfirmationDecision } from "./order-confirmation-model";
 
 function quantityLabel(value: string | number) {
   return new Intl.NumberFormat("ru-KZ", {
@@ -58,43 +33,41 @@ export function OrderConfirmationPanel({
 }) {
   const [open, setOpen] = useState(false);
   const triggerContainerRef = useRef<HTMLSpanElement>(null);
-  const [draft, setDraft] = useState<Draft>(() => initialDraft(order));
+  const submitLock = useRef(false);
+  const [draftOrder, setDraftOrder] = useState(order);
+  const [draft, setDraft] = useState(() => initialConfirmationDraft(order));
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const errorRef = useRef<HTMLDivElement>(null);
 
-  const preview = useMemo(
-    () =>
-      order.items.reduce((sum, item) => {
-        const accepted = Number(draft[item.id]?.acceptedQuantity ?? 0);
-        if (!Number.isFinite(accepted) || accepted < 0) return sum;
-        return sum + accepted * Number(item.unitPriceMinor);
-      }, 0),
-    [draft, order.items],
-  );
-  const reduction = Math.max(0, Number(order.subtotalAmountMinor) - preview);
+  useEffect(() => {
+    // Disabling the submitting button can move focus to body. Restore it inside
+    // the dialog after an error so keyboard users can read it and press Escape.
+    if (open && submitError && !submitting) errorRef.current?.focus();
+  }, [open, submitError, submitting]);
+
+  const preview = useMemo(() => confirmationPreview(draftOrder, draft), [draftOrder, draft]);
+  const stale = confirmationSnapshot(draftOrder) !== confirmationSnapshot(order);
+  const returnFocus = () => window.requestAnimationFrame(() => {
+    const trigger = triggerContainerRef.current?.querySelector("button");
+    (trigger ?? document.getElementById(`supplier-order-${order.id}`))?.focus();
+  });
 
   const changeOpen = (nextOpen: boolean) => {
+    if (submitLock.current) return;
     setOpen(nextOpen);
-    if (nextOpen) {
-      setDraft(initialDraft(order));
-      setSubmitError(null);
-    } else {
-      queueMicrotask(() =>
-        triggerContainerRef.current?.querySelector("button")?.focus(),
-      );
-    }
+    if (!nextOpen) returnFocus();
   };
 
   const submit = async () => {
+    if (submitLock.current || stale) return;
     const decisions: OrderConfirmationDecision[] = [];
-    for (const item of order.items) {
-      const acceptedQuantity = Number(draft[item.id]?.acceptedQuantity);
+    for (const item of draftOrder.items) {
+      const acceptedQuantity = confirmationQuantity(draft[item.id]?.acceptedQuantity, item.quantity);
       const requestedQuantity = Number(item.quantity);
       const reason = draft[item.id]?.reason.trim() ?? "";
       if (
-        !Number.isFinite(acceptedQuantity) ||
-        acceptedQuantity < 0 ||
-        acceptedQuantity > requestedQuantity
+        acceptedQuantity === null
       ) {
         setSubmitError("Подтверждённое количество должно быть от нуля до заказанного.");
         return;
@@ -103,13 +76,17 @@ export function OrderConfirmationPanel({
         setSubmitError("Укажите причину для каждой позиции с уменьшенным количеством.");
         return;
       }
+      if (reason.length > 500) {
+        setSubmitError("Причина должна содержать не более 500 символов.");
+        return;
+      }
       decisions.push({
         itemId: item.id,
         acceptedQuantity,
         ...(reason ? { reason } : {}),
       });
     }
-    setSubmitting(true);
+    submitLock.current = true; setSubmitting(true);
     setSubmitError(null);
     try {
       const error = await onConfirm(decisions);
@@ -118,8 +95,11 @@ export function OrderConfirmationPanel({
         return;
       }
       setOpen(false);
+      // Successful decisions remove this panel; the surviving order list owns focus.
+    } catch {
+      setSubmitError("Не удалось сохранить решение. Черновик сохранён — проверьте соединение и повторите попытку.");
     } finally {
-      setSubmitting(false);
+      submitLock.current = false; setSubmitting(false);
     }
   };
 
@@ -138,30 +118,27 @@ export function OrderConfirmationPanel({
         open={open}
         onOpenChange={changeOpen}
         title={`Подтверждение заказа ${order.orderNumber}`}
-        description="Проверьте доступное количество. Уменьшение освободит лишний резерв и изменит итог заказа; причина будет видна клинике."
+        description="Проверьте доступное количество. Уменьшение освободит лишний резерв и изменит итог заказа; причина будет видна клинике. Черновик сохраняется при закрытии окна, пока вы остаётесь на этой странице."
         actions={
           <>
             <DmButton appearance="secondary" disabled={submitting} onClick={() => changeOpen(false)}>
               Вернуться к заказам
             </DmButton>
-            <DmButton appearance="primary" onClick={() => void submit()} disabled={submitting}>
+            <DmButton appearance="primary" onClick={() => void submit()} disabled={submitting || stale || preview === null}>
               {submitting ? "Сохраняем решение…" : "Подтвердить заказ"}
             </DmButton>
           </>
         }
       >
         <div className={styles.content}>
+          {stale ? <DmFeedback tone="warning" title="Заказ обновился" description="Черновик сохранён, но относится к прежней версии заказа. Сверьте данные перед новым решением." alert /> : null}
+          {stale ? <DmButton disabled={submitting} onClick={() => { setDraftOrder(order); setDraft(initialConfirmationDraft(order)); setSubmitError(null); }}>Начать заново по актуальному заказу</DmButton> : null}
           <div className={styles.items}>
-            {order.items.map((item) => {
-              const accepted = Number(
-                draft[item.id]?.acceptedQuantity ?? item.quantity,
-              );
-              const invalid =
-                !Number.isFinite(accepted) ||
-                accepted < 0 ||
-                accepted > Number(item.quantity);
+            {draftOrder.items.map((item) => {
+              const accepted = confirmationQuantity(draft[item.id]?.acceptedQuantity, item.quantity);
+              const invalid = accepted === null;
               const reduced =
-                Number.isFinite(accepted) && accepted < Number(item.quantity);
+                accepted !== null && accepted < Number(item.quantity);
               const productName = item.offer.productVariant.product.canonicalName;
               return (
                 <section className={styles.item} key={item.id}>
@@ -184,6 +161,7 @@ export function OrderConfirmationPanel({
                       min={0}
                       max={Number(item.quantity)}
                       step="any"
+                      disabled={submitting || stale}
                       value={draft[item.id]?.acceptedQuantity ?? ""}
                       onChange={(_, data) =>
                         setDraft((current) => ({
@@ -214,6 +192,8 @@ export function OrderConfirmationPanel({
                       <DmTextarea
                         aria-label={`Причина изменения: ${productName}`}
                         resize="vertical"
+                        disabled={submitting || stale}
+                        maxLength={500}
                         value={draft[item.id]?.reason ?? ""}
                         onChange={(_, data) =>
                           setDraft((current) => ({
@@ -232,20 +212,25 @@ export function OrderConfirmationPanel({
             })}
           </div>
           <div className={styles.summary} aria-live="polite">
-            <span>Новый итог: <strong>{formatMoney(preview, order.currency)}</strong></span>
+            <span>Новый итог: <strong>{preview ? formatConfirmationMoney(preview.total, draftOrder.currency) : "Уточните количество"}</strong></span>
             <span>
-              {reduction > 0
-                ? `Уменьшение: ${formatMoney(reduction, order.currency)}`
-                : "Заказ подтверждается полностью"}
+              {preview === null ? "Проверьте заполненные поля"
+                : preview.rejected ? "Все позиции отклоняются"
+                : preview.reduction > BigInt(0)
+                  ? `Уменьшение: ${formatConfirmationMoney(preview.reduction, draftOrder.currency)}`
+                  : preview.partial ? "Состав изменён, сумма не изменилась"
+                  : "Заказ подтверждается полностью"}
             </span>
           </div>
           {submitError ? (
-            <DmFeedback
-              tone="danger"
-              title="Заказ не подтверждён"
-              description={submitError}
-              alert
-            />
+            <div ref={errorRef} tabIndex={-1} role="group" aria-label="Ошибка подтверждения заказа">
+              <DmFeedback
+                tone="danger"
+                title="Заказ не подтверждён"
+                description={submitError}
+                alert
+              />
+            </div>
           ) : null}
         </div>
       </DmDialog>

@@ -1,0 +1,15 @@
+{
+  "kind": "prototype-only",
+  "initialAttempt": {
+    "tabContainment": "FAIL",
+    "bodyFocusedOnce": true
+  },
+  "correction": "Explicit Tab wrap inside modal",
+  "secondAttempt": {
+    "tabContainment": true,
+    "samples": 12
+  },
+  "draftPreserved": true,
+  "returnFocusVerified": true,
+  "notRuntimeEvidence": true
+}

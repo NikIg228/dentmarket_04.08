@@ -1,6 +1,21 @@
 import { Injectable } from "@nestjs/common";
 import { Document as DocxDocument, Packer, Paragraph, TextRun } from "docx";
 import PDFDocument from "pdfkit";
+import { join } from "node:path";
+
+const pdfFontPath = join(__dirname, "fonts", "NotoSans.ttf");
+const pdfFontCoverage = require("./fonts/coverage.json") as { ranges: [number, number][] };
+
+function assertPdfCharacters(text: string) {
+  for (const character of text) {
+    if (character === "\n" || character === "\r" || character === "\t") continue;
+    const codepoint = character.codePointAt(0)!;
+    if (!pdfFontCoverage.ranges.some(([first, last]) => codepoint >= first && codepoint <= last)) {
+      // Fail generation explicitly instead of silently writing a missing-glyph box.
+      throw new Error(`PDF font does not support character U+${codepoint.toString(16).toUpperCase()}`);
+    }
+  }
+}
 
 @Injectable()
 export class DocumentRendererService {
@@ -33,13 +48,15 @@ export class DocumentRendererService {
   }
 
   private pdf(title: string, text: string) {
+    assertPdfCharacters(title);
+    assertPdfCharacters(text);
     return new Promise<Buffer>((resolve, reject) => {
       const document = new PDFDocument({ size: "A4", margins: { top: 56, bottom: 56, left: 56, right: 56 }, info: { Title: title, Producer: "B2B Marketplace" } });
       const chunks: Buffer[] = [];
       document.on("data", (chunk: Buffer) => chunks.push(chunk));
       document.on("end", () => resolve(Buffer.concat(chunks)));
       document.on("error", reject);
-      document.font(require.resolve("@fontsource/roboto/files/roboto-cyrillic-400-normal.woff"));
+      document.font(pdfFontPath);
       document.fontSize(19).text(title, { align: "center" }).moveDown(1.5);
       document.fontSize(11).text(text, { align: "left", lineGap: 4 });
       document.end();

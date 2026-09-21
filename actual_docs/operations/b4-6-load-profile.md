@@ -1,5 +1,15 @@
 # B4.6: нагрузочный профиль catalog и checkout
 
+## Статус очереди — 2026-09-14
+
+Локальный baseline ниже сохранён как завершённое историческое evidence.
+Открытые managed Redis failover и длительный staging soak перенесены в
+POST-BE.2: возвращаемся после завершения backend и выбора целевой среды.
+См. [Foundation](../backend/DENTMARKET_BACKEND_FOUNDATION_V2.md).
+Это не закрытие B4.6 целиком. Regression load/correctness checks при изменении
+затронутой логики остаются допустимыми и обязательными по риску; отложена
+итоговая проверка развёртывания, а не тесты новых фаз.
+
 ## Назначение
 
 Этот gate проверяет controlled-pilot dataset на отдельной PostgreSQL базе и не
