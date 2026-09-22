@@ -1004,6 +1004,7 @@ model User {
   updatedAt                DateTime                  @updatedAt
   platformOfferAcceptances PlatformOfferAcceptance[]
   emailAuthTokens          EmailAuthToken[]
+  supplierTermsAcceptances SupplierTermsAcceptance[]
 }
 
 model EmailAuthToken {
@@ -1070,6 +1071,7 @@ model Organization {
   notificationPrefs                 NotificationPreference[]
   registrationIntents               RegistrationIntent[]
   platformOfferAcceptances          PlatformOfferAcceptance[]
+  supplierTermsAcceptances          SupplierTermsAcceptance[]
   supplierBuyerAgreementsAsBuyer    BuyerSupplierAgreement[]  @relation("BuyerSupplierAgreementBuyer")
   supplierBuyerAgreementsAsSupplier BuyerSupplierAgreement[]  @relation("BuyerSupplierAgreementSupplier")
   createdAt                         DateTime                  @default(now())
@@ -1134,6 +1136,37 @@ model PlatformOfferAcceptance {
 
   @@index([userId, acceptedAt])
   @@index([termsVersion, acceptedAt])
+}
+
+enum SupplierAdmissionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SUSPENDED
+}
+
+model SupplierTermsAcceptance {
+  id                      String @id @default(uuid()) @db.Uuid
+  organizationId          String @db.Uuid
+  userId                  String @db.Uuid
+  bundleHash              String @db.VarChar(64)
+  documentsSnapshot       Json
+  organizationSnapshot    Json
+  organizationVersion     Int
+  representativeName      String
+  representativeAuthority String
+  acceptedAt              DateTime @default(now())
+  evidenceSnapshot        Json
+  admissionStatus         SupplierAdmissionStatus @default(PENDING)
+  reviewedById            String? @db.Uuid
+  reviewedAt              DateTime?
+  reviewReason            String?
+  version                 Int @default(1)
+  organization            Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  user                    User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, bundleHash, organizationVersion], map: "SupplierTermsAcceptance_org_bundle_version_key")
+  @@index([admissionStatus, acceptedAt])
 }
 
 model OrganizationCapability {

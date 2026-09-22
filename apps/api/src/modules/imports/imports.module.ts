@@ -5,9 +5,10 @@ import { ImportFileParser } from "./import-file.parser";
 import { ImportsController } from "./imports.controller";
 import { ImportsService } from "./imports.service";
 import { SearchModule } from "../search/search.module";
+import { MarketplaceAgreementsModule } from "../agreements/marketplace-agreements.module";
 
 @Module({
-  imports: [AccessControlModule, SuppliersModule, SearchModule],
+  imports: [AccessControlModule, SuppliersModule, SearchModule, MarketplaceAgreementsModule],
   controllers: [ImportsController],
   providers: [ImportFileParser, ImportsService],
 })

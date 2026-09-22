@@ -13,17 +13,21 @@ import {
 import styles from "../../page.module.css";
 import type { DocumentRecord, MerchantAccount } from "./types";
 import { statusTone } from "./view-model";
+import type { ApiContext } from "@marketplace/api-client";
+import { SupplierTermsPanel } from "../../supplier-terms-panel";
 
 export function SupplierDocuments({
   documents,
   merchantAccounts,
   busy,
   onDownload,
+  apiContext,
 }: {
   documents: DocumentRecord[];
   merchantAccounts: MerchantAccount[];
   busy: string | null;
   onDownload: (document: DocumentRecord) => Promise<void>;
+  apiContext: ApiContext;
 }) {
   return (
     <div className="mp-stack">
@@ -32,6 +36,7 @@ export function SupplierDocuments({
         title="Документы"
         description="Счета, спецификации и накладные с электронными подписями и историей версий."
       />
+      <SupplierTermsPanel key={apiContext.organizationId} apiContext={apiContext} />
       <Section>
         {!documents.length ? (
           <EmptyState

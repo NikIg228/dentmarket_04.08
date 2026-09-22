@@ -29,6 +29,7 @@ import {
 } from "@marketplace/ui";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { loginUrl } from "../public-links";
+import { SupplierTermsPanel } from "../supplier-terms-panel";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:4012/api";
 const SESSION_KEY = "dentmarket:supplier-session";
@@ -159,6 +160,7 @@ export default function SupplierDocumentsPage() {
   };
 
   return <AppShell productName="DentMarket KZ" productMark="DM" workspaceLabel="Кабинет поставщика" userName={handoff?.displayName ?? "Demo Dental Supply"} userMeta={handoff?.organizationDisplayName ?? "Поставщик"} navigation={navigation} activeNavigation="documents" contextLabel="Документолог" onNavigate={(id) => { if (id !== "documents") window.location.assign("/"); }} {...logout}>
+    {sessionReady ? <SupplierTermsPanel key={organizationId} apiContext={apiContext} /> : null}
     <DocumentArchiveWorkspace
       roleLabel="поставщик"
       organizationId={organizationId}

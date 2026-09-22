@@ -5,6 +5,7 @@ import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../platform/prisma/prisma.service";
 import type { SupplierActorContext } from "../suppliers/supplier-access.service";
 import { normalizeCatalogText, rankVariants } from "../imports/matching";
+import { SupplierTermsService } from "../agreements/supplier-terms.service";
 
 const importReviewInclude = Prisma.validator<Prisma.ProductCandidateInclude>()({
   supplier: { include: { organization: true } },
@@ -46,7 +47,7 @@ function stringValue(value: unknown) {
 
 @Injectable()
 export class ModerationService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly terms: SupplierTermsService) {}
 
   private async isOperator(organizationId: string) {
     return Boolean(await this.prisma.organizationCapability.findUnique({ where: { organizationId_capability: { organizationId, capability: "MARKETPLACE_OPERATOR" } } }));
@@ -63,10 +64,7 @@ export class ModerationService {
     const price = offer?.prices[0] ?? null;
     const balance = offer?.inventoryBalances[0] ?? null;
     const now = new Date();
-    const activeAgreement = offer ? agreementActive ?? Boolean(await this.prisma.marketplaceAgreement.findFirst({
-      where: { supplierOrganizationId: candidate.supplierOrganizationId, status: { in: ["ACTIVE", "NON_RENEWING"] }, startsAt: { lte: now }, endsAt: { gt: now } },
-      select: { id: true },
-    })) : false;
+    const activeAgreement = offer ? agreementActive ?? (await this.terms.commercialState(candidate.supplierOrganizationId)).admitted : false;
     const blockers: string[] = [];
     if (candidate.approvedProduct?.status !== "ACTIVE") blockers.push("Карточка товара не активна");
     if (candidate.approvedVariant?.status !== "ACTIVE") blockers.push("Вариант товара не активен");
@@ -133,9 +131,9 @@ export class ModerationService {
       this.prisma.industry.findMany({ where: { status: "ACTIVE" }, orderBy: { nameRu: "asc" }, select: { id: true, nameRu: true } }),
       this.prisma.category.findMany({ where: { status: "ACTIVE" }, orderBy: { nameRu: "asc" }, select: { id: true, nameRu: true, industryId: true } }),
       this.prisma.unitOfMeasure.findMany({ orderBy: { nameRu: "asc" }, select: { id: true, nameRu: true, symbol: true } }),
-      this.prisma.marketplaceAgreement.findMany({ where: { status: { in: ["ACTIVE", "NON_RENEWING"] }, startsAt: { lte: now }, endsAt: { gt: now } }, select: { supplierOrganizationId: true } }),
+      this.terms.activeSupplierIds(),
     ]);
-    const suppliersWithAgreement = new Set(agreements.map(({ supplierOrganizationId }) => supplierOrganizationId));
+    const suppliersWithAgreement = new Set(agreements);
     return {
       items: await Promise.all(candidates.map((candidate) => this.importReviewPresentation(candidate, suppliersWithAgreement.has(candidate.supplierOrganizationId)))),
       options: {

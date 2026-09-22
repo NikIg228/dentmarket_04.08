@@ -2,6 +2,85 @@
 
 Дата: 2026-09-21. Это карточка исполнения, не продуктовый backlog.
 
+## CORE-01 supplier common terms — решение владельца 22.09.2026
+
+- ACTIVE, writer primary 01a0c415-1c3c-73e3-a270-5ad591fa9ca7, generation2/idle.
+  Canonical root, main@f051a66599834032a0f95a7495b6945ec6f1f811; входной dirty
+  только этот checkpoint (сохранён итог attempt5). Новых агентов/worktrees нет.
+- Последний запрос заменяет текущую продуктовую границу: общий договор продавца,
+  тарифы/правила и отдельные документы о персональных данных; версионный акцепт
+  в кабинете, затем отдельный операторский допуск. Новый индивидуальный договор
+  и обязательная ЭЦП исключаются из подключения. История существующих договоров
+  сохраняется; действующие ранее оформленные договоры не аннулируются миграцией.
+- Кнопка «Ознакомлен» в конце, только после просмотра всех документов; явное
+  подтверждение полномочий/принятия от имени организации. Пустые страницы —
+  DRAFT, без выдуманных юридических текстов и без фиктивного акцепта.
+- Scope: schemas/client/OpenAPI, additive Prisma migration, agreements/readiness/
+  publication gate, supplier/admin UI и legal routes, Product/Foundation/ADR.
+  Акцепт не равен допуску, регистрационная галочка не заменяет коммерческий акцепт.
+  Immutable snapshots, authenticated actor/tenant, idempotence, audit/outbox,
+  операторская проверка организации/полномочий, отклонение и приостановление.
+- DoD: focused schema/API/UI regressions; prisma validate/generate + upgrade-path
+  на проверенной disposable test DB; npm run typecheck, npm test, затронутые builds,
+  verify:postgres, verify:core-contract, verify:web с keyboard/mobile smoke;
+  review/diff/staged/secrets, разрешённый commit/push и actual CI.
+  Commands20min, suite45min, blocker15min, максимум3 попытки нового gate.
+  Рабочую/demo/public DB не изменять, новые кластеры/интеграции не создавать.
+- Старая история CI attempt1–5 BLOCKED сохранена ниже, повтор не выполнен;
+  карта экранов не запускается. Блокер legacy callback не чинить как скрытый scope.
+- Практики прочитаны: Backend Architect (контракты/транзакции), Frontend Developer
+  (доступный просмотр), Code Reviewer (tenant/версии), Git Workflow Master (diff).
+- Candidate готов в schemas/client/OpenAPI, additive migration/table, новый
+  SupplierTermsService/controller (snapshot/акцепт/оператор/download), два статуса
+  и общий gate publication/commerce/search/moderation/readiness. API создания
+  нового индивидуального договора возвращает410; история/старые действующие
+  договоры сохраняются. Supplier panel подключён к /documents и root workspace;
+  admin panel заменён проверкой допуска; /legal/[code] содержит пустые DRAFT.
+  Browser coverage хранит просмотренные диапазоны, прыжок End не заменяет чтение.
+- Checks: prisma generate PASS (после изменения composite unique — новый вход);
+  prisma validate attempt1 FAIL missing DATABASE_URL; attempt2 static dummy URL
+  PASS, без подключения. typecheck attempt1 FAIL только public legal page:
+  ApiClient constructor требовал context; исправлено {}. Следующий run — attempt2.
+  npm test attempt1: API327/328 PASS, новые terms10/10 PASS; единственный FAIL —
+  прежний PDF renderer timeout5000ms под параллельной нагрузкой. Не менять test/
+  assertions/timeout; один повтор с maxWorkers2 обоснован contention. Другие
+  workspace suites прошли; подробности outputs/supplier-terms-20260922/tests-1.log.
+- DB read-only preflight: attempt1 нет env/.env; после обнаруженного прежнего
+  способа получения local config из scripts/dev-local.mjs attempt2 PASS:
+  existing dentmarket_audit_20260914/public, pg_trgm=true, новая terms table ещё
+  отсутствует. Credentials не выводились. Рабочая БД не читалась/не менялась.
+  Upgrade/migration и runtime/browser ещё NOT_RUN; owned серверов нет.
+- Дополнительное поручение владельца передано боковой задачей
+  01a0c7c5-c484-7db2-bd73-4e4480980508: docs-only внутренние диалоги. Внесены
+  Product §22.12 + §22.1/22.2, Foundation CORE-06.5 [ ], UI §2.2. Статус только
+  requirements approved / implementation not started; запрет21.09 явно уточнён
+  решением22.09. Docs links/согласованность/diff-check PASS, отправлен readback.
+  Это не реализация сообщений, не новый runtime gate и не завершение CORE-01.
+- Уточнение evidence22.09: typecheck attempt2 PASS15/15; tests attempt2 с
+  maxWorkers2 PASS14/14 workspace tasks, API328/328. Добавлены ещё2 unit проверки
+  точных цен только допущенных offers; итоговые typecheck attempt3 PASS15/15,
+  tests attempt3 PASS14/14 tasks, API330/330 (66 files), maxWorkers2.
+- Upgrade-path PASS: новая additive migration применена только к audit DB.
+  verify:postgres attempt1 остановлен до runtime из-за EPERM DLL Prisma;
+  preflight перенесён в отдельный завершающийся процесс, attempt2 PASS по полному
+  результату PostgreSQL smoke (checkout/rollback/concurrency/tenant). Core contract
+  PASS275 operations/71 schemas/21 core operations, reused build prerequisites.
+  Runtime-split PASS для api/worker/all и forbidden-entrypoint/production guards.
+  Supplier/admin builds PASS; generated next-env.d.ts возвращены к исходным.
+- verify:web attempt1: JWT/PostgreSQL API + DRAFT + desktop + mobile PASS4/4;
+  operator test FAIL: выбран скрытый mobile select. Исправлен только test locator
+  на видимую desktop кнопку, scenario сделан независимым. Focused attempt2
+  operator PASS (1/1), прежние4 PASS переиспользуются. Проверены screenshots
+  desktop/mobile, клавиатура Enter, End не обходит покрытие, immutable download,
+  самостоятельный допуск, tenant denial, idempotent audit/outbox. Owned процессы
+  fixture остановлены, sessions revoked. Тестовые тексты только в отдельном harness.
+- Дополнительный normal DRAFT onboarding smoke PASS: новая регистрация не даёт
+  акцепт/допуск, старый generation API410, draft acceptance409, operator-only403.
+  Воспроизводит новый процесс без legacy callback, не ослабляет guards ЭЦП.
+- Evidence: outputs/supplier-terms-20260922/. HEAD прежний; commit/push NOT_RUN.
+  Следующий шаг: итог gates/review и отдельные scoped commits/обычный push,
+  затем фактический CI нового change set. Старый attempt5 не перезапускается.
+
 ## CI API + worker — один разрешённый цикл №5, 21.09.2026
 
 - Явное «да» владельца передано Оркестратором 01a02859-08f3-7082-920d-49400f0fbb09:
@@ -45,8 +124,36 @@
   на CRLF/LF неизменённых файлов; attempt2 normalized PASS. Runtime не запускался.
   Evidence: outputs/ci-screenmap-20260921/attempt5/static-gates.json.
   Product TS/API не менялись; полные suites локально NOT_RUN, выполняются в CI.
-- Следующий шаг: review/staging/commit/push и один фактический attempt5; кандидат
-  не принят до runtime readiness/notification outcome и полного CI/browser.
+- Candidate f051a66599834032a0f95a7495b6945ec6f1f811 опубликован в main;
+  remote SHA совпал. Staged6 paths/diff/secret-pattern review PASS.
+  Attempt5: CI35613553621 и Security35613553648, start14:38:50 UTC,
+  deadline15:23:50 UTC; завершены около14:51:24 UTC, budget не исчерпан.
+- Итог attempt5: **BLOCKED / общий CI FAIL**. Новый runtime harness подтверждён:
+  API + worker ready14:51:11 UTC, database/storage/queue checks и штатные роли;
+  legacy isolated preflight/seed PASS, local runtime units6/6 и CI units6/6 PASS.
+  verify:search-commerce PASS (505 projection, 3 offers/cities, checkout4 suppliers).
+  verify:document-compliance PASS14:51:20 UTC: SIGNED/SUPERSEDED/PDF, compliance
+  PASSED, relevant3/sent3. verify:security PASS (headers/rate limits/MFA).
+- Следующий smoke verify:onboarding-agreement FAIL14:51:20 UTC: POST
+  /documents/signatures/callback ожидал201, получил400, verification:
+  "Signed callback requires gateway verification evidence". Fixture callback
+  scripts/verify-onboarding-agreement.mjs:39 содержит certificate и вложенный
+  evidence.verification, но не обязательный top-level verification. Контракт/
+  guard не менялись и не обходились; исправление этого fixture не выполнено.
+  verify:trust-geo NOT_RUN; Pilot browser verification SKIPPED после FAIL.
+- Остальные предшествующие CI gates (typecheck/test/build, migrations/profiles,
+  Prisma validate, runtime/core/config/auth/outbound/outbox) PASS; весь отдельный
+  postgres-integration job PASS, Security workflow35613553648 PASS.
+  Cleanup marker14:51:21 подтверждает остановку owned API + worker;
+  Stop containers обоих CI jobs PASS. Активных операций нет, локальная БД не
+  затрагивалась. Шестой цикл/restart не запускался, карта не изменена.
+- Evidence: outputs/ci-screenmap-20260921/attempt5/{static-gates.json,
+  final-result.json,runtime-excerpt.log}; readback штатным GitHub connector.
+  Опубликованный fix исправил worker/notification этап, но полный DoD CI → карта
+  не достигнут. Dirty только этот итоговый checkpoint, без evidence-only push.
+- Один следующий шаг после отдельного решения: сопоставить callback fixture
+  onboarding-agreement с текущим verification контрактом подписи, сохраняя
+  обязательный guard; новый runtime цикл этим checkpoint не разрешён.
 
 ## Единственный дополнительный CI цикл — разрешён владельцем 21.09.2026
 

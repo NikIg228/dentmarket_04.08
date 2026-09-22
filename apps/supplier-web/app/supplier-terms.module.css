@@ -1,0 +1,8 @@
+.stack { display: grid; gap: 16px; min-width: 0; }
+.statuses, .documentTabs { display: flex; flex-wrap: wrap; gap: 12px; }
+.documentTabs button { white-space: normal; }
+.reader { height: min(440px, 55vh); min-height: 160px; overflow-y: auto; overscroll-behavior: contain; border: 1px solid var(--colorNeutralStroke1, #ccd3dc); border-radius: 8px; padding: 16px; background: var(--colorNeutralBackground1, #fff); line-height: 1.65; }
+.reader:focus-visible { outline: 2px solid var(--colorBrandStroke1, #0f6cbd); outline-offset: 2px; }
+.text { white-space: pre-wrap; overflow-wrap: anywhere; }
+.legalPage { max-width: 880px; margin: 0 auto; padding: 32px 20px; line-height: 1.7; overflow-wrap: anywhere; }
+@media (max-width: 600px) { .documentTabs { flex-direction: column; } .reader { padding: 12px; } }

@@ -17,6 +17,8 @@ import type { SupplierActorContext } from "../suppliers/supplier-access.service"
 import { MediaAccessService } from "../../platform/storage/media-access.service";
 import { scopeMatches } from "../promotions/promotion-engine";
 import { environment } from "../../platform/config/environment";
+import { SupplierTermsService } from "../agreements/supplier-terms.service";
+import { visibleOfferSummary } from "./visible-offer-summary";
 
 type SearchRow = { productId: string; rank: number };
 type PublicSearchPromotion = {
@@ -65,6 +67,7 @@ export class SearchService {
     private readonly prisma: PrismaService,
     private readonly analytics: SearchAnalyticsService,
     private readonly mediaAccess: MediaAccessService,
+    private readonly terms: SupplierTermsService,
   ) {}
 
   async publicCities() {
@@ -106,6 +109,7 @@ export class SearchService {
 
   async search(input: SearchCatalogInput, context: SupplierActorContext) {
     await this.assertBuyer(input.buyerOrganizationId, context);
+    const admittedSuppliers = await this.terms.activeSupplierIds();
     const pilotProfile = environment().DEPLOYMENT_PROFILE === "pilot";
     const searchIntent = expandDentalSearchQuery(input.q);
     const q = searchIntent.normalizedQuery;
@@ -123,7 +127,7 @@ export class SearchService {
     }
     const where: Prisma.Sql[] = [
       Prisma.sql`p.status = 'ACTIVE'`,
-      Prisma.sql`EXISTS (SELECT 1 FROM "MarketplaceAgreement" ma WHERE ma.status IN ('ACTIVE', 'NON_RENEWING') AND ma."startsAt" <= NOW() AND ma."endsAt" > NOW() AND ma."supplierOrganizationId" = ANY(d."supplierIds"))`,
+      admittedSuppliers.length ? Prisma.sql`d."supplierIds" && ARRAY[${Prisma.join(admittedSuppliers.map((id) => Prisma.sql`${id}::uuid`))}]` : Prisma.sql`FALSE`,
     ];
     if (pilotProfile)
       where.push(
@@ -505,8 +509,9 @@ export class SearchService {
     };
   }
 
-  private loadSearchProducts(productIds: string[]) {
+  private async loadSearchProducts(productIds: string[]) {
     const now = new Date();
+    const admittedSuppliers = await this.terms.activeSupplierIds();
     return this.prisma.product.findMany({
       where: { id: { in: productIds }, status: "ACTIVE" },
       select: {
@@ -554,6 +559,7 @@ export class SearchService {
             externalMetadata: true,
             supplierOffers: {
               where: {
+                supplierOrganizationId: { in: admittedSuppliers },
                 status: "ACTIVE",
                 publication: {
                   is: {
@@ -623,12 +629,13 @@ export class SearchService {
     });
   }
 
-  private loadProducts(
+  private async loadProducts(
     productIds: string[],
     buyerOrganizationId?: string,
     quantity = 1,
   ) {
     const now = new Date();
+    const admittedSuppliers = await this.terms.activeSupplierIds();
     return this.prisma.product.findMany({
       where: { id: { in: productIds }, status: "ACTIVE" },
       include: {
@@ -651,6 +658,7 @@ export class SearchService {
             },
             supplierOffers: {
               where: {
+                supplierOrganizationId: { in: admittedSuppliers },
                 status: "ACTIVE",
                 publication: {
                   is: {
@@ -887,11 +895,7 @@ export class SearchService {
         id: category.id,
         name: category.nameRu,
       })),
-      minNormalizedPriceMinor:
-        product.searchDocument?.minNormalizedPriceMinor?.toString() ?? null,
-      maxNormalizedPriceMinor:
-        product.searchDocument?.maxNormalizedPriceMinor?.toString() ?? null,
-      isAvailable: product.searchDocument?.isAvailable ?? false,
+      ...visibleOfferSummary(offers),
       reviewSummary: this.productReviewSummary(
         product.variants.map(({ id }) => id),
         reviewSummaries,

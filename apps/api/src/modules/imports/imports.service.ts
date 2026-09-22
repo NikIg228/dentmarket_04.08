@@ -30,6 +30,7 @@ import {
 import { BackgroundQueueService } from "../../platform/jobs/background-queue.service";
 import { FileUploadPolicyService } from "../../platform/security/file-upload-policy.service";
 import { SearchProjectionService } from "../search/search-projection.service";
+import { SupplierTermsService } from "../agreements/supplier-terms.service";
 
 type RawRow = Record<string, unknown>;
 
@@ -126,6 +127,7 @@ export class ImportsService implements OnModuleInit {
     private readonly backgroundQueue: BackgroundQueueService,
     private readonly uploads: FileUploadPolicyService,
     private readonly searchProjection: SearchProjectionService,
+    private readonly terms: SupplierTermsService,
   ) {}
 
   private rollbackResponse(rollbackEvidence: Prisma.JsonValue | null): SupplierImportRollbackResponse {
@@ -248,14 +250,7 @@ export class ImportsService implements OnModuleInit {
           quantityAvailable: { gt: 0 },
         },
       }),
-      this.prisma.marketplaceAgreement.count({
-        where: {
-          supplierOrganizationId,
-          status: { in: ["ACTIVE", "NON_RENEWING"] },
-          startsAt: { lte: new Date() },
-          endsAt: { gt: new Date() },
-        },
-      }),
+      this.terms.commercialState(supplierOrganizationId),
       this.prisma.supplierOrder.count({
         where: {
           supplierOrganizationId,
@@ -315,9 +310,15 @@ export class ImportsService implements OnModuleInit {
       },
       {
         id: "agreement",
-        label: "Договор ЭЦП",
-        complete: agreement > 0,
-        action: "Подписать договор с оператором",
+        label: "Договор принят",
+        complete: agreement.contractAccepted,
+        action: "Ознакомиться с документами и принять договор",
+      },
+      {
+        id: "admission",
+        label: "Поставщик допущен к работе",
+        complete: agreement.admitted,
+        action: "Дождаться проверки организации и полномочий оператором",
       },
       {
         id: "offer",
@@ -359,7 +360,7 @@ export class ImportsService implements OnModuleInit {
         activeOffers: offers,
         activePrices: prices,
         freshInventory: inventory,
-        activeAgreements: agreement,
+        activeAgreements: agreement.admitted ? 1 : 0,
         testOrders,
       },
     };

@@ -6,6 +6,7 @@ export const frontendDeploymentProfile: DeploymentProfile =
 export const frontendFeatures = deploymentFeatures(frontendDeploymentProfile);
 
 import type {
+  AcceptSupplierTermsInput, ReviewSupplierAdmissionInput, SupplierLegalBundle, SupplierTermsState, SupplierTermsAcceptance, SupplierAdmissionList,
   WorkspaceContext,
   AuthClientOptions, AuthRegistrationAccepted, AuthForgotAccepted, AuthEmailRegistration, LocalOperatorLogin, LocalOperatorSession,
   RegistrationResumeRequest,
@@ -158,6 +159,12 @@ export class MarketplaceApiError extends Error {
 }
 
 export class MarketplaceApiClient {
+  getSupplierLegalDocuments() { return this.get<SupplierLegalBundle>("/supplier-terms/documents"); }
+  getSupplierTerms() { return this.get<SupplierTermsState>("/supplier-terms/current"); }
+  acceptSupplierTerms(input: AcceptSupplierTermsInput) { return this.post<SupplierTermsAcceptance>("/supplier-terms/acceptances", input); }
+  getSupplierAdmissions() { return this.get<SupplierAdmissionList>("/supplier-terms/operator/acceptances"); }
+  reviewSupplierAdmission(id: string, input: ReviewSupplierAdmissionInput) { return this.post<SupplierTermsAcceptance>(`/supplier-terms/operator/acceptances/${encodeURIComponent(id)}/review`, input); }
+  downloadSupplierTerms(id: string) { return this.download(`/supplier-terms/acceptances/${encodeURIComponent(id)}/download`); }
   constructor(
     private readonly baseUrl: string,
     private readonly context: ApiContext,

@@ -30,7 +30,11 @@ Google и Apple OIDC проверяются по issuer, audience, сроку и
 ## Данные и файлы
 
 - Integration credentials и MFA secrets используют независимые 32-byte keys.
-- Документы имеют SHA-256 checksum и immutable version chain. Договор поставщика активируется только после проверенных ЭЦП поставщика и оператора; callback сверяет HMAC, timestamp, event id, checksum, certificate validity и БИН стороны.
+- Документы имеют SHA-256 checksum и immutable version chain. Уточнение22.09.2026:
+  новый поставщик принимает общие версии документов и отдельно получает допуск
+  оператора (Product §9.7 / ADR013). Пустые DRAFT не принимаются; акцепт сам
+  не открывает продажи. Legacy ЭЦП сохраняет прежние проверки HMAC, timestamp,
+  event id, checksum, certificate validity и БИН стороны; эти guards не ослаблены.
 - Financial ledger защищён database trigger от update/delete.
 - Upload сначала попадает в quarantine. Имя, extension, magic bytes и структура OOXML проверяются до публикации; обычный ZIP нельзя выдать за DOCX/XLSX. ClamAV получает байты через INSTREAM, а при required mode недоступность scanner закрывает загрузку.
 - Payment/integration/signature webhooks подписывают `timestamp.rawBody`; окно по умолчанию 300 секунд, event id обеспечивает replay protection.

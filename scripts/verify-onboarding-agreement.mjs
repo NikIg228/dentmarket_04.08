@@ -1,9 +1,6 @@
-import { createHmac, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 
 const API = process.env.API_URL ?? "http://127.0.0.1:4012/api";
-const CALLBACK_SECRET =
-  process.env.SIGNATURE_CALLBACK_SECRET ??
-  "local-signature-callback-secret-2026";
 const OPERATOR = {
   actorId: "00000000-0000-4000-8000-000000000002",
   organizationId: "00000000-0000-4000-8000-000000000001",
@@ -28,46 +25,12 @@ async function request(
     body: body ? JSON.stringify(body) : undefined,
   });
   const text = await response.text();
-  const payload = text ? JSON.parse(text) : null;
+  const payload = text ? response.headers.get("content-type")?.includes("application/json") ? JSON.parse(text) : text : null;
   if (response.status !== expected)
     throw new Error(
       `${method} ${path}: expected ${expected}, received ${response.status}: ${text}`,
     );
   return payload;
-}
-
-async function callback(signature, checksum, bin) {
-  const body = JSON.stringify({
-    signatureId: signature.id,
-    externalSessionId: signature.externalSessionId,
-    status: "SIGNED",
-    externalSignatureId: `verified-${randomUUID()}`,
-    signedDocumentChecksum: checksum,
-    certificate: {
-      subjectBin: bin,
-      issuer: "Local qualified EDS certification authority",
-      serialNumber: `SER-${randomUUID()}`,
-      validFrom: new Date(Date.now() - 60_000).toISOString(),
-      validTo: new Date(Date.now() + 86_400_000).toISOString(),
-    },
-    evidence: { verification: "end-to-end" },
-  });
-  const timestamp = String(Date.now());
-  const eventId = `eds-${randomUUID()}`;
-  const signatureHeader = createHmac("sha256", CALLBACK_SECRET)
-    .update(`${timestamp}.${body}`)
-    .digest("hex");
-  return request("/documents/signatures/callback", {
-    method: "POST",
-    expected: 201,
-    headers: {
-      "content-type": "application/json",
-      "x-signature-event-id": eventId,
-      "x-signature-timestamp": timestamp,
-      "x-signature-signature": signatureHeader,
-    },
-    body: JSON.parse(body),
-  });
 }
 
 const suffix = `${Date.now()}`.slice(-12);
@@ -107,94 +70,37 @@ const supplier = {
 if (!supplier.actorId || !supplier.organizationId)
   throw new Error("Registration did not create an owner and organization");
 
-const empty = await request("/marketplace-agreements/current", {
-  identity: supplier,
-});
-if (!empty.signingRequired || empty.agreement)
-  throw new Error("A new supplier must require an agreement");
-const agreement = await request("/marketplace-agreements", {
-  method: "POST",
-  expected: 201,
-  identity: supplier,
-  body: { renewalMode: "AUTO_ANNUAL" },
-});
-if (agreement.signing.party !== "SUPPLIER" || !agreement.signing.available)
-  throw new Error("Supplier signing window is unavailable");
-
-const supplierSession = await request(
-  `/marketplace-agreements/${agreement.id}/sign`,
-  {
-    method: "POST",
-    expected: 201,
-    identity: supplier,
-    body: { signerName: `ТОО Сквозной тест ${suffix}`, expiresInMinutes: 60 },
-  },
-);
-await callback(
-  supplierSession.signature,
-  agreement.document.checksumSha256,
-  suffix,
-);
-const pending = await request("/marketplace-agreements/operator/pending", {
-  identity: OPERATOR,
-});
-const queued = pending.find(({ id }) => id === agreement.id);
-if (!queued?.signing.supplierSigned || !queued.signing.available)
-  throw new Error("Agreement did not reach the operator signature queue");
-
-const operatorSession = await request(
-  `/marketplace-agreements/${agreement.id}/sign`,
-  {
-    method: "POST",
-    expected: 201,
-    identity: OPERATOR,
-    body: { signerName: "ТОО Marketplace Operator", expiresInMinutes: 60 },
-  },
-);
-await callback(
-  operatorSession.signature,
-  agreement.document.checksumSha256,
-  OPERATOR.bin,
-);
-const active = await request("/marketplace-agreements/current", {
-  identity: supplier,
-});
-if (
-  !active.agreement?.active ||
-  active.signingRequired ||
-  active.signingAvailable
-)
-  throw new Error(
-    "Two EDS signatures did not activate and close the signing window",
-  );
-await request(`/marketplace-agreements/${agreement.id}/sign`, {
-  method: "POST",
-  expected: 409,
-  identity: supplier,
-  body: { signerName: "Retry forbidden", expiresInMinutes: 60 },
-});
-
-console.log(
-  JSON.stringify(
-    {
-      verified: true,
-      registration: {
-        email,
-        organizationId: supplier.organizationId,
-        ownerUserId: supplier.actorId,
-      },
-      agreement: {
-        id: agreement.id,
-        number: agreement.agreementNumber,
-        status: active.agreement.status,
-        startsAt: active.agreement.startsAt,
-        endsAt: active.agreement.endsAt,
-        supplierSigned: active.agreement.signing.supplierSigned,
-        operatorSigned: active.agreement.signing.operatorSigned,
-        signingAvailable: active.agreement.signing.available,
-      },
-    },
-    null,
-    2,
-  ),
-);
+const state = await request("/supplier-terms/current", { identity: supplier });
+if (state.contractAccepted || state.admitted || state.acceptance) throw new Error("Registration must not grant supplier acceptance/admission");
+if (state.bundle.documents.length !== 4) throw new Error("All supplier legal documents must be listed");
+await request("/marketplace-agreements", { method: "POST", expected: 410, identity: supplier, body: {} });
+const acceptance = {
+  organizationVersion: state.organization.version,
+  bundleHash: state.bundle.hash,
+  reviewedDocuments: state.bundle.documents.map(({code, hash}) => ({code, hash})),
+  acknowledged: true,
+  actsForOrganization: true,
+  representativeAuthority: "Synthetic verification representative",
+};
+await request("/supplier-terms/operator/acceptances", { identity: supplier, expected: 403 });
+if (!state.bundle.available) {
+  await request("/supplier-terms/acceptances", { method: "POST", expected: 409, identity: supplier, body: acceptance });
+  const blocked = await request("/supplier-terms/current", { identity: supplier });
+  if (blocked.acceptance || blocked.admitted) throw new Error("Draft documents must not grant acceptance or admission");
+  console.log(JSON.stringify({ verified: true, mode: "draft_documents_fail_closed", supplierOrganizationId: supplier.organizationId, documents: state.bundle.documents.length, salesAllowed: false }));
+} else {
+  const accepted = await request("/supplier-terms/acceptances", { method: "POST", expected: 201, identity: supplier, body: acceptance });
+  const repeated = await request("/supplier-terms/acceptances", { method: "POST", expected: 201, identity: supplier, body: acceptance });
+  if (accepted.id !== repeated.id || accepted.admissionStatus !== "PENDING") throw new Error("Acceptance must be idempotent and pending review");
+  const pending = await request("/supplier-terms/current", { identity: supplier });
+  if (!pending.contractAccepted || pending.admitted) throw new Error("Acceptance cannot grant sales");
+  const review = { expectedVersion: accepted.version, status: "APPROVED", organizationVerified: true, representativeVerified: true, reason: "Synthetic operator verification" };
+  await request(`/supplier-terms/operator/acceptances/${accepted.id}/review`, { method: "POST", expected: 403, identity: supplier, body: review });
+  await request(`/supplier-terms/operator/acceptances/${accepted.id}/review`, { method: "POST", expected: 400, identity: OPERATOR, body: {...review, representativeVerified: false} });
+  await request(`/supplier-terms/operator/acceptances/${accepted.id}/review`, { method: "POST", expected: 201, identity: OPERATOR, body: review });
+  const admitted = await request("/supplier-terms/current", { identity: supplier });
+  if (!admitted.contractAccepted || !admitted.admitted) throw new Error("Verified operator decision did not grant admission");
+  const download = await request(`/supplier-terms/acceptances/${accepted.id}/download`, { identity: supplier });
+  if (!state.bundle.documents.every(document => download.includes(document.content))) throw new Error("Accepted texts are missing from the download");
+  console.log(JSON.stringify({ verified: true, mode: "common_terms_and_operator_admission", acceptanceId: accepted.id, supplierOrganizationId: supplier.organizationId }));
+}

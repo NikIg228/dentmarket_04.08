@@ -617,6 +617,7 @@ export default function SupplierWorkspace() {
       <SupplierTrustPanel supplierId={supplierId} apiContext={apiContext} />
     ) : (
       <SupplierDocuments
+        apiContext={apiContext}
         documents={documents}
         merchantAccounts={merchantAccounts}
         busy={busy}

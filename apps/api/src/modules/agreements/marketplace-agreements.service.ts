@@ -5,6 +5,7 @@ import type { SignMarketplaceAgreementInput } from "@marketplace/schemas";
 import { PrismaService } from "../../platform/prisma/prisma.service";
 import { DocumentsService } from "../documents/documents.service";
 import type { SupplierActorContext } from "../suppliers/supplier-access.service";
+import { SupplierTermsService } from "./supplier-terms.service";
 
 const addYear = (value: Date) => { const next = new Date(value); next.setUTCFullYear(next.getUTCFullYear() + 1); return next; };
 const liveStatuses = ["DRAFT", "AWAITING_SIGNATURE", "ACTIVE", "NON_RENEWING"] as const;
@@ -23,7 +24,7 @@ export function annualRenewalProjection(previousEnd: Date, now: Date) {
 
 @Injectable()
 export class MarketplaceAgreementsService {
-  constructor(private readonly prisma: PrismaService, private readonly documents: DocumentsService) {}
+  constructor(private readonly prisma: PrismaService, private readonly documents: DocumentsService, private readonly terms: SupplierTermsService) {}
 
   private async isOperator(organizationId: string) { return Boolean(await this.prisma.organizationCapability.findUnique({ where: { organizationId_capability: { organizationId, capability: "MARKETPLACE_OPERATOR" } } })); }
 
@@ -162,17 +163,14 @@ export class MarketplaceAgreementsService {
 
   async assertActive(supplierOrganizationId: string) {
     await this.processRenewals(supplierOrganizationId);
-    const now = new Date();
-    const agreement = await this.prisma.marketplaceAgreement.findFirst({ where: { supplierOrganizationId, status: { in: ["ACTIVE", "NON_RENEWING"] }, startsAt: { lte: now }, endsAt: { gt: now } }, orderBy: { endsAt: "desc" } });
-    if (!agreement) throw new ForbiddenException("An active EDS-signed marketplace supplier agreement is required for commercial operations");
-    return agreement;
+    const state = await this.terms.commercialState(supplierOrganizationId);
+    if (!state.admitted) throw new ForbiddenException("Для коммерческих операций необходимы принятый договор и допуск поставщика оператором");
+    return state;
   }
 
   async activeSupplierIds() {
     await this.processRenewals();
-    const now = new Date();
-    const agreements = await this.prisma.marketplaceAgreement.findMany({ where: { status: { in: ["ACTIVE", "NON_RENEWING"] }, startsAt: { lte: now }, endsAt: { gt: now } }, select: { supplierOrganizationId: true } });
-    return [...new Set(agreements.map(({ supplierOrganizationId }) => supplierOrganizationId))];
+    return this.terms.activeSupplierIds();
   }
 
   async requestNonRenewal(agreementId: string, reason: string, context: SupplierActorContext) {

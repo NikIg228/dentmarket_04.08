@@ -18,6 +18,7 @@ import type {
 } from "@nestjs/swagger/dist/interfaces/open-api-spec.interface";
 import {
   addCartItemSchema,
+  acceptSupplierTermsSchema, reviewSupplierAdmissionSchema, supplierLegalBundleSchema, supplierTermsStateSchema, supplierTermsAcceptanceSchema, supplierAdmissionListSchema,
   updateCartItemSchema,
   cartVersionSchema,
   repriceCartSchema,
@@ -89,6 +90,12 @@ const authenticatedCompareOffersQuerySchema = compareOffersSchema.omit({
 const supplierOrdersQuerySchema = z.object({ checkoutId: z.uuid().optional() });
 
 const coreZodSchemas = {
+  AcceptSupplierTermsRequest: acceptSupplierTermsSchema,
+  ReviewSupplierAdmissionRequest: reviewSupplierAdmissionSchema,
+  SupplierLegalBundleResponse: supplierLegalBundleSchema,
+  SupplierTermsStateResponse: supplierTermsStateSchema,
+  SupplierTermsAcceptanceResponse: supplierTermsAcceptanceSchema,
+  SupplierAdmissionListResponse: supplierAdmissionListSchema,
   WorkspaceContextResponse: workspaceContextSchema,
   AuthClientOptionsResponse: authClientOptionsSchema,
   AuthRegistrationAcceptedResponse: authRegistrationAcceptedSchema,
