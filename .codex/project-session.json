@@ -5,8 +5,8 @@
   "canonicalRoot": "C:\\Users\\user\\Desktop\\dentmarket-kz-main",
   "generation": 2,
   "primaryThreadId": "01a0c415-1c3c-73e3-a270-5ad591fa9ca7",
-  "successorThreadId": null,
-  "transition": "idle",
+  "successorThreadId": "01a0c957-1f23-7b70-9dc9-226afbb5c0b1",
+  "transition": "preparing",
   "autoHandoffEnabled": true,
   "rolloverPolicy": "after-task-completion",
   "hookActivationStatus": "REQUIRES_REVIEW_AND_TRUST",
@@ -26,5 +26,5 @@
     "01a02551-6288-7e10-b66f-d67bd887ff05",
     "01a025b2-389e-78a2-90fe-8ca01b056de4"
   ],
-  "lastAuthorization": "2026-09-21: owner explicitly authorized recovery of the already interrupted handoff; source archive and successor comprehension confirmed, generation 2 finalized without another rotation. Owner superseded immediate rollover: compaction restores/continues the entire current task; handoff only after full DoD/checks/review/authorized publication/actual CI where required, no unfinished operations and verified successor comprehension. Failed, blocked, pending or unknown outcomes are incomplete. Governance update is separate from preserved CI remediation, then approved B2B screen map. September 26 target is internal backend/frontend; no live integrations, working DB reseed, worktrees or blanket production certification. Payment channels clarified; commission collection and bank products remain unapproved options."
+  "lastAuthorization": "2026-09-22: owner authorized a fresh main task if useful; Orchestrator01a02859-08f3-7082-920d-49400f0fbb09 verified product closure267be7f and CI35731694388/Security35731694259 success and authorized only the planned governance handoff. Source01a0c415-1c3c-73e3-a270-5ad591fa9ca7 generation2 is the sole governance writer. Create exactly one local successor in the canonical saved project, read-only comprehension first, publish/review required docs evidence, then prepare generation3 awaiting_archive and stop source writes. Sole finalizer is the Orchestrator, not source or successor. Preserve working dev servers and four prior next-env files; no product phase, worktrees, working DB changes, hook/trust or automation changes. Next product scope is unselected. Compaction itself never authorizes handoff; archive only after full DoD and verified successor comprehension."
 }

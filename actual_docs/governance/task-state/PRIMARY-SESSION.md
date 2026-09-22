@@ -2,9 +2,72 @@
 
 Дата: 2026-09-21. Это карточка исполнения, не продуктовый backlog.
 
+## HANDOFF-G3 — разрешённая governance-передача, 22.09.2026
+
+- PREPARING, source01a0c415-1c3c-73e3-a270-5ad591fa9ca7 / generation2,
+  projectId local-affe45ff7ccd29c6dcc081e3663d7082. Владелец разрешил новую
+  основную задачу при необходимости; Оркестратор после независимой сверки выбрал
+  плановую передачу перед новой фазой. Основание — свежий компактный старт после
+  CLOSED, не потеря контекста/авария. Метрики модели не являются DoD передачи.
+- Единственный finalizer: Оркестратор01a02859-08f3-7082-920d-49400f0fbb09.
+  Source не архивирует себя, successor не финализирует. Registry preparing,
+  source остаётся единственным governance writer до проверенного READY и
+  публикации docs; оба исполнителя не начинают продуктовую запись.
+- Вход: canonical root/main@267be7f1f4d9b2f7aced348ed4f6dbdee061cfad,
+  продуктовый DoD CLOSED; CI35731694388/Security35731694259 SUCCESS. Рабочие
+  данные/код/контракты не меняются. Dirty own PRIMARY-SESSION (итоги CI), четыре
+  прежних next-env исключены; их исходные hashes совпали. Registry generation2,
+  successor отсутствует, других изменяющих операций/тестовых процессов нет.
+- Runtime сохранить: source-owned launcher30968, dev-local31284, gateway14696,
+  canonical root, go_live/JWT/all; API4012/web3000–3003/gateway3080. Это serving
+  stand для пользователя, не незаконченная проверка. Hooks/trust не изменять.
+- Scope/DoD: актуализировать только PROJECT_HANDOFF/PRIMARY-SESSION/registry,
+  создать ровно одного local successor в том же saved project без смены модели,
+  read-only comprehension → review → scoped docs commit/push/actual CI →
+  generation3/awaiting_archive и остановка всех source writes. Finalizer отдельно
+  проверит receipt, архивирует source и завершит тот же переход. Следующий
+  продуктовый scope не выбран; backlog и старые BLOCKED/PENDING не задания.
+- Docs gates: ссылки/согласованность/JSON/diff-check/review; source/runtime
+  checks reuse exact267be7f. Локальные build/TS/API/DB/browser suites NOT_RUN
+  для docs-only. Docs CI отдельный, пока NOT_RUN, pending не PASS. Не создавать
+  duplicate successor при неясном ответе инструмента; сначала list/read. Лимит
+  comprehension3, correction только по расхождению; одна публикация docs-пакета,
+  без повторных прогонов на неизменных входах. История ниже сохранена.
+- Создан ровно один successor01a0c957-1f23-7b70-9dc9-226afbb5c0b1, host local,
+  «Platforma.Market — основной», saved project сверён через list_projects,
+  environment local в canonical root; модель не переопределялась. Registry ID
+  записан сразу после успешного create_thread. Comprehension1 IN_PROGRESS:
+  документы/релевантные контракты/Git/runtime, строгий read-only. Source остаётся
+  единственным governance writer; successor не финализирует и не начинает scope.
+- Comprehension1 PASS / READY FOR HANDOFF: successor turn
+  01a0c957-2292-78e3-bfc0-13b19643e3c2 завершён, final message
+  msg_0148f0bd236bb314016ab285d3e55887d289e69dd3243494e1 прочитан полностью.
+  Подтверждены exact HEAD/remote267be7f, source/successor/preparing, продуктовый
+  CLOSED и границы §22, Code Reviewer/контракты, dirty ownership/hashes,
+  runtime/source/listeners и единственный finalizer. Отдельно отмечено:
+  go_live/JWT взят из checkpoint, env процесса не считывался; это корректная
+  граница evidence. Записей/прогонов у successor нет, статус idle/read-only.
+- Source review PASS: docs links3, JSON registry/preparing consistency,
+  hooks/automation flags unchanged, history retained, diff-check PASS.
+  Применены Code Reviewer/Git Workflow Master для согласованности и scoped
+  publication; OpenAI Docs + native tools для local task creation без worktree.
+  В пакет входят ровно3 governance paths;4 next-env excluded. Source публикует
+  preparing snapshot; после actual docs CI перейдёт в awaiting_archive локально
+  и прекратит все записи. Delivery финального operational registry будет явно
+  указан finalizer отдельно от опубликованного docs SHA. Это не новый продукт.
+
 ## PRODUCT-LOGIN-RETURN — продолжение по решению владельца, 22.09.2026
 
-- 22.09.2026, продолжение ACTIVE по явному «Окей, согласен, бро, давай»:
+- CLOSED 22.09.2026:267be7f1f4d9b2f7aced348ed4f6dbdee061cfad на main, remote
+  SHA подтверждён. CI35731694388 SUCCESS (verify35 steps + postgres12),
+  Security35731694259 SUCCESS. Flow-b3 3PASS10.5s; regular39PASS1.5min/38 opt-in
+  SKIP, без flaky/retry failures. Оба product-return1280/390 прошли в общем CI.
+  Причина прежнего FAIL устранена единственной env строкой, asserts не менялись.
+  YAML/Turbo preflight и diff-check PASS; неизменные локальные gates reused.
+  Runtime health ready всех5 services, stand не перезапускался;4 next-env hashes
+  совпадают с исходными. DoD данного product-return + CI fix достигнут; полный
+  Product§22.1 не заявляется, следующие задачи автоматически не начинаются.
+- 22.09.2026, возобновление по явному «Окей, согласен, бро, давай»:
   исправить только NEXT_PUBLIC_LANDING_APP_URL в job verify env. Canonical root,
   main@4d5fc96, тот же primary generation2/idle; dirty собственный checkpoint и
   четыре прежних next-env. Старые3/3 failures сохраняются, новая проверка только
@@ -22,7 +85,11 @@
   без ослабления asserts/retries, dependencies/deploy/auth изменений. Инструкции
   ролей ранее прочитаны; staged/outgoing/diff-check перед публикацией обязательны.
   TS/build/unit/API/browser локально REUSED_PASS4d5fc96; actual CI нового SHA pending.
-- Текущее состояние BLOCKED после публикации4d5fc96: локальные gates PASS,
+- Published267be7f1f4d9b2f7aced348ed4f6dbdee061cfad main: fetch/fast-forward/push/
+  remote SHA PASS. CI35731694388 (verify106758601508, postgres106758601807) и
+  Security35731694259 IN_PROGRESS, attempt1 на исправленном env. Функциональный
+  source не менялся; локальный stand не затронут. Ждём обязательный actual CI.
+- История BLOCKED после публикации4d5fc96: локальные gates PASS,
   CI FAIL только на новых product-return tests, по3/3 попытки1280/390.
   Подтверждённый blocker — CI build не задаёт NEXT_PUBLIC_LANDING_APP_URL;
   public-links production fallback ведёт на внешнюю страницу /login вместо
@@ -32,7 +99,7 @@
   задать NEXT_PUBLIC_LANDING_APP_URL=http://127.0.0.1:3003 в job verify env,
   затем проверить пересобранный CI artifact в согласованном продолжении.
   Сохранить достигнутые PASS и счётчики; весь аудит/локальный suite не повторять.
-- ACTIVE: явное «приступай» после предложения пути карточка → вход → обязательная
+- Исходное поручение: явное «приступай» после предложения пути карточка → вход → обязательная
   анкета клиники при необходимости → та же карточка. Сначала закрыть city Escape
   в CI; прежние desktop3/3 и mobile flaky3 сохранены, новый план — доказать гонку
   native details.toggle / React effect и исправить её без задержек в тесте.
