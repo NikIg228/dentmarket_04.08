@@ -2,9 +2,231 @@
 
 Дата: 2026-09-21. Это карточка исполнения, не продуктовый backlog.
 
+## LOCAL-AUTH-CATALOG — согласованные 15 исправлений, 22.09.2026
+
+- ACTIVE: локальные gates PASS, review/publication/CI ещё не завершены;
+  прежние3/3 неудачи сохранены. Единственный writer
+  primary01a0c415-1c3c-73e3-a270-5ad591fa9ca7. Не передавать и не архивировать.
+  Основание: владелец в боковой задаче01a0c7c5-c484-7db2-bd73-4e4480980508
+  утвердил аудит15 пунктов, «приступай» и «Да, передать и начать выполнение»;
+  поручение передано primary. Боковая задача read-only, записи не ведёт.
+- Вход: canonical root/main@a4eaa0e49a2f6f042689dcf34942598d4f01479c.
+  Dirty: собственный post-CI checkpoint и4 generated next-env.d.ts; сохранить.
+  Прошлый409 FIXED, CI остаётся FAIL по registration/logout3 UI tests; их3/3
+  попытки сохранены, новый запуск только на исправленных входах/новой гипотезе.
+- Утверждённый scope/порядок (не расширять на backlog/интеграции/редизайн):
+  1) Закрыть anonymous supplier, удалить operator/org fallback; tenant membership.
+  2) Обычный локальный JWT-вход, trusted actor, keys/URLs/cookies/config errors.
+  3) Убрать demo UI/runtime, сохранить публичный каталог и test isolation.
+  4) Роль выбирает доступный кабинет, не расширяет права/не меняется молча.
+  5) One-time handoff: timeout/error/finally, StrictMode single-flight.
+  6) Refresh/cookie/CSRF/single-flight/logout; без unsafe write replay.
+  7) Доказать runtime DB/P2021; необходимая локальная additive migration
+     разрешена после точной проверки цели/сохранности; без reset/reseed.
+  8) Общий каталог / и /catalog, search/filter/page сохраняются при возврате.
+  9) API error не маскируется snapshot; явно stale/retry/recovery/live checkout.
+  10) Next navigation/loading/error, timeout/abort, сохранение ввода.
+  11) Readiness API/web/gateway, all/selected profiles/ports/URLs.
+  12) Профилирование/Turbo/watch churn, comparable before/after; StrictMode остаётся.
+  13) Dev origins/HMR/listen/Host/Origin gateway; LAN отдельный сценарий.
+  14) Два минимальных local test accounts: clinic/supplier, обычный вход,
+      без operator/фиктивных акцептов; credentials вне git/logs.
+  15) Cold/warm, login/reload/catalog/back/refresh/logout/outage/isolation.
+- DoD: schema/client/API contract first при изменениях; targeted regressions,
+  root typecheck/test/diff-check, затронутые builds, core-contract/PostgreSQL/
+  runtime-split/config по затронутому риску, verify:web desktop/mobile + ordinary
+  local JWT scenarios; migration preserving data; review/scoped commit/push/CI.
+  Probe2мин, server5мин, command20мин, suite45мин, blocker15мин;3 attempts/gate.
+  Не совмещать build/typegen с dev. Перед тяжёлыми проверками подготовить
+  безопасный stop/restart только точно установленных task runtime процессов;
+  чужие процессы без основания/согласования не останавливать.
+- Статусы1–15: IN_PROGRESS/NOT_VERIFIED. Пока только восстановлен контекст,
+  изучается auth path. API500/missing table — гипотеза до runtime DB evidence.
+  Собственных процессов/новых агентов/worktrees нет. Следующий шаг: сверить
+  серверный session/workspace-context и frontend handoff/refresh контракт.
+- Пользователь явно разрешил остановить dev-local PID15624 и его6 listeners
+  для JWT/migration/cold-start/gates и затем запустить снова. Перед остановкой
+  сверены command identity, canonical descendants и принадлежность портов.
+  Исходное дерево остановлено; остальные Node/MCP процессы не затрагивать.
+- WIP auth: общие session schemas/OpenAPI, membership choices, destination
+  cookie session при handoff, отсутствие silent role switch, frontend store с
+  single-flight/timeout/refresh и server membership check, удалён supplier/docs
+  identity fallback и demo UI. Новые тесты пока NOT_RUN. ADR014 фиксирует модель.
+  Следующий шаг: исправить dev JWT config и собрать/проверить auth slice.
+- Evidence outputs/local-auth-catalog-20260922. Focused auth-client8/8 PASS,
+  auth-api12/12 PASS; client/supplier/buyer targeted typecheck PASS; root
+  typecheck attempt1 PASS12/12 (1m8.058с), API build/prebuild attempt1 PASS.
+  После root typecheck изменены только E2E fixture/mail configuration; полная
+  итоговая проверка всех последующих входов ещё нужна. Тесты/verify/web НЕ PASS.
+- Каталог WIP: /catalog reexports /, сохранены существующие visual root controls;
+  query/filter/loaded count — URL helpers, product Next Link + safe returnTo,
+  live-only catalog/offer data, cancellation/timeout, route loading/error.
+  Product static descriptions/media enrich только successful live result.
+  Next configs: explicit local dev origins + same-origin dev /api rewrite;
+  Next dev bound127.0.0.1. Gateway now Host-before-/api, preserves/validates Origin,
+  aggregate readiness; launcher preflight ports/schema, JWT key outside Git,
+  sequential warm-up. Turbo test/typecheck use source transit + schema build;
+  прежние15 root typecheck tasks стали12 (wall time не изолированный benchmark).
+- Подтверждена причинаAPI500: own canonical compiled API port4615 с явно
+  заданным standard local DATABASE_URL marketplace/public на127.0.0.1:5432.
+  GET /api/catalog/search500 requestId b868e4a6-f4aa-4824-aca2-86ec16df96b7,
+  stack SupplierTermsService.activeSupplierIds → missing SupplierTermsAcceptance.
+  db-before.json:150 tables/11736 rows, только pending20260922000000.
+- Локальная migration22.09 разрешена владельцем в пункте7, применена один раз
+  после verified target и pg_dump/pg_restore --list backup. Migration PASS;
+  counts149 прежних business tables неизменны, fingerprints всех Agreement
+  таблиц неизменны, новый terms table пуст (0 fictitious acceptances).
+  backup/metadata/SQL log/result в ignored evidence; данные не reseed/reset.
+  diagnose-runtime before/after закрывает own API; обычный стенд ещё остановлен,
+  обязан запустить после проверок. Accounts и runtime browser scenarios NOT_DONE.
+- Остаток: finish/review auth refresh/cookie multi-origin, selected startup profile,
+  gateway/config tests, validate catalog back/popstate/races; provision2 minimal
+  local accounts без договорного допуска; full tests/builds/disposable PG/JWT/
+  browser gates/CI, cold/warm measurements и safe credentials delivery.
+  UI failures previous CI explained statically: registration lacks local mail;
+  supplier logout fixture returned malformed terms object, crashed before shell.
+  Updated test fixtures only; actual browser recheck ещё NOT_RUN. Не считать
+  эти статические объяснения browser PASS, не сбрасывать прежние3/3 попытки.
+- Runtime after migration: catalog200/24 items/54 total; API закрылся штатно.
+  npm test -- -- --maxWorkers=2 PASS11/11 tasks, API337/337,49.934с.
+  local-runtime node tests attempt1 FAIL (fetch нормализовал Host в тесте),
+  attempt2 PASS3/3 после перехода test transport на raw HTTP. Runtime guard
+  не ослаблялся. Root typecheck/build evidence выше устарело после новых TS
+  refresh/URL правок; full pilot build attempt1 сейчас выполняется, один процесс.
+  Selected launch включает landing; общий startup deadline5min; popstate и
+  отмена load-more при новом поиске добавлены. Рабочая БД больше не менялась.
+- Далее:2 working local synthetic accounts созданы в собственных организациях,
+  минимальные scoped roles, supplier profile/пустой склад; без operator, договоров
+  или акцептов. Credentials только ignored .tmp/local-runtime/LOCAL-ACCOUNTS.md.
+  JWT workspace live gate PASS (audit DB): context/membership/header isolation,
+  one-time exchange, role cookies/CSRF/rotation/session binding/revoke, OpenAPI.
+  Build1 FAIL TS Promise<Promise> WebLocks typing; исправлено async await.
+  Build2 FAIL webpack .js→TS imports в source-exported api-client; moduleResolution
+  согласован с Bundler consumer, imports extensionless. Typecheck2 PASS12/12,
+  46.837с. Build3 запущен с этими новыми входами, последний разрешённый запуск.
+  Изолированный PostgreSQL gate1 выполняется с reused schemas/API builds;
+  сам сценарий применяет migrations и test seed только audit DB.
+- Build3 PASS10/10 tasks; four Next production pilot artifacts/bundle budgets.
+  API/schemas prerequisites reused for core-contract PASS (live21 operations,
+ 54 success schemas); PostgreSQL PASS tenant/rollback/concurrent stock/idempotency.
+  runtime-split, pilot-composition, frontend-profile, local-profile,
+  production-config, production-auth-contract PASS (config-gates.json).
+  Full final typecheck3 + tests2 идут после source import fix/E2E alignment;
+  затем verify:web на audit DB. Все own fixture APIs закрыты, dev не запущен.
+- Typecheck3 PASS12/12, tests2 PASS11/11 на source revision build3; изменены далее
+  только E2E fixtures/config, targeted E2E typecheck PASS. Web1:15FAIL/16PASS/
+ 38SKIP/4not-run. Причины: audit public context ошибочно000030 вместо pilot buyer;
+  stale pilot inventory; legacy actor-only UI identities; ErrorState имеет strong
+  внутри alert, не heading; local mail acknowledgment теперь «Письмо сохранено
+  локально». API500 не повторился, FlowB3 отказ404 из-за public buyer fixture.
+  Audit pilot fixture refreshed штатным seed-profile pilot (10/10/500/50 PASS),
+  working DB не затрагивалась. E2E helper выдаёт настоящий scoped session/JWT для
+  существующего active membership, без auth bypass. Dropdown/profile/FlowA/B2
+  переведены на этот контракт, роль выбирается по реально активной организации.
+  Web2 запущен с corrected public buyer env/fresh fixtures/new UI session setup.
+  Gateway readiness уточнён до API /health/ready, local-runtime tests3 PASS3/3.
+- Web2:29PASS/3FAIL/3not-run/38SKIP. Две supplier assertions ожидали имя
+  пользователя в скрытом sidebar вместо серверного имени организации/heading;
+  fixture profile не имел import.manage для onboarding-readiness. Исправлены
+  именно test identities/assertions, own local supplier получил только это
+  необходимое право импорта. E2E types2 PASS. Web3 PASS35/35,38explicit opt-in
+  SKIP (1.7m), включая FlowB3 rollback/publication, normal purchase/fulfillment,
+  registration acknowledgment и обе logout ширины. Лимит web3/3 сохранён;
+  повторять неизменённый gate не требуется. Own production test servers закрыты.
+  Начата проверка owned dev:supplier: API+supplier+landing, затем restart all.
+- Selected supplier PASS:4012/3002/3003 HTTP200, readiness наблюдена не позднее169с;
+  PID16140 и дерево остановлены после ownership check. Первый all PASS137478мс,
+  gateway/API/4frontends ready. Обнаружены10 пустых incremental compile events
+  при неизменных TS и одном Nest watcher; all PID27832 остановлен для watch fix.
+  API watchOptions исключают generated/output/cache directories; исходный include
+  не меняется. Сравнение после restart2 ожидается; old logs/all-runtime-1.json
+  сохранены. E2E opt-in catalog tests приведены к общей странице/loaded window,
+  отдельная targeted E2E types3 PASS;38 opt-in по-прежнему NOT_RUN, не PASS.
+- Watch config API typecheck PASS. All restart2 PASS80843мс,10→0 пустых
+  recompilations; warm cache отличается, это не изолированный speed benchmark.
+  Active owned replacement stand PID28124 (npm parent), canonical folder/go_live/
+  JWT, все4web+API+gateway. Не останавливать без необходимости; это обещанный
+  пользователю восстановленный стенд. Изолированные browser/API harnesses закрываются.
+- Ordinary gateway browser1 FAIL на неверном broad locator (нажат header
+  «Каталог» вместо backlink), browser2 FAIL на неверном регистре/тексте backlink.
+  Прочитаны actual TSX и screenshot; exact «← Вернуться в каталог» в browser3.
+  HMR реально /_next/hmr, frames получены (не старый webpack-hmr path).
+  До1/2 failure guest catalog HTTP200,24→48 loaded window, warm render1.6–1.8с,
+  page errors0. Browser3 выполняется;3/3 попытки, normal login/expiry/logout
+  ещё не PASS. Node readback resolver явно maps только3 своих .localhost names
+  к127.0.0.1 (Windows DNS EAI_AGAIN, Chromium handles .localhost нативно).
+- Финальный checkpoint22.09: browser3 FAIL после успешных guest gate,
+  catalog48→product→back48 с sort/count, outage/error/no snapshot/retry,
+  обычного BUYER email login + handoff201 + reload с собственной организацией.
+  Ошибка только на независимом Playwright APIRequestContext readback:
+  getaddrinfo EAI_AGAIN marketplace.localhost; monkeypatch основного Node DNS
+  не влияет на транспорт Playwright. HTTP readback не отправлен. HMR /_next/hmr
+  реально получает frames; page errors0. Supplier browser login, expired JWT
+  refresh и multi-tab logout в этом прогоне НЕ выполнены. Лимит3/3 исчерпан;
+  четвёртый запуск не сделан, это не PASS и не готовность к commit/push.
+  API counterparts ранее PASS в workspace-live-1.log, но не заменяют этот UI gate.
+- Browser закрыт; обе собственные синтетические сессии рабочего test user
+  отозваны (browser-cleanup.json count2). Ошибка инструмента включала auth headers;
+  raw ignored failure artifacts редактированы, credentials удалены, session revoked.
+  Private passwords только .tmp/local-runtime/LOCAL-ACCOUNTS.md; данные каталога
+  и договоров не менялись после разрешённой migration. Пользовательские accounts
+  сохранены, доступ поставщика к продажам не выдан. Stand PID28124 остаётся запущен.
+- Итог15 пунктов:1–4 реализованы, API/guest gates PASS;5–6 unit/API PASS,
+  финальная browser verification PENDING;7 migration/preservation/API200 PASS;
+ 8–10 общий каталог/navigation/timeout/outage проверены в browser3;11 selected/all
+  readiness PASS;12 transit/source graph+watch10→0 подтверждены, startup137.5/80.8с
+  с разной температурой cache, не чистый A/B;13 Host/Origin/HMR PASS;14 два
+  обычных minimal test accounts созданы, clinic login PASS, supplier UI PENDING;
+ 15 полностью не закрыт. 38 opt-in suites не запускались; regular verify:web35PASS.
+- Единственный следующий шаг после нового явного решения владельца по Workflow4.3:
+  заменить только API readback harness на loopback127.0.0.1:3080 с проверенным
+  Host и cookies нужного origin (без изменения приложения/guards/DNS системы),
+  затем проверить оставшиеся ordinary supplier/refresh/logout scenarios. Нового
+  браузера/инструмента недостаточно для сброса счётчика. До этого не повторять
+  gates, не commit/push, не начинать новую фазу. main/HEAD a4eaa0e неизменны,
+  origin/main совпадает (fetch22.09, divergence0/0); все новые правки остаются WIP.
+  Применены прочитанные Backend Architect (session boundary), Frontend Developer
+  (shared store/async states), Code Reviewer (tenant/refresh/write replay), Git
+  Workflow Master (один writer, scoped evidence, запрет публикации failed gate).
+- Продолжение22.09: пользователь ответил «окей» на конкретный план заменить
+  API readback на loopback с Host/cookies и проверить оставшиеся сценарии.
+  main/HEAD/dirty scope/primary сверены; приложение и guards не меняются.
+  Harness использует raw HTTP127.0.0.1:3080, Host/Origin исходного origin,
+  cookies из browser context для исходного URL; системный DNS не меняется.
+  Ошибки транспорта не выводят headers. Новый ограниченный раунд: максимум3
+  запуска с обоснованными изменениями входов, budget15мин; старт loopback1.
+  Проверенные root/build/web/PG gates переиспользуются на неизменных исходниках.
+- Loopback1: DNS устранён; BUYER и SUPPLIER обычный login/reload/foreign tenant
+  denied/expired JWT refresh PASS. BUYER multi-tab logout+revocation PASS;
+  supplier legal/admission false PASS; page errors0/HMR PASS. FAIL только
+  ожидание мобильной кнопки «Выйти» до открытия sidebar: getByRole скрывает
+  inaccessible subtree даже при waitFor attached. Screenshot/исходник AppShell
+  подтверждают; harness wait-only locator теперь includeHidden, click по-прежнему
+  после открытия меню. App source не менялся. Loopback2 разрешён этим новым входом;
+  cleanup теперь отзывает также собственные destination sessions при любом исходе.
+- Loopback2 PASS11 сценариев: оба обычных входа/reload/foreign tenant denial,
+  server-rejected expired JWT refresh, logout revocation+refresh denial+соседняя
+  вкладка (BUYER desktop/SUPPLIER mobile), public catalog48/back/outage/retry,
+  anonymous supplier closed; договор/допуск false, page errors0, HMR frames.
+  Evidence browser-runtime-loopback.json; предыдущие3/3+loopback1 сохранены в
+  истории. Приложение после root/web/build gates не менялось; повторные suites
+  не нужны. Остаются scoped review/staging, commit/push и фактический CI.
+- Финальный локальный review PASS: schemas/OpenAPI/session actor/tenant,
+  destination cookie/CSRF/rotation/write replay, verified UI и catalog failure
+  paths согласованы; no guards bypass. Root typecheck3/tests2/build3, PG/core/
+  profile gates, web3 и loopback2 — PASS/REUSED_PASS на описанных входах.
+  API watch-only config отдельно typechecked; E2E changes отдельно typechecked.
+  Cleanup loopback PASS: отозвана1 оставшаяся собственная headless supplier
+  session из неуспешной попытки, активных сессий проверочного браузера0.
+  Обычный стенд остаётся запущен. Generated4 next-env.d.ts/ignored passwords,
+  JWT/backup/logs/harness не включаются в commit. origin/main=a4eaa0e, divergence0/0;
+  push workflows просмотрены: CI/Security без release/deploy на main push.
+  Далее один scoped commit и обычный push; CI до readback остаётся PENDING.
+
 ## Flow B3.3 publication409 — продолжение владельца 22.09.2026
 
-- ACTIVE: явное «приступай» к получению причины409 и устранению подтверждённого
+- 409 FIXED; общая CI-приёмка BLOCKED на трёх других UI-тестах (итог ниже).
+  Явное «приступай» к получению причины409 и устранению подтверждённого
   дефекта. Предыдущие6 автоматических попыток (два push runs × initial+2 retries)
   сохранены; разрешено ограниченное продолжение с новой диагностикой.
 - Canonical root/main@402c173ec449c417bfaa7f5c6852b95431174c79, тот же primary.
@@ -49,6 +271,30 @@
   cleanup собственных records подтверждён проходом сценария. Runtime API/схемы
   не менялись; broad PostgreSQL/build проверка не повторяется по Workflow§4.2.
   Staging только flow-b3-rollback.spec.ts + этот checkpoint,4 next-env сохраняются.
+- Commit a4eaa0e49a2f6f042689dcf34942598d4f01479c опубликован origin/main,
+  fetch/fast-forward и remote SHA PASS. Исходные4 generated next-env сохранены.
+  Automatic CI35701824783 и Security35701824737 start07:52:43 UTC;
+  deadline08:37:43 UTC. Ручных rerun нет; terminal readback выполнен.
+- Итог actual CI: Flow B3 PASS3/3 (10.2с), исходный publication409 устранён.
+  Security35701824737 PASS (dependencies/CodeQL); postgres-integration106661400147
+  PASS (postgres/authority/backup-restore). Verify106661400282: все шаги до
+  Pilot browser verification PASS, включая typecheck/test/build/runtime/core.
+  Общий verify:web FAIL:32 passed,38 skipped,3 failed (3.6мин):
+  marketplace.spec.ts:98 — отсутствует заголовок «Проверьте почту» после регистрации;
+  workspace-logout.spec.ts:13 — отсутствует «Выйти» при1440;
+  workspace-logout.spec.ts:11 — timeout ожидания «Открыть меню» при390.
+  Каждый новый сбой прошёл initial+2 automatic retries (3/3); не перезапускать
+  без нового разрешённого основания. Причины этих UI-сбоев ещё не установлены.
+  CI завершён FAIL, Security PASS; Stop containers/Complete job PASS в обоих
+  CI jobs, локальные owned процессы завершены. Рабочая БД/пользовательские
+  dev процессы/4 generated next-env не изменялись этой задачей.
+- Evidence: outputs/flow-b3-409-20260922/{final-result.json,ci-excerpt.log},
+  https://github.com/NikIg228/dentmarket_04.08/actions/runs/35701824783.
+  Следующий точный шаг: сверить состояние страницы регистрации и supplier shell
+  по failure diagnostics с текущим UI перед отдельно согласованным исправлением
+  трёх оставшихся тестов. Новые продуктовые фазы/карта экранов не запускаются.
+  Итоговый post-push checkpoint сохранён локально; дополнительного push при
+  failed обязательном gate нет. Общий CORE-01 DoD не объявлен завершённым.
 
 ## CORE-01 supplier common terms — решение владельца 22.09.2026
 

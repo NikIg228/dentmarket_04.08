@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { expect, test, type APIResponse, type Page } from "@playwright/test";
 import { PrismaClient } from "@prisma/client";
+import { workspaceFixture } from "../fixtures/workspace-session";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:4012/api";
 const BUYER_URL = "http://127.0.0.1:3001";
@@ -295,18 +296,13 @@ async function responseJson<T>(response: APIResponse): Promise<T> {
 }
 
 async function openBuyer(page: Page) {
-  await page.addInitScript(({ organizationId, userId, displayName }) => {
+  const session = await workspaceFixture(prisma, "BUYER", buyer);
+  await page.addInitScript(session => {
     window.sessionStorage.setItem(
       "dentmarket:buyer-session",
-      JSON.stringify({
-        actorId: userId,
-        organizationId,
-        displayName,
-        organizationDisplayName: displayName,
-        capability: "BUYER",
-      }),
+      JSON.stringify(session),
     );
-  }, buyer);
+  }, session);
   await page.goto(BUYER_URL);
   await expect(
     page.getByRole("heading", {

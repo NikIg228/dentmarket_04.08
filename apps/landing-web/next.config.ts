@@ -27,7 +27,13 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   env: frontendDeploymentEnvironment(process.env),
+  allowedDevOrigins: ["127.0.0.1", "localhost", "dentmarket.localhost", "marketplace.localhost", "buyer.localhost", "supplier.localhost", "admin.localhost"],
   reactStrictMode: true,
+  async rewrites() {
+    if (process.env.NODE_ENV !== "development") return [];
+    const api = (process.env.INTERNAL_API_URL ?? "http://127.0.0.1:4012/api").replace(/\/$/, "");
+    return [{ source: "/api/:path*", destination: api + "/:path*" }];
+  },
   async headers() {
     return [{ source: "/(.*)", headers: securityHeaders }];
   },

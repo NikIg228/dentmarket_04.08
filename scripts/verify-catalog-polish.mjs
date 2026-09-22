@@ -37,14 +37,14 @@ async function prepare(){
   db.organizationMembership.updateMany({where:{userId:user.userId,organizationId:user.organizationId},data:{organizationId:supplierOrganizationId}}),
  ]);
  const permission=await db.permission.findUniqueOrThrow({where:{code:'catalog.product.view'}});
- await db.rolePermission.create({data:{roleId:role.id,permissionId:permission.id}});
+ await db.rolePermission.createMany({data:{roleId:role.id,permissionId:permission.id},skipDuplicates:true});
  const session=await fixture.request('/auth/login',{email:user.email,password:user.password});
  const handoff=await fixture.request('/auth/handoff',{capability:'SUPPLIER'},201,session.accessToken);
  const buyer=await fixture.account(2,'BUYER');
  const buyerRole=await db.role.findFirstOrThrow({where:{organizationId:buyer.organizationId}});
  for(const code of ['order.create','document.view','notification.view','catalog.product.view']){
   const permission=await db.permission.findUniqueOrThrow({where:{code}});
-  await db.rolePermission.create({data:{roleId:buyerRole.id,permissionId:permission.id}});
+  await db.rolePermission.createMany({data:{roleId:buyerRole.id,permissionId:permission.id},skipDuplicates:true});
  }
  const buyerSession=await fixture.request('/auth/login',{email:buyer.email,password:buyer.password});
  const buyerHandoff=await fixture.request('/auth/handoff',{capability:'BUYER'},201,buyerSession.accessToken);

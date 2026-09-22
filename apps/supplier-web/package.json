@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "build": "next build --webpack && node ../../scripts/verify-supplier-bundle.mjs",
-    "dev": "next dev --port 3002",
+    "dev": "next dev --port 3002 --hostname 127.0.0.1",
     "start": "next start --port 3002",
     "typecheck": "tsc --noEmit",
     "lint": "tsc --noEmit",

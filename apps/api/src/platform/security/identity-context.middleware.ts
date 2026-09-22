@@ -29,11 +29,13 @@ export function resolveJwtActor(token: string, requestedOrganizationId: string |
 export function identityContextMiddleware(sessionVerifier?: SessionVerifier) {
   const config = environment();
   return (request: Request, _response: Response, next: NextFunction) => {
-    if (config.AUTH_MODE === "development") return next();
     const authorization = request.header("authorization");
+    if (config.AUTH_MODE === "development" && !authorization) return next();
     const requestedOrganizationId = request.header("x-organization-id");
     delete request.headers["x-user-id"];
     delete request.headers["x-organization-id"];
+    delete request.headers["x-session-id"];
+    delete request.headers["x-authentication-methods"];
     if (!authorization?.startsWith("Bearer ")) return next();
     void (async () => {
       try {

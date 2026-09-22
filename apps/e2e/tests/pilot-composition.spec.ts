@@ -1,6 +1,9 @@
 import { readFileSync, mkdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
+import { installPilotWorkspace } from "../fixtures/workspace-session";
+let disposeWorkspace: (() => Promise<void>) | undefined;
+test.afterEach(async () => { await disposeWorkspace?.(); disposeWorkspace = undefined; });
 
 const root = resolve(process.cwd(), "../..");
 const output = resolve(root, "output/playwright/pilot-composition");
@@ -73,17 +76,7 @@ for (const width of [1280, 390]) {
   }) => {
     await page.setViewportSize({ width, height: 900 });
     const evidence = observe(page);
-    await page.addInitScript(() => {
-      sessionStorage.setItem(
-        "dentmarket:buyer-session",
-        JSON.stringify({
-          actorId: "00000000-0000-4000-8000-000000000500",
-          organizationId: "00000000-0000-4000-8000-000000000030",
-          displayName: "Pilot QA clinic",
-          capability: "BUYER",
-        }),
-      );
-    });
+    const workspace = await installPilotWorkspace(page, "BUYER"); disposeWorkspace = workspace.dispose;
     await page.goto("http://127.0.0.1:3001");
     await expect(
       page.getByRole("heading", {
@@ -123,9 +116,10 @@ for (const width of [1280, 390]) {
   }) => {
     await page.setViewportSize({ width, height: 900 });
     const evidence = observe(page);
+    const workspace = await installPilotWorkspace(page, "SUPPLIER"); disposeWorkspace = workspace.dispose;
     await page.goto("http://127.0.0.1:3002");
     await expect(
-      page.getByRole("combobox", { name: "Организация поставщика" }),
+      page.getByRole("heading", { name: `Добрый день, ${workspace.displayName}` }),
     ).toBeVisible();
     await page.getByRole("button", { name: "Ещё", exact: true }).click();
     await expect(

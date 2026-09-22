@@ -51,7 +51,18 @@ export class AuthSessionsService {
   }
 
   private async memberships(userId: string) {
-    return this.prisma.organizationMembership.findMany({ where: { userId, status: "ACTIVE", organization: { status: "ACTIVE" } }, select: { organizationId: true, isPrimary: true }, orderBy: { acceptedAt: "asc" } });
+    return this.prisma.organizationMembership.findMany({ where: { userId, status: "ACTIVE", user: { status: "ACTIVE" }, organization: { status: "ACTIVE" } }, select: { organizationId: true, isPrimary: true }, orderBy: { acceptedAt: "asc" } });
+  }
+
+  async workspaceChoices(userId?: string): Promise<WorkspaceContext[]> {
+    if (!userId) throw new UnauthorizedException("Войдите в аккаунт");
+    const memberships = await this.prisma.organizationMembership.findMany({
+      where: { userId, status: "ACTIVE", user: { status: "ACTIVE" }, organization: { status: "ACTIVE" } },
+      select: { organization: { select: { id: true, displayName: true, capabilities: { select: { capability: true } } } } },
+      orderBy: { acceptedAt: "asc" },
+    });
+    return memberships.map(({ organization }) => ({ organizationId: organization.id, organizationDisplayName: organization.displayName,
+      capabilities: organization.capabilities.map(item => item.capability).filter((value): value is "BUYER" | "SUPPLIER" => value === "BUYER" || value === "SUPPLIER") }));
   }
 
   async workspaceContext(userId?: string, organizationId?: string): Promise<WorkspaceContext> {
@@ -154,6 +165,7 @@ export class AuthSessionsService {
       }
       throw new UnauthorizedException("Email или пароль указаны неверно");
     }
+    if (user.status !== "ACTIVE") throw new UnauthorizedException("Доступ к аккаунту недоступен");
     if (!user.emailVerifiedAt) throw new UnauthorizedException("Сначала подтвердите email");
     let operatorOrganizationId: string | undefined;
     if (operatorOnly) {
@@ -270,10 +282,11 @@ export class AuthSessionsService {
     return { user: { id: user.id, email: user.email, displayName: user.displayName }, ...(onboarding ? { capability: onboarding.capability, organizationId: onboarding.organizationId, organizationDisplayName: onboarding.organizationDisplayName } : {}), ...this.sessionPayload(session, refreshToken) };
   }
 
-  async rotate(refreshToken: string, metadata: RequestMetadata) {
+  async rotate(refreshToken: string, metadata: RequestMetadata, expectedSessionId?: string) {
     const tokenHash = hash(refreshToken);
     const session = await this.prisma.authSession.findFirst({ where: { OR: [{ refreshTokenHash: tokenHash }, { previousTokenHash: tokenHash }] } });
     if (!session) throw new UnauthorizedException("Refresh session is invalid");
+    if (expectedSessionId && session.id !== expectedSessionId) throw new UnauthorizedException("Refresh cookie belongs to another session");
     if (session.previousTokenHash && secureEqual(session.previousTokenHash, tokenHash)) {
       await this.prisma.$transaction([this.prisma.authSession.updateMany({ where: { familyId: session.familyId, status: "ACTIVE" }, data: { status: "REVOKED", revokedAt: new Date(), revokeReason: "refresh_replay" } }), this.prisma.securityEvent.create({ data: { severity: "CRITICAL", type: "auth.refresh_replay", actorId: session.userId, sessionId: session.id, ipAddress: metadata.ipAddress, userAgent: metadata.userAgent, correlationId: metadata.correlationId } })]);
       throw new UnauthorizedException("Refresh token replay detected; session family revoked");
@@ -282,7 +295,8 @@ export class AuthSessionsService {
     if (session.status !== "ACTIVE" || session.expiresAt <= now) throw new UnauthorizedException("Refresh session is revoked or expired");
     const memberships = await this.memberships(session.userId);
     const organizationIds = memberships.map(({ organizationId }) => organizationId);
-    const activeOrganizationId = session.activeOrganizationId && organizationIds.includes(session.activeOrganizationId) ? session.activeOrganizationId : organizationIds[0] ?? null;
+    const activeOrganizationId = session.activeOrganizationId;
+    if (!activeOrganizationId || !organizationIds.includes(activeOrganizationId)) throw new UnauthorizedException("Активное членство недоступно. Войдите заново.");
     const next = randomBytes(48).toString("base64url");
     const claimed = await this.prisma.authSession.updateMany({
       where: {
@@ -334,7 +348,7 @@ export class AuthSessionsService {
     return { handoffCode: code, expiresAt, organizationId, organizationDisplayName: membership.organization.displayName, capability };
   }
 
-  async exchangeHandoff(code: string) {
+  async exchangeHandoff(code: string, metadata: RequestMetadata = {}) {
     const record = await this.prisma.idempotencyRecord.findUnique({ where: { scope_key: { scope: "session-handoff", key: hash(code) } } });
     if (!record || record.expiresAt <= new Date() || record.responseCode !== 200) throw new UnauthorizedException("Session handoff is invalid or expired");
     const consumed = await this.prisma.idempotencyRecord.updateMany({ where: { id: record.id, responseCode: 200, expiresAt: { gt: new Date() } }, data: { responseCode: 410 } });
@@ -343,8 +357,12 @@ export class AuthSessionsService {
     if (!payload.sessionId || !payload.userId || !payload.organizationId || !payload.capability) throw new UnauthorizedException("Session handoff payload is invalid");
     const session = await this.prisma.authSession.findFirst({ where: { id: payload.sessionId, userId: payload.userId, status: "ACTIVE", expiresAt: { gt: new Date() }, organizationIds: { has: payload.organizationId } } });
     if (!session) throw new UnauthorizedException("Authentication session is revoked or expired");
+    const workspace = await this.workspaceContext(payload.userId, payload.organizationId);
+    if (!workspace.capabilities.includes(payload.capability)) throw new UnauthorizedException("Organization capability is no longer available");
     const user = await this.prisma.user.findUniqueOrThrow({ where: { id: payload.userId }, select: { id: true, email: true, displayName: true } });
-    return { user, capability: payload.capability, organizationId: payload.organizationId, ...this.sessionPayload(session, ""), refreshToken: undefined };
+    // The destination owns its refresh cookie; no access/refresh token travels in the URL.
+    const destination = await this.createSession(user.id, [workspace.organizationId], workspace.organizationId, session.authMethods, metadata);
+    return { ...destination, user, capability: payload.capability, organizationId: workspace.organizationId, organizationDisplayName: workspace.organizationDisplayName };
   }
 
   async revoke(sessionId: string, userId: string, reason: string) {
@@ -363,8 +381,8 @@ export class AuthSessionsService {
   async switchOrganization(sessionId: string, userId: string, organizationId: string) {
     const session = await this.prisma.authSession.findFirst({ where: { id: sessionId, userId, status: "ACTIVE", expiresAt: { gt: new Date() } } });
     if (!session) throw new NotFoundException("Session not found");
-    const membership = await this.prisma.organizationMembership.findUnique({ where: { userId_organizationId: { userId, organizationId } } });
-    if (membership?.status !== "ACTIVE") throw new UnauthorizedException("Organization membership is not active");
+    const membership = await this.prisma.organizationMembership.findFirst({ where: { userId, organizationId, status: "ACTIVE", user: { status: "ACTIVE" }, organization: { status: "ACTIVE" } } });
+    if (!membership || !session.organizationIds.includes(organizationId)) throw new UnauthorizedException("Organization membership is not active");
     const updated = await this.prisma.authSession.update({ where: { id: sessionId }, data: { activeOrganizationId: organizationId, lastUsedAt: new Date() } });
     return { activeOrganizationId: organizationId, accessToken: this.issueAccessToken(userId, updated.organizationIds, organizationId, updated.authMethods, updated.id), accessTokenExpiresIn: environment().AUTH_ACCESS_TOKEN_TTL_SECONDS };
   }

@@ -1,5 +1,6 @@
 "use client";
 
+import { useVerifiedSession, sessionApiContext, sessionStore, logoutSession } from "./workspace-session";
 import { confirmationOutcomeMessage } from "./order-confirmation-model";
 
 import { Menu, MenuItem, MenuList, MenuPopover, MenuTrigger } from "@fluentui/react-components";
@@ -34,6 +35,7 @@ import {
   type NavigationItem,
 } from "@marketplace/ui";
 import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { loginUrl } from "./public-links";
 import { SupplierDashboard } from "./features/supplier-workspace/supplier-dashboard";
@@ -95,33 +97,8 @@ const SupplierTrustPanel = dynamic(() =>
   import("./supplier-trust-panel").then((module) => module.SupplierTrustPanel),
 );
 
-const OPERATOR_ID = "00000000-0000-4000-8000-000000000002";
-const OPERATOR_ORG_ID = "00000000-0000-4000-8000-000000000001";
 const SESSION_KEY = "dentmarket:supplier-session";
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:4012/api";
-
-type SessionHandoff = SessionHandoffEnvelope;
-
-function readSessionHandoff(): SessionHandoff | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const serialized = window.location.hash.startsWith("#session=")
-      ? decodeURIComponent(window.location.hash.slice("#session=".length))
-      : window.sessionStorage.getItem(SESSION_KEY);
-    if (!serialized) return null;
-    return parseSessionHandoff(serialized, "SUPPLIER");
-  } catch {
-    return null;
-  }
-}
-
-const suppliers: SupplierSummary[] = [
-  { id: "00000000-0000-4000-8000-000000000020", name: "Demo Dental Supply", city: "Алматы" },
-  { id: "00000000-0000-4000-8000-000000000025", name: "Ortho Trade KZ", city: "Астана" },
-  { id: "00000000-0000-4000-8000-000000000060", name: "MedConsum", city: "Шымкент" },
-  { id: "00000000-0000-4000-8000-000000000070", name: "TechDent Systems", city: "Алматы" },
-  { id: "00000000-0000-4000-8000-000000000080", name: "SterileLine", city: "Караганда" },
-];
 
 const navigation: NavigationItem[] = [
   { id: "dashboard", label: "Обзор", icon: <DataTrending24Regular /> },
@@ -133,19 +110,11 @@ const navigation: NavigationItem[] = [
 ];
 
 export default function SupplierWorkspace() {
-  const [handoff, setHandoff] = useState<SessionHandoff | null>(null);
-  const [handoffChecked, setHandoffChecked] = useState(false);
-  const apiContext = useMemo<ApiContext>(
-    () =>
-      handoff?.accessToken
-        ? { accessToken: handoff.accessToken }
-        : handoff?.actorId && handoff.organizationId
-          ? { actorId: handoff.actorId, organizationId: handoff.organizationId }
-          : { actorId: OPERATOR_ID, organizationId: OPERATOR_ORG_ID },
-    [handoff],
-  );
+  const router = useRouter();
+  const { session: handoff, ready: handoffChecked, error: sessionError } = useVerifiedSession();
+  const apiContext = sessionApiContext;
   const api = useMemo(() => new MarketplaceApiClient(API_URL, apiContext), [apiContext]);
-  const [supplierId, setSupplierId] = useState(suppliers[0].id);
+  const supplierId = handoff?.organizationId ?? "";
   const [active, setActive] = useState("dashboard");
   const [offers, setOffers] = useState<Offer[]>([]);
   const [balances, setBalances] = useState<Balance[]>([]);
@@ -171,58 +140,9 @@ export default function SupplierWorkspace() {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
-  const logout = useSessionLogout({ sessionKey: SESSION_KEY, sessionId: handoff?.sessionId, revoke: () => revokeWorkspaceSession(API_URL, handoff), redirectUrl: loginUrl });
+  const logout = useSessionLogout({ sessionKey: SESSION_KEY, sessionId: handoff?.sessionId, revoke: logoutSession, redirectUrl: loginUrl });
 
-  useEffect(() => {
-    void (async () => {
-      const next = readSessionHandoff();
-      if (!next?.organizationId) {
-        setHandoffChecked(true);
-        return;
-      }
-      let resolved = next;
-      if (next.handoffCode && !next.accessToken) {
-        const response = await fetch(`${API_URL}/auth/handoff/exchange`, {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ handoffCode: next.handoffCode }),
-        });
-        if (!response.ok) {
-          setHandoffChecked(true);
-          return;
-        }
-        const session = (await response.json()) as {
-          accessToken?: string;
-          user?: { id: string; displayName: string };
-          organizationId?: string;
-          capability?: string;
-        };
-        resolved = { ...next, ...session, actorId: session.user?.id };
-      }
-      setHandoff(resolved);
-      setSupplierId(resolved.organizationId!);
-      window.sessionStorage.setItem(SESSION_KEY, JSON.stringify(resolved));
-      window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
-      setHandoffChecked(true);
-    })();
-  }, []);
-
-  const availableSuppliers = useMemo<SupplierSummary[]>(
-    () =>
-      handoff?.organizationId
-        ? [
-            {
-              id: handoff.organizationId,
-              name: handoff.organizationDisplayName || "Новая организация",
-              city: "География не настроена",
-            },
-          ]
-        : suppliers,
-    [handoff],
-  );
-  const supplier =
-    availableSuppliers.find((item) => item.id === supplierId) ??
-    availableSuppliers[0];
+  const supplier: SupplierSummary = { id: supplierId, name: handoff?.organizationDisplayName ?? "", city: "География не настроена" };
   const supplierOrders = orders.filter(
     (order) => order.supplierOrganizationId === supplierId,
   );
@@ -232,7 +152,7 @@ export default function SupplierWorkspace() {
 
   const refresh = useCallback(
     async (silent = false) => {
-      if (!handoffChecked) return;
+      if (!handoffChecked || !handoff) return;
       setRefreshing(true);
       if (!silent) setLoading(true);
       setError(null);
@@ -285,7 +205,7 @@ export default function SupplierWorkspace() {
         if (!silent) setLoading(false);
       }
     },
-    [active, api, handoffChecked, supplierId],
+    [active, api, handoffChecked, handoff, supplierId],
   );
 
   useEffect(() => {
@@ -634,6 +554,9 @@ export default function SupplierWorkspace() {
       : item,
   );
 
+  if (!handoffChecked) return <LoadingState label="Проверяем вход" />;
+  if (!handoff) return <ErrorState title="Войдите в кабинет поставщика" description={sessionError ?? "Кабинет доступен только участникам организации."} action={<><DmButton as="a" href={loginUrl}>Войти</DmButton><DmButton onClick={() => void sessionStore.retry()}>Повторить проверку</DmButton></>} />;
+
   return (
     <AppShell
       {...logout}
@@ -655,21 +578,12 @@ export default function SupplierWorkspace() {
               : undefined
       }
       onNavigate={(item) => {
-        if (item === "documents") window.location.assign("/documents");
+        if (item === "documents") router.push("/documents");
         else setActive(item);
       }}
       actions={
         <>
-          <DmSelect
-            className={styles.switcher}
-            value={supplierId}
-            onChange={(_, data) => setSupplierId(data.value)}
-            aria-label="Организация поставщика"
-          >
-            {availableSuppliers.map((item) => (
-              <option value={item.id} key={item.id}>{item.name}</option>
-            ))}
-          </DmSelect>
+          <span className={styles.switcher}>{supplier.name}</span>
           <Menu>
             <MenuTrigger disableButtonEnhancement>
               <DmButton appearance="subtle" icon={<MoreHorizontal24Regular />}>Ещё</DmButton>

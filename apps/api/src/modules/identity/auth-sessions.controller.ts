@@ -1,5 +1,5 @@
 import { BadRequestException, Body, Controller, Delete, Get, Header, Headers, Param, Post, Req, Res, UnauthorizedException } from "@nestjs/common";
-import { localOperatorLoginSchema } from "@marketplace/schemas";
+import { localOperatorLoginSchema, workspaceHandoffRequestSchema, workspaceExchangeRequestSchema } from "@marketplace/schemas";
 import { ApiCoreBody, ApiCoreProtected, ApiCoreResponse } from "../../platform/openapi/core-openapi";
 import { demoSessionSchema, emailForgotPasswordSchema, emailLoginSchema, emailRegisterSchema, emailResetPasswordSchema, emailTokenSchema, refreshSessionSchema, revokeSessionSchema, socialExchangeSchema, switchSessionOrganizationSchema, unlinkExternalIdentitySchema } from "@marketplace/schemas";
 import { ApiTags } from "@nestjs/swagger";
@@ -18,11 +18,12 @@ const equal = (left: string, right: string) => { const a = Buffer.from(left); co
 export class AuthSessionsController {
   constructor(private readonly sessions: AuthSessionsService) {}
   private metadata(request: Request) { return { ipAddress: request.ip, userAgent: request.header("user-agent"), correlationId: request.header("x-request-id") }; }
-  private setCookies(response: Response, refreshToken: string, csrfToken: string, expiresAt: Date | string) {
+  private setCookies(response: Response, refreshToken: string, csrfToken: string, expiresAt: Date | string, workspace?: "BUYER" | "SUPPLIER") {
     const config = environment();
     const common = { secure: config.NODE_ENV === "production", sameSite: "lax" as const, domain: config.AUTH_COOKIE_DOMAIN, path: "/api/auth", expires: new Date(expiresAt) };
-    response.cookie("mp_refresh", refreshToken, { ...common, httpOnly: true });
-    response.cookie("mp_csrf", csrfToken, { ...common, httpOnly: false });
+    const suffix = workspace ? `_${workspace.toLowerCase()}` : "";
+    response.cookie(`mp_refresh${suffix}`, refreshToken, { ...common, httpOnly: true });
+    response.cookie(`mp_csrf${suffix}`, csrfToken, { ...common, path: "/", httpOnly: false });
   }
 
   @Post("social/exchange")
@@ -73,6 +74,10 @@ export class AuthSessionsController {
     return this.sessions.workspaceContext(userId, organizationId);
   }
 
+  @Get("workspaces") @Header("Cache-Control", "no-store") @ApiCoreProtected()
+  @ApiCoreResponse("WorkspaceChoicesResponse")
+  workspaces(@Headers("x-user-id") userId: string) { return this.sessions.workspaceChoices(userId); }
+
   @Post("local-operator/login") @Header("Cache-Control", "no-store")
   @ApiCoreBody("LocalOperatorLoginRequest") @ApiCoreResponse("LocalOperatorSessionResponse", 201)
   @ApiCoreResponse("ErrorResponse", 400) @ApiCoreResponse("ErrorResponse", 401) @ApiCoreResponse("ErrorResponse", 404) @ApiCoreResponse("ErrorResponse", 429)
@@ -97,33 +102,45 @@ export class AuthSessionsController {
   }
 
   @Post("handoff")
+  @Header("Cache-Control", "no-store") @ApiCoreProtected()
+  @ApiCoreBody("WorkspaceHandoffRequest") @ApiCoreResponse("WorkspaceHandoffResponse", 201)
   createHandoff(@Headers("x-user-id") userId: string, @Headers("x-organization-id") organizationId: string, @Headers("x-session-id") sessionId: string, @Body() body: unknown) {
-    const value = body && typeof body === "object" ? body as { capability?: unknown } : {};
-    if (!userId || !organizationId || !["BUYER", "SUPPLIER"].includes(String(value.capability))) throw new UnauthorizedException("Authenticated organization and capability are required");
-    return this.sessions.createHandoff(userId, organizationId, String(value.capability) as "BUYER" | "SUPPLIER", sessionId || undefined);
+    const parsed = workspaceHandoffRequestSchema.safeParse(body);
+    if (!parsed.success) throw new BadRequestException("Выберите кабинет клиники или поставщика");
+    if (!userId || !organizationId || !sessionId) throw new UnauthorizedException("Authenticated session and organization are required");
+    return this.sessions.createHandoff(userId, organizationId, parsed.data.capability, sessionId);
   }
 
   @Post("handoff/exchange")
-  exchangeHandoff(@Body() body: unknown) {
-    const value = body && typeof body === "object" ? body as { handoffCode?: unknown } : {};
-    if (typeof value.handoffCode !== "string" || value.handoffCode.length < 20) throw new BadRequestException("handoffCode is required");
-    return this.sessions.exchangeHandoff(value.handoffCode);
+  @Header("Cache-Control", "no-store")
+  @ApiCoreBody("WorkspaceExchangeRequest") @ApiCoreResponse("WorkspaceSessionResponse", 201)
+  async exchangeHandoff(@Body() body: unknown, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
+    const parsed = workspaceExchangeRequestSchema.safeParse(body);
+    if (!parsed.success) throw new BadRequestException("handoffCode is required");
+    const result = await this.sessions.exchangeHandoff(parsed.data.handoffCode, this.metadata(request));
+    const csrfToken = randomBytes(32).toString("base64url");
+    this.setCookies(response, result.refreshToken, csrfToken, result.refreshTokenExpiresAt, result.capability);
+    return { ...result, refreshToken: undefined, csrfToken };
   }
 
   @Post("refresh")
+  @Header("Cache-Control", "no-store")
+  @ApiCoreBody("WorkspaceRefreshRequest") @ApiCoreResponse("WorkspaceRefreshResponse", 201)
   async refresh(@Body() body: unknown, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
     const parsed = refreshSessionSchema.safeParse(body); if (!parsed.success) throw new BadRequestException(parsed.error.flatten());
     const cookie = cookies(request.header("cookie"));
-    const refreshToken = parsed.data.refreshToken ?? cookie.mp_refresh;
+    const suffix = parsed.data.workspace ? `_${parsed.data.workspace.toLowerCase()}` : "";
+    const refreshCookie = cookie[`mp_refresh${suffix}`], csrfCookie = cookie[`mp_csrf${suffix}`];
+    const refreshToken = parsed.data.refreshToken ?? refreshCookie;
     if (!refreshToken) throw new UnauthorizedException("Refresh token is required");
-    if (cookie.mp_refresh) {
+    if (refreshCookie) {
       const suppliedCsrf = request.header("x-csrf-token") ?? parsed.data.csrfToken;
-      if (!suppliedCsrf || !cookie.mp_csrf || !equal(suppliedCsrf, cookie.mp_csrf)) throw new UnauthorizedException("CSRF validation failed");
+      if (!suppliedCsrf || !csrfCookie || !equal(suppliedCsrf, csrfCookie)) throw new UnauthorizedException("CSRF validation failed");
     }
-    const result = await this.sessions.rotate(refreshToken, this.metadata(request));
+    const result = await this.sessions.rotate(refreshToken, this.metadata(request), parsed.data.expectedSessionId);
     const csrfToken = randomBytes(32).toString("base64url");
-    this.setCookies(response, result.refreshToken, csrfToken, result.refreshTokenExpiresAt);
-    return { ...result, refreshToken: cookie.mp_refresh ? undefined : result.refreshToken, csrfToken };
+    this.setCookies(response, result.refreshToken, csrfToken, result.refreshTokenExpiresAt, parsed.data.workspace);
+    return { ...result, refreshToken: refreshCookie ? undefined : result.refreshToken, csrfToken };
   }
 
   @Post("logout")
@@ -138,7 +155,7 @@ export class AuthSessionsController {
     const config = environment();
     const common = { secure: config.NODE_ENV === "production", sameSite: "lax" as const, domain: config.AUTH_COOKIE_DOMAIN, path: "/api/auth" };
     response.clearCookie("mp_refresh", { ...common, httpOnly: true });
-    response.clearCookie("mp_csrf", { ...common, httpOnly: false });
+    response.clearCookie("mp_csrf", { ...common, path: "/", httpOnly: false });
     return { ok: true };
   }
 

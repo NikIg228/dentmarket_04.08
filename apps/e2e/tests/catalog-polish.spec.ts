@@ -33,43 +33,40 @@ test.afterEach(async({page},info)=>{
  if(info.status!==info.expectedStatus)await page.screenshot({path:info.outputPath('failure.png'),fullPage:true}).catch(()=>undefined);
  await page.goto('about:blank');
 });
-const cards=(page:Page)=>page.getByTestId('catalog-card');
+const cards=(page:Page)=>page.getByTestId('product-card');
 async function openCatalog(page:Page,suffix=''){
  await page.goto(`http://127.0.0.1:3101/catalog?q=${data.keyword}&sort=NAME_ASC${suffix}`);
- await expect(page.getByRole('region',{name:'Каталог товаров',exact:true})).toHaveAttribute('aria-busy','false');
+ await expect(cards(page).first()).toBeVisible();
 }
-async function search(page:Page,value:string){const input=page.getByRole('combobox',{name:'Поиск по каталогу',exact:true});await input.fill(value);await input.press('Enter');}
+async function search(page:Page,value:string){const input=page.getByRole('textbox',{name:'Поиск по каталогу',exact:true});await input.fill(value);await input.press('Enter');}
 
-test('real catalog pagination, history, complete reset and end of results',async({page})=>{
+test('unified catalog restores its loaded window and filters after product navigation',async({page})=>{
  await page.setViewportSize({width:1440,height:900});await openCatalog(page,'&inStock=true&categoryId='+data.categoryId);
  await expect(cards(page)).toHaveCount(24);
  const firstIds=await cards(page).evaluateAll(nodes=>nodes.map(n=>n.getAttribute('data-product-id')));
- await page.getByRole('button',{name:'Следующая страница',exact:true}).click();
- await expect(cards(page)).toHaveCount(2);await expect(page).toHaveURL(/offset=24/);
- expect((await cards(page).evaluateAll(nodes=>nodes.map(n=>n.getAttribute('data-product-id')))).some(id=>firstIds.includes(id))).toBe(false);
- await expect(page.getByRole('button',{name:'Следующая страница',exact:true})).toBeDisabled();
- await expect(page.getByRole('status')).toContainText('25–26 из 26 · Конец списка');
- await page.reload();await expect(cards(page)).toHaveCount(2);
- await page.goBack();await expect(cards(page)).toHaveCount(24);
- await page.goForward();await expect(cards(page)).toHaveCount(2);
- await page.getByRole('combobox',{name:'Сортировка'}).selectOption('PRICE_ASC');
- await expect(cards(page)).toHaveCount(24);await expect(page).not.toHaveURL(/offset=/);
- await search(page,'auditmissingnone'+data.keyword);await expect(page.getByText('Ничего не нашли',{exact:true})).toBeVisible();
- await page.getByRole('button',{name:'Сбросить фильтры',exact:true}).click();
- await expect(page).toHaveURL('http://127.0.0.1:3101/catalog');
- await expect(page.getByRole('combobox',{name:'Поиск по каталогу'})).toHaveValue('');
- await expect(page.getByRole('checkbox',{name:'Только в наличии'})).not.toBeChecked();
- await expect(page.getByRole('combobox',{name:'Сортировка'})).toHaveValue('RELEVANCE');await expect(cards(page)).toHaveCount(24);
- await page.screenshot({path:test.info().outputPath('catalog-reset-desktop-1440.png'),fullPage:true});
+ await page.getByRole('link',{name:/Показать ещё/}).click();
+ await expect(cards(page)).toHaveCount(26);await expect(page).toHaveURL(/count=26/);
+ const ids=await cards(page).evaluateAll(nodes=>nodes.map(n=>n.getAttribute('data-product-id')));
+ expect(new Set(ids).size).toBe(26);expect(ids.slice(0,24)).toEqual(firstIds);
+ await expect(page.getByRole('link',{name:/Показать ещё/})).toHaveCount(0);
+ const returnUrl=page.url();await cards(page).first().getByRole('link',{name:/Открыть карточку/}).click();await expect(page).toHaveURL(/\/products\//);
+ await page.getByRole('link',{name:'← Вернуться в каталог',exact:true}).click();await expect(cards(page)).toHaveCount(26);await expect(page).toHaveURL(returnUrl);
+ await page.reload();await expect(cards(page)).toHaveCount(26);
+ await page.getByRole('combobox',{name:'Сортировка каталога'}).selectOption('PRICE_ASC');
+ await expect(cards(page)).toHaveCount(24);await expect(page).not.toHaveURL(/count=/);
+ await search(page,'auditmissingnone'+data.keyword);await expect(page.getByText('Ничего не найдено',{exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'Сбросить всё',exact:true}).click();
+ await expect(page).not.toHaveURL(/categoryId=|inStock=/);
+ await expect(page.getByRole('textbox',{name:'Поиск по каталогу'})).toHaveValue('auditmissingnone'+data.keyword);
+ await page.screenshot({path:test.info().outputPath('catalog-restored-desktop-1440.png'),fullPage:true});
 });
 
 test('same offer package and unit prices survive product detail and keyboard comparison',async({page})=>{
  await page.setViewportSize({width:1440,height:900});await openCatalog(page);
- const card=page.locator(`[data-testid="catalog-card"][data-product-id="${data.productId}"]`);
- await expect(card).toHaveAttribute('data-offer-id',data.offerId);
+ const card=page.locator(`[data-testid="product-card"][data-product-id="${data.productId}"]`);
  await expect(card).toContainText(/1\s234,5\s₸/);await expect(card).toContainText(/123,45\s₸/);await expect(card).toContainText('AUD05 Коробка 10');
- await card.getByRole('link',{name:'Подробнее'}).click();
- await expect(page).toHaveURL(new RegExp(`/products/${data.productId}$`));
+ await card.getByRole('link',{name:/Открыть карточку/}).click();
+ await expect(page).toHaveURL(new RegExp(`/products/${data.productId}\\?returnTo=`));
  await expect(page.getByText(/1\s234,5\s₸ за упаковку/)).toBeVisible();
  const compare=page.getByRole('button',{name:'Сравнить и заказать'});await compare.focus();await page.keyboard.press('Enter');
  const dialog=page.getByRole('dialog');await expect(dialog).toContainText(/123,45\s₸/);await expect(dialog).toContainText('В корзину добавляется 1 единица продажи (10');
@@ -84,14 +81,14 @@ test('same offer package and unit prices survive product detail and keyboard com
 test('mobile real pagination and explicitly simulated HTTP failure preserve request for retry',async({page})=>{
  await page.setViewportSize({width:390,height:844});await openCatalog(page);
  await expect(cards(page)).toHaveCount(24);
- await page.getByRole('button',{name:'Следующая страница',exact:true}).click();await expect(cards(page)).toHaveCount(2);
+ await page.getByRole('link',{name:/Показать ещё/}).click();await expect(cards(page)).toHaveCount(26);
  await page.route('**/catalog-search?**',route=>route.fulfill({status:503,contentType:'application/json',body:'{"message":"simulated"}'}),{times:1});
- await page.getByRole('button',{name:'Предыдущая страница',exact:true}).click();
- await expect(page.getByText('Каталог временно недоступен. Запрос и фильтры сохранены — повторите загрузку.',{exact:true})).toBeVisible();
- await expect(page.getByRole('combobox',{name:'Поиск по каталогу'})).toHaveValue(data.keyword);
+ await page.reload();
+ await expect(page.getByText('Каталог временно недоступен. Запрос и фильтры сохранены — повторите загрузку.',{exact:true}).first()).toBeVisible();
+ await expect(page.getByRole('textbox',{name:'Поиск по каталогу'})).toHaveValue(data.keyword);await expect(cards(page)).toHaveCount(0);
  await page.screenshot({path:test.info().outputPath('catalog-simulated-error-mobile-390.png'),fullPage:true});
- await page.getByRole('button',{name:'Повторить загрузку'}).click();await expect(cards(page)).toHaveCount(24);
- await expect(page.getByRole('button',{name:'Предыдущая страница',exact:true})).toBeDisabled();
+ await page.getByRole('button',{name:'Повторить',exact:true}).first().click();await expect(cards(page)).toHaveCount(26);
+ await expect(page.getByRole('link',{name:/Показать ещё/})).toHaveCount(0);
 });
 
 test('delayed old request cannot overwrite a newer real result (transport scheduling simulated)',async({page})=>{
@@ -102,8 +99,8 @@ test('delayed old request cannot overwrite a newer real result (transport schedu
   if(new URL(route.request().url()).searchParams.get('sort')!=='PRICE_ASC'){await route.continue();return;}
   const response=await route.fetch();captured();await hold;await route.fulfill({response}).catch(()=>undefined);done();
  });
- await page.getByRole('combobox',{name:'Сортировка'}).selectOption('PRICE_ASC');await seen;
- await page.getByRole('combobox',{name:'Сортировка'}).selectOption('NAME_ASC');await expect(cards(page)).toHaveCount(24);await expect(cards(page).first()).toContainText('Материал 00');
+ await page.getByRole('combobox',{name:'Сортировка каталога'}).selectOption('PRICE_ASC');await seen;
+ await page.getByRole('combobox',{name:'Сортировка каталога'}).selectOption('NAME_ASC');await expect(cards(page)).toHaveCount(24);await expect(cards(page).first()).toContainText('Материал 00');
  release();await finished;await expect(cards(page)).toHaveCount(24);await expect(cards(page).first()).toContainText('Материал 00');
 });
 

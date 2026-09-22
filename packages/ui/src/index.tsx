@@ -736,3 +736,4 @@ export function errorMessage(error: unknown) {
   if (error instanceof Error) return error.message;
   return "Произошла неизвестная ошибка";
 }
+export { useWorkspaceSession } from "./use-workspace-session";

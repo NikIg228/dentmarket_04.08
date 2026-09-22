@@ -80,37 +80,12 @@ export type ApiContext = {
   actorId?: string;
   organizationId?: string;
   accessToken?: string;
+  getAccessToken?: (forceRefresh?: boolean) => Promise<string | undefined>;
+  onUnauthorized?: () => void;
 };
 
-export type SessionHandoffEnvelope = {
-  actorId?: string;
-  sessionId?: string;
-  displayName?: string;
-  organizationDisplayName?: string;
-  organizationId?: string;
-  accessToken?: string;
-  handoffCode?: string;
-  capability?: string;
-};
-
-export function parseSessionHandoff(
-  serialized: string | null,
-  capability: "BUYER" | "SUPPLIER",
-): SessionHandoffEnvelope | null {
-  if (!serialized) return null;
-  try {
-    const value = JSON.parse(serialized) as SessionHandoffEnvelope;
-    if (
-      value.capability !== capability ||
-      !value.organizationId ||
-      (!value.accessToken && !value.actorId && !value.handoffCode)
-    )
-      return null;
-    return value;
-  } catch {
-    return null;
-  }
-}
+export { parseSessionHandoff, type SessionHandoffEnvelope } from "./session-handoff";
+export { createWorkspaceSession, workspaceSessionStore } from "./workspace-session";
 
 /** Revoke the handoff's session, never an unrelated refresh-cookie session. */
 export async function revokeWorkspaceSession(
@@ -170,10 +145,11 @@ export class MarketplaceApiClient {
     private readonly context: ApiContext,
   ) {}
 
-  private headers(): Record<string, string> {
+  private async headers(): Promise<Record<string, string>> {
     const headers: Record<string, string> = {};
-    if (this.context.accessToken)
-      headers.authorization = `Bearer ${this.context.accessToken}`;
+    const accessToken = this.context.getAccessToken ? await this.context.getAccessToken() : this.context.accessToken;
+    if (accessToken)
+      headers.authorization = `Bearer ${accessToken}`;
     else {
       if (this.context.actorId) headers["x-user-id"] = this.context.actorId;
       if (this.context.organizationId)
@@ -184,15 +160,23 @@ export class MarketplaceApiClient {
 
   async request<T>(path: string, init: RequestInit = {}): Promise<T> {
     this.assertEnabledPath(path);
-    const response = await fetch(`${this.baseUrl.replace(/\/$/, "")}${path}`, {
+    const send = async () => fetch(`${this.baseUrl.replace(/\/$/, "")}${path}`, {
       ...init,
       headers: {
         "content-type": "application/json",
-        ...this.headers(),
+        ...await this.headers(),
         ...init.headers,
       },
       cache: "no-store",
+      signal: init.signal ? AbortSignal.any([init.signal, AbortSignal.timeout(20_000)]) : AbortSignal.timeout(20_000),
     });
+    let response = await send();
+    // Only safe reads can be replayed. Writes refresh before sending and never retry.
+    if (response.status === 401 && this.context.getAccessToken && ["GET", "HEAD"].includes((init.method ?? "GET").toUpperCase())) {
+      await this.context.getAccessToken(true);
+      response = await send();
+    }
+    if (response.status === 401) this.context.onUnauthorized?.();
     const text = await response.text();
     let payload: unknown = null;
     if (text) {
@@ -211,8 +195,9 @@ export class MarketplaceApiClient {
   ): Promise<{ blob: Blob; fileName: string | null }> {
     this.assertEnabledPath(path);
     const response = await fetch(`${this.baseUrl.replace(/\/$/, "")}${path}`, {
-      headers: this.headers(),
+      headers: await this.headers(),
       cache: "no-store",
+      signal: AbortSignal.timeout(20_000),
     });
     if (!response.ok) {
       const text = await response.text();

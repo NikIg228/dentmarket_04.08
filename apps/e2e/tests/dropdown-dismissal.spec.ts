@@ -1,4 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
+import { installPilotWorkspace } from "../fixtures/workspace-session";
+let disposeWorkspace: (() => Promise<void>) | undefined;
+test.afterEach(async () => { await disposeWorkspace?.(); disposeWorkspace = undefined; });
 
 const buyerUrl = process.env.E2E_BUYER_URL ?? "http://127.0.0.1:3001";
 const supplierUrl = process.env.E2E_SUPPLIER_URL ?? "http://127.0.0.1:3002";
@@ -143,8 +146,9 @@ for (const width of [1280, 390]) {
     });
 
     test("supplier Fluent menu keeps outside and Escape dismissal", async ({ page }) => {
+      const workspace = await installPilotWorkspace(page, "SUPPLIER"); disposeWorkspace = workspace.dispose;
       await page.goto(supplierUrl);
-      await expect(page.getByRole("heading", { name: "Добрый день, Demo Dental Supply" })).toBeVisible();
+      await expect(page.getByRole("heading", { name: `Добрый день, ${workspace.displayName}` })).toBeVisible();
       const trigger = page.getByRole("button", { name: "Ещё", exact: true });
       if (width === 390) await trigger.tap();
       else await trigger.click();

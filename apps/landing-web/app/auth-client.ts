@@ -1,4 +1,4 @@
-import { workspaceContextSchema } from "@marketplace/schemas";
+import { workspaceContextSchema, workspaceChoicesSchema, type WorkspaceContext } from "@marketplace/schemas";
 export type AuthCapability = "BUYER" | "SUPPLIER";
 
 export type AuthSession = {
@@ -59,7 +59,9 @@ export function feedbackFromError(
   }
   return {
     kind: "error",
-    message: cause instanceof Error ? cause.message : fallback,
+    message: cause instanceof TypeError || (cause instanceof Error && ["TimeoutError", "AbortError"].includes(cause.name))
+      ? "Сервер не ответил. Данные формы сохранены — проверьте соединение и повторите вход."
+      : cause instanceof Error ? cause.message : fallback,
   };
 }
 
@@ -69,6 +71,7 @@ export async function authRequest<T>(path: string, body: unknown): Promise<T> {
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
     credentials: "include",
+    signal: AbortSignal.timeout(15_000),
   });
   const payload = (await response.json().catch(() => null)) as
     | (T & ApiErrorPayload)
@@ -87,12 +90,8 @@ export function pickCapability(
   sessionCapability?: AuthCapability,
   preferredCapability?: AuthCapability,
 ): AuthCapability | undefined {
-  if (sessionCapability && available.includes(sessionCapability)) {
-    return sessionCapability;
-  }
-  if (preferredCapability && available.includes(preferredCapability)) {
-    return preferredCapability;
-  }
+  if (preferredCapability) return available.includes(preferredCapability) ? preferredCapability : undefined;
+  if (sessionCapability) return available.includes(sessionCapability) ? sessionCapability : undefined;
   if (available.includes("BUYER")) return "BUYER";
   if (available.includes("SUPPLIER")) return "SUPPLIER";
   return undefined;
@@ -126,7 +125,19 @@ export function workspaceHandoffUrl({
 export async function openWorkspace(
   session: AuthSession,
   preferredCapability?: AuthCapability,
+  selectedOrganizationId?: string,
 ) {
+  if (selectedOrganizationId && selectedOrganizationId !== session.activeOrganizationId) {
+    if (!session.sessionId) throw new Error("Не удалось определить сессию. Войдите заново.");
+    const switched = await fetch(`${apiUrl}/auth/sessions/${encodeURIComponent(session.sessionId)}/organization`, {
+      method: "POST", headers: { authorization: `Bearer ${session.accessToken}`, "content-type": "application/json" },
+      body: JSON.stringify({ organizationId: selectedOrganizationId }), signal: AbortSignal.timeout(15_000),
+    });
+    if (!switched.ok) throw new Error("Организация недоступна. Обновите список и войдите заново.");
+    const result = await switched.json() as { accessToken: string; activeOrganizationId: string };
+    if (!result.accessToken || result.activeOrganizationId !== selectedOrganizationId) throw new Error("Не удалось подтвердить выбранную организацию");
+    session = { ...session, ...result };
+  }
   const organizationId =
     session.activeOrganizationId ?? session.organizationId;
   if (!organizationId) {
@@ -136,6 +147,7 @@ export async function openWorkspace(
   const response = await fetch(`${apiUrl}/auth/workspace-context`, {
     headers: { authorization: `Bearer ${session.accessToken}` },
     cache: "no-store",
+    signal: AbortSignal.timeout(15_000),
   });
   const payload: unknown = await response.json().catch(() => null);
   if (!response.ok) {
@@ -150,7 +162,7 @@ export async function openWorkspace(
   const capability = pickCapability(parsed.data.capabilities, session.capability, preferredCapability);
 
   if (!capability) {
-    throw new Error("Для аккаунта не найден кабинет клиники или поставщика");
+    throw new Error("У организации нет доступа к выбранному кабинету. Выберите доступную роль или обратитесь к владельцу организации.");
   }
 
   const handoffResponse = await fetch(`${apiUrl}/auth/handoff`, {
@@ -158,12 +170,10 @@ export async function openWorkspace(
     headers: {
       "content-type": "application/json",
       authorization: `Bearer ${session.accessToken}`,
-      "x-user-id": session.user.id,
-      "x-organization-id": organizationId,
-      ...(session.sessionId ? { "x-session-id": session.sessionId } : {}),
     },
     body: JSON.stringify({ capability }),
     credentials: "include",
+    signal: AbortSignal.timeout(15_000),
   });
   const handoffPayload = (await handoffResponse.json().catch(() => null)) as {
     handoffCode?: string;
@@ -188,4 +198,13 @@ export async function openWorkspace(
       organizationId,
     }),
   );
+}
+
+export async function availableWorkspaces(session: AuthSession, capability: AuthCapability): Promise<WorkspaceContext[]> {
+  if (!session.activeOrganizationId && !session.organizationId) throw new Error("У аккаунта нет активной организации");
+  const response = await fetch(`${apiUrl}/auth/workspaces`, { headers: { authorization: `Bearer ${session.accessToken}` }, cache: "no-store", signal: AbortSignal.timeout(15_000) });
+  if (!response.ok) throw new Error("Не удалось получить доступные организации. Повторите вход.");
+  const choices = workspaceChoicesSchema.parse(await response.json()).filter(item => item.capabilities.includes(capability));
+  if (!choices.length) throw new Error("У аккаунта нет доступа к выбранному кабинету. Выберите доступную роль.");
+  return choices;
 }

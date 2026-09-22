@@ -1,3 +1,4 @@
+import { workspaceFixture } from "../fixtures/workspace-session";
 import { randomUUID } from "node:crypto";
 import { unlink } from "node:fs/promises";
 import { resolve, sep } from "node:path";
@@ -415,18 +416,13 @@ async function openNavigationIfCollapsed(page: Page) {
 
 async function openSupplierOrder(page: Page, orderNumber: string) {
   const handoff = encodeURIComponent(
-    JSON.stringify({
-      actorId: supplier.userId,
-      organizationId: supplier.organizationId,
-      displayName: supplier.displayName,
-      organizationDisplayName: supplier.displayName,
-      capability: "SUPPLIER",
-    }),
+    JSON.stringify(await workspaceFixture(prisma, "SUPPLIER", supplier)),
   );
   await page.goto(`${SUPPLIER_URL}/#session=${handoff}`);
+  const organization = await prisma.organization.findUniqueOrThrow({ where: { id: supplier.organizationId }, select: { displayName: true } });
   await expect(
-    page.getByRole("combobox", { name: "Организация поставщика" }),
-  ).toHaveValue(supplier.organizationId);
+    page.getByRole("heading", { name: `Добрый день, ${organization.displayName}` }),
+  ).toBeVisible();
   await openNavigationIfCollapsed(page);
   await page
     .getByRole("navigation")
@@ -463,13 +459,7 @@ async function assertDecisionEvidence(orderId: string) {
 
 async function openBuyerOrders(page: Page) {
   const handoff = encodeURIComponent(
-    JSON.stringify({
-      actorId: buyer.userId,
-      organizationId: buyer.organizationId,
-      displayName: buyer.displayName,
-      organizationDisplayName: buyer.displayName,
-      capability: "BUYER",
-    }),
+    JSON.stringify(await workspaceFixture(prisma, "BUYER", buyer)),
   );
   await page.goto(`${BUYER_URL}/#session=${handoff}`);
   await openNavigationIfCollapsed(page);
@@ -1117,7 +1107,7 @@ test.describe.serial("@flow-b2 supplier order confirmation", () => {
     await expect(page.getByRole("dialog")).toContainText(order.orderNumber);
     await page.getByRole("dialog").getByRole("button", { name: "Закрыть" }).last().click();
 
-    const supplierHandoff = encodeURIComponent(JSON.stringify({ actorId: supplier.userId, organizationId: supplier.organizationId, displayName: supplier.displayName, organizationDisplayName: supplier.displayName, capability: "SUPPLIER" }));
+    const supplierHandoff = encodeURIComponent(JSON.stringify(await workspaceFixture(prisma, "SUPPLIER", supplier)));
     await page.goto(`${SUPPLIER_URL}/documents#session=${supplierHandoff}`);
     await expect(page.getByRole("heading", { name: "Документы", exact: true })).toBeVisible();
     const supplierArchiveRow = page.getByRole("row").filter({ hasText: order.orderNumber }).filter({ hasText: "Счёт" }).first();

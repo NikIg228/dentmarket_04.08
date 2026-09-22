@@ -17,6 +17,7 @@ import type { Cart } from "../../features/purchasing/types";
 import { loginUrl } from "../../public-links";
 import styles from "./page.module.css";
 import { formatCatalogMoney } from "../../catalog/catalog-view-model";
+import { useVerifiedSession, sessionApiContext } from "../../workspace-session";
 
 type Offer = {
   id: string;
@@ -39,6 +40,7 @@ function deliveryLabel(methods: string[] = []) {
 }
 
 export default function ProductOfferActions({ offers }: { offers: Offer[] }) {
+  const { session, ready } = useVerifiedSession();
   const [compareOpen, setCompareOpen] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<
@@ -53,23 +55,11 @@ export default function ProductOfferActions({ offers }: { offers: Offer[] }) {
   );
 
   const addToCart = async (offer: Offer) => {
-    const session = parseSessionHandoff(
-      window.sessionStorage.getItem("dentmarket:buyer-session"),
-      "BUYER",
-    );
-    if (!session) {
+    if (!ready || !session) {
       window.location.assign(loginUrl);
       return;
     }
-    const context: ApiContext = session.accessToken
-      ? { accessToken: session.accessToken }
-      : session.actorId && session.organizationId
-        ? {
-            actorId: session.actorId,
-            organizationId: session.organizationId,
-          }
-        : {};
-    const api = new MarketplaceApiClient(apiUrl, context);
+    const api = new MarketplaceApiClient(apiUrl, sessionApiContext);
     setBusy(offer.id);
     setFeedback(null);
     try {

@@ -90,7 +90,11 @@ export async function startLocalAuthFixture({ web = false, operator = true, webA
     const user = await db.user.findUniqueOrThrow({ where: { email } }); issuedUsers.push(user.id);
     assert.ok(user.emailVerifiedAt);
     const organization = await db.organization.create({ data: { bin: `95${String(Date.now()).slice(-8)}${String(index).padStart(2,'0')}`, legalName: runId, displayName: runId, capabilities: { create: { capability } } } });
-    const role = await db.role.create({ data: { organizationId: organization.id, code: 'audit_local_auth', name: 'Audit operator', permissions: { create: ['organization.view','security.event.view'].map(code => ({ permission: { connect: { code } } })) } } });
+    const permissions = capability === 'BUYER' ? ['organization.view','order.create','document.view','notification.view','catalog.product.view']
+      : capability === 'SUPPLIER' ? ['organization.view','catalog.product.view','inventory.view','order.confirm','integration.view','import.manage','compliance.view','document.view','notification.view']
+      : ['organization.view','security.event.view'];
+    if (capability === 'SUPPLIER') await db.supplierProfile.create({ data: { organizationId: organization.id } });
+    const role = await db.role.create({ data: { organizationId: organization.id, code: 'audit_local_auth', name: 'Audit workspace user', permissions: { create: permissions.map(code => ({ permission: { connect: { code } } })) } } });
     await db.organizationMembership.create({ data: { userId: user.id, organizationId: organization.id, status: 'ACTIVE', acceptedAt: new Date(), isPrimary: true, roles: { create: { roleId: role.id } } } });
     return { email, password, userId: user.id, organizationId: organization.id, verificationToken: token };
   }

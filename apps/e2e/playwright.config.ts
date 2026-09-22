@@ -1,4 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
+import { e2eJwtSecret } from "./fixtures/workspace-session";
 
 const workspace = "../..";
 const databaseUrl =
@@ -30,6 +31,9 @@ export default defineConfig({
         API_HOST: "127.0.0.1",
         API_PORT: "4012",
         AUTH_MODE: "development",
+        JWT_SECRET: process.env.JWT_SECRET ?? e2eJwtSecret,
+        // Local file delivery is confined to the explicitly isolated E2E API.
+        AUTH_LOCAL_MAIL_ENABLED: "true",
         DEPLOYMENT_PROFILE: "pilot",
         PROCESS_ROLE: "all",
         BACKGROUND_QUEUE_ENABLED: "false",

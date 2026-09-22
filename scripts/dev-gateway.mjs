@@ -4,7 +4,7 @@ import net from "node:net";
 const gatewayHost = process.env.DEV_GATEWAY_HOST ?? "127.0.0.1";
 const gatewayPort = Number(process.env.DEV_GATEWAY_PORT ?? "3080");
 
-const apiTarget = { host: "127.0.0.1", port: 4012, name: "API" };
+const apiTarget = { host: "127.0.0.1", port: Number(process.env.API_PORT ?? 4012), name: "API" };
 const domainTargets = new Map([
   ["dentmarket.localhost", { host: "127.0.0.1", port: 3003, name: "Landing" }],
   ["marketplace.localhost", { host: "127.0.0.1", port: 3001, name: "Marketplace" }],
@@ -27,6 +27,7 @@ function isApiRequest(request) {
 }
 
 function resolveTarget(request) {
+  if (!domainTargets.has(requestHostname(request))) return undefined;
   if (isApiRequest(request)) return apiTarget;
   return domainTargets.get(requestHostname(request));
 }
@@ -53,18 +54,37 @@ function proxyHeaders(request, target) {
     "x-forwarded-proto": "http",
   };
 
-  // API calls are same-origin in the browser once they pass through the local
-  // gateway. Do not forward the synthetic *.localhost Origin to the API CORS
-  // layer, whose allowlist intentionally contains only direct local origins.
-  if (target === apiTarget) delete headers.origin;
+  // Preserve Origin so the API can enforce its configured browser boundary.
   return headers;
 }
 
-const server = http.createServer((request, response) => {
+function allowedOrigin(request) {
+  if (!request.headers.origin) return true;
+  try {
+    const origin = new URL(request.headers.origin);
+    return origin.protocol === "http:" && origin.port === String(gatewayPort) && domainTargets.has(origin.hostname);
+  } catch { return false; }
+}
+
+const server = http.createServer(async (request, response) => {
+  if (!resolveTarget(request)) {
+    response.writeHead(421, { "content-type": "application/json" }); response.end(JSON.stringify({ error: "Unknown local DentMarket domain" })); return;
+  }
+  if (!allowedOrigin(request)) {
+    response.writeHead(403, { "content-type": "application/json" }); response.end(JSON.stringify({ error: "Origin is not allowed by the local profile" })); return;
+  }
   const pathname = new URL(request.url ?? "/", "http://gateway.local").pathname;
   if (pathname === "/__gateway/health") {
-    response.writeHead(200, { "content-type": "application/json; charset=utf-8" });
-    response.end(JSON.stringify(gatewayDescription()));
+    const targets = [apiTarget, ...new Map([...domainTargets.values()].map(target => [target.port, target])).values()];
+    const checks = await Promise.all(targets.map(async target => {
+      try {
+        const check = await fetch(`http://${target.host}:${target.port}${target === apiTarget ? "/api/health/ready" : target.name === "Landing" ? "/login" : "/"}`, { method: target === apiTarget ? "GET" : "HEAD", signal: AbortSignal.timeout(3000) });
+        return { name: target.name, ready: check.ok };
+      } catch { return { name: target.name, ready: false }; }
+    }));
+    const ready = checks.every(check => check.ready);
+    response.writeHead(ready ? 200 : 503, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+    response.end(JSON.stringify({ ...gatewayDescription(), status: ready ? "ready" : "starting", checks }));
     return;
   }
 
@@ -103,17 +123,17 @@ const server = http.createServer((request, response) => {
     response.end(
       JSON.stringify({
         error: `${target.name} is not ready`,
-        detail: error.message,
       }),
     );
   });
+  proxyRequest.setTimeout(target === apiTarget ? 20000 : 60000, () => proxyRequest.destroy(new Error("Upstream timeout")));
   request.on("aborted", () => proxyRequest.destroy());
   request.pipe(proxyRequest);
 });
 
 server.on("upgrade", (request, socket, head) => {
   const target = resolveTarget(request);
-  if (!target || target === apiTarget) {
+  if (!target || target === apiTarget || !allowedOrigin(request)) {
     socket.end("HTTP/1.1 421 Misdirected Request\r\nConnection: close\r\n\r\n");
     return;
   }
@@ -145,7 +165,7 @@ server.on("upgrade", (request, socket, head) => {
 
 server.listen(gatewayPort, gatewayHost, () => {
   const routes = gatewayDescription().routes;
-  console.log(`DentMarket dev gateway is ready on ${gatewayHost}:${gatewayPort}`);
+  console.log(`DentMarket dev gateway is listening on ${gatewayHost}:${gatewayPort}; readiness: /__gateway/health`);
   console.log(`Landing:     ${routes.landing}`);
   console.log(`Marketplace: ${routes.marketplace}`);
   console.log(`Supplier:    ${routes.supplier}`);

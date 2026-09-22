@@ -1,7 +1,14 @@
 import { spawn, spawnSync } from "node:child_process";
 import { localDevelopmentProfile } from "./lib/local-development-profile.mjs";
+import { localAuthConfig } from "./lib/local-auth-config.mjs";
+import { assertPortsAvailable, waitForSurface } from "./lib/local-readiness.mjs";
+import { assertLocalSchema } from "./lib/local-schema.mjs";
 
 const surface = process.argv[2] ?? "buyer";
+const apiPort = Number(process.env.API_PORT ?? 4012);
+const gatewayPort = Number(process.env.DEV_GATEWAY_PORT ?? 3080);
+if (![apiPort, gatewayPort].every(port => Number.isInteger(port) && port > 0 && port <= 65535)) throw new Error("API_PORT/DEV_GATEWAY_PORT must be valid ports");
+const webPorts = { admin: 3000, buyer: 3001, supplier: 3002, landing: 3003 };
 const workspaceBySurface = {
   admin: "@marketplace/admin-web",
   buyer: "@marketplace/buyer-web",
@@ -16,6 +23,9 @@ if (surface !== "all" && !workspaceBySurface[surface]) {
   process.exit(1);
 }
 
+const selectedSurfaces = surface === "all" ? Object.keys(webPorts) : [...new Set([surface, "landing"])];
+const startupDeadline = Date.now() + 300_000;
+
 const env = {
   ...process.env,
   NODE_ENV: "development",
@@ -29,7 +39,7 @@ const env = {
     "postgresql://marketplace:marketplace@127.0.0.1:5432/marketplace?schema=public",
   API_HOST: process.env.API_HOST ?? "127.0.0.1",
   API_PORT: process.env.API_PORT ?? "4012",
-  AUTH_MODE: process.env.AUTH_MODE ?? "development",
+  ...localAuthConfig(process.env),
   BACKGROUND_QUEUE_ENABLED: process.env.BACKGROUND_QUEUE_ENABLED ?? "false",
   OBJECT_STORAGE_DRIVER: process.env.OBJECT_STORAGE_DRIVER ?? "local",
   PUBLIC_CATALOG_ORGANIZATION_ID:
@@ -37,26 +47,33 @@ const env = {
     "00000000-0000-4000-8000-000000000030",
   NEXT_PUBLIC_API_URL:
     process.env.NEXT_PUBLIC_API_URL ??
-    (surface === "all" ? "/api" : "http://127.0.0.1:4012/api"),
+    "/api",
   INTERNAL_API_URL:
-    process.env.INTERNAL_API_URL ?? "http://127.0.0.1:4012/api",
+    process.env.INTERNAL_API_URL ?? `http://127.0.0.1:${apiPort}/api`,
   NEXT_PUBLIC_BUYER_APP_URL:
     process.env.NEXT_PUBLIC_BUYER_APP_URL ??
     (surface === "all"
-      ? "http://marketplace.localhost:3080"
+      ? `http://marketplace.localhost:${gatewayPort}`
       : "http://127.0.0.1:3001"),
   NEXT_PUBLIC_LANDING_APP_URL:
     process.env.NEXT_PUBLIC_LANDING_APP_URL ??
     (surface === "all"
-      ? "http://dentmarket.localhost:3080"
+      ? `http://dentmarket.localhost:${gatewayPort}`
       : "http://127.0.0.1:3003"),
   NEXT_PUBLIC_SUPPLIER_APP_URL:
     process.env.NEXT_PUBLIC_SUPPLIER_APP_URL ??
     (surface === "all"
-      ? "http://supplier.localhost:3080"
+      ? `http://supplier.localhost:${gatewayPort}`
       : "http://127.0.0.1:3002"),
 };
+env.CORS_ORIGINS = process.env.CORS_ORIGINS ?? [
+  ...["dentmarket.localhost", "marketplace.localhost", "buyer.localhost", "supplier.localhost", "admin.localhost", "localhost", "127.0.0.1"].map(host => `http://${host}:${gatewayPort}`),
+  ...Object.values(webPorts).flatMap(port => [`http://localhost:${port}`, `http://127.0.0.1:${port}`]),
+].join(",");
+env.AUTH_EMAIL_BASE_URL = process.env.AUTH_EMAIL_BASE_URL ?? env.NEXT_PUBLIC_LANDING_APP_URL;
+if (process.env.DEV_GATEWAY_HOST && process.env.DEV_GATEWAY_HOST !== "127.0.0.1") throw new Error("The standard local profile listens on loopback. LAN requires a separately configured trusted Host/Origin profile.");
 
+if (env.API_HOST !== "127.0.0.1") throw new Error("API_HOST must use loopback in the standard local profile.");
 const npmCli = process.env.npm_execpath;
 if (!npmCli) {
   console.error("Run this launcher through npm, for example: npm run dev");
@@ -98,9 +115,9 @@ function shutdown(code, message) {
 }
 
 async function waitForApi(api) {
-  const healthUrl = `http://127.0.0.1:${env.API_PORT}/api/health`;
+  const healthUrl = `http://127.0.0.1:${env.API_PORT}/api/health/ready`;
   const healthTimeoutMs = 300_000;
-  const deadline = Date.now() + healthTimeoutMs;
+  const deadline = startupDeadline;
 
   while (Date.now() < deadline) {
     if (api.exitCode !== null || api.signalCode) {
@@ -128,6 +145,12 @@ process.once("SIGTERM", () => shutdown(143));
 console.log(
   `Starting DentMarket locally with deployment profile ${env.DEPLOYMENT_PROFILE}...`,
 );
+await assertPortsAvailable([apiPort, ...selectedSurfaces.map(name => webPorts[name]), ...(surface === "all" ? [gatewayPort] : [])]);
+await assertLocalSchema(env.DATABASE_URL);
+// Shared CommonJS schemas are the only runtime package output required by dev.
+const schemas = spawnNpm(["run", "build", "--workspace=@marketplace/schemas"]);
+const schemaExit = await new Promise(resolve => schemas.once("exit", resolve));
+if (schemaExit !== 0) shutdown(1, "Shared schemas failed to build; API/frontend were not started.");
 const api = spawnNpm(["run", "dev", "--workspace=@marketplace/api"]);
 
 let healthUrl;
@@ -137,10 +160,7 @@ try {
   shutdown(1, error instanceof Error ? error.message : String(error));
 }
 
-const frontendWorkspaces =
-  surface === "all"
-    ? Object.values(workspaceBySurface)
-    : [workspaceBySurface[surface]];
+const frontendWorkspaces = selectedSurfaces.map(name => workspaceBySurface[name]);
 const filters = frontendWorkspaces.map((workspace) => `--filter=${workspace}`);
 
 console.log(`API is healthy at ${healthUrl}. Starting ${surface} web surface(s)...`);
@@ -148,7 +168,7 @@ const frontend = spawnNpm(["exec", "--", "turbo", "dev", ...filters]);
 const gateway = surface === "all" ? spawnNpm(["run", "dev:gateway"]) : null;
 
 if (gateway) {
-  console.log("A single public gateway will expose every surface on port 3080.");
+  console.log(`Gateway is starting on port ${gatewayPort}; waiting for the requested surfaces.`);
 }
 
 api.once("exit", (code, signal) => {
@@ -177,3 +197,13 @@ gateway?.once("exit", (code, signal) => {
     );
   }
 });
+
+try {
+  // Warm one route at a time to avoid four simultaneous first compilations.
+  for (const name of selectedSurfaces) {
+    await waitForSurface(`http://127.0.0.1:${webPorts[name]}${name === "landing" ? "/login" : "/"}`, () => frontend.exitCode !== null || Boolean(frontend.signalCode), Math.max(0, startupDeadline - Date.now()));
+    console.log(`${name}: ready`);
+  }
+  if (gateway) await waitForSurface(`http://127.0.0.1:${gatewayPort}/__gateway/health`, () => gateway.exitCode !== null, Math.max(0, startupDeadline - Date.now()));
+  console.log(`DentMarket ${surface} is ready. Auth: JWT; public catalog; no demo login.`);
+} catch (error) { shutdown(1, error instanceof Error ? error.message : "Local readiness failed"); }

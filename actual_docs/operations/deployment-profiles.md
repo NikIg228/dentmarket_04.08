@@ -24,14 +24,35 @@ CI, Docker и production builds по-прежнему требуют явног�
 Regression: `npm run verify:local-profile` и `npm run verify:frontend-profile`.
 Документ: [ADR 011](../architecture/adr/011-local-full-feature-demonstration.md).
 
-Особенность текущего локального Admin: `admin.localhost:3080` требует обычную
-авторизацию; existing dev identity разрешена только на `localhost`/`127.0.0.1`.
-Для изолированной операторской проверки используйте отдельный `dev:admin`
-(предварительно остановив общий launcher) и `http://127.0.0.1:3000`.
-В режиме `dev all` относительный `/api` обслуживает gateway; открытие прямого
-порта Admin из этого режима даёт 404 на API. Не добавлять auth bypass для
-поддомена ради smoke. Единый демонстрационный вход оператора через gateway
-остаётся отдельным локальным onboarding/config outcome, а не закрытым gate.
+Обычный локальный launcher использует `AUTH_MODE=jwt` и отключает demo login.
+Если ключ не задан, он один раз создаётся в ignored `.tmp/local-runtime/jwt-secret`;
+последующие старты используют тот же ключ. Несогласованная пара RSA/EC keys,
+короткий secret и попытка включить development identity дают явную ошибку.
+Тестовый режим identity headers остаётся только в изолированных API fixtures.
+
+Вход клиники/поставщика: `http://dentmarket.localhost:3080/login`. Доступны только
+активные членства и выбранная роль; несколько организаций показываются списком.
+Открытие supplier URL без сессии показывает вход. Оператор использует собственный
+процесс авторизации; разрешения клиники или поставщика его не заменяют.
+Договор и операторский допуск проверяются отдельно от входа (ADR014).
+
+Отдельные `dev:buyer`, `dev:supplier`, `dev:admin` запускают также landing на3003;
+вход открывается на `http://127.0.0.1:3003/login`. Относительный `/api` работает
+через Next dev rewrite на прямых портах и через gateway на локальных доменах.
+Web ports: admin3000, buyer3001, supplier3002, landing3003; API_PORT по умолчанию4012,
+DEV_GATEWAY_PORT3080. Нельзя запускать одновременно два профиля на тех же портах.
+Launcher проверяет занятость, применённые миграции, API readiness и каждый frontend;
+только после прогрева сообщает ready. Общий startup budget —5мин. Pending migration
+требует отдельно проверенной процедуры; launcher не мигрирует и не reseed данные.
+Gateway проверяет Host до любого маршрута, включая `/api`, и сохраняет разрешённый
+Origin. Стандартный профиль слушает127.0.0.1; LAN требует отдельной настройки.
+
+До build/typecheck/E2E остановить свой dev launcher; не выполнять Next dev/build
+над одной `.next` одновременно. Turbo typecheck/test отслеживают source dependencies
+через transit; отдельно собирается только CommonJS schemas. StrictMode включён.
+API watch исключает каталоги generated artifacts (`dist`, `.next`, `.tmp`,
+`outputs` и cache); запись результатов проверок не должна перезапускать API.
+Сессия кабинета и cookies описаны в [ADR014](../architecture/adr/014-local-workspace-sessions.md).
 
 Отдельный перечень скрытых функций, различия по ролям и условия включения:
 [свод внепилотных функций](../product/DENTMARKET_OUT_OF_PILOT_FEATURES.md).

@@ -46,26 +46,29 @@ test("buyer can open a product card from the public catalog", async ({ page }) =
   await expectHealthyPage(page, errors);
 });
 
-test("supplier can switch organization and inspect offers", async ({ page }) => {
+test("anonymous supplier cannot open a workspace or select a seeded organization", async ({ page }) => {
   const errors = collectBrowserErrors(page);
   await page.goto("http://127.0.0.1:3002");
-  await expect(page.getByText("Demo Dental Supply", { exact: true }).first()).toBeVisible();
-  await expect(page.getByRole("combobox", { name: "Организация поставщика" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Ещё", exact: true })).toBeVisible();
+  await expect(page.getByRole("alert").filter({ hasText: "Войдите в кабинет поставщика" })).toBeVisible();
+  await expect(page.getByRole("combobox", { name: "Организация поставщика" })).toHaveCount(0);
+  await expect(page.getByText("Demo Dental Supply", { exact: true })).toHaveCount(0);
   await expectHealthyPage(page, errors);
 });
 
-test("active EDS agreement hides the signing action", async ({ page }) => {
+test("anonymous supplier cannot open private documents", async ({ page }) => {
   const errors = collectBrowserErrors(page);
-  await page.goto("http://127.0.0.1:3002");
-  await expect(page.getByRole("button", { name: "Ещё", exact: true })).toBeVisible();
+  await page.goto("http://127.0.0.1:3002/documents");
+  await expect(page.getByRole("link", { name: "Войти", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Ознакомлен", exact: true })).toHaveCount(0);
   await expectHealthyPage(page, errors);
 });
 
-test("supplier sees explainable trust and verified warehouses", async ({ page }) => {
+test("an actor-only stored identity does not authorize the supplier workspace", async ({ page }) => {
   const errors = collectBrowserErrors(page);
+  await page.addInitScript(() => sessionStorage.setItem("dentmarket:supplier-session", JSON.stringify({ capability: "SUPPLIER", actorId: "00000000-0000-4000-8000-000000000001", organizationId: "00000000-0000-4000-8000-000000000020" })));
   await page.goto("http://127.0.0.1:3002");
-  await expect(page.getByRole("button", { name: "Ещё", exact: true })).toBeVisible();
+  await expect(page.getByRole("alert").filter({ hasText: "Войдите в кабинет поставщика" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Предложения", exact: true })).toHaveCount(0);
   await expectHealthyPage(page, errors);
 });
 
@@ -79,7 +82,7 @@ test("public landing routes both marketplace audiences", async ({ page }) => {
   await expectHealthyPage(page, errors);
 });
 
-test("new supplier completes registration and receives a secure cabinet handoff", async ({ page }) => {
+test("new supplier registration requires email verification before cabinet access", async ({ page }) => {
   const errors = collectBrowserErrors(page);
   const suffix = String(Date.now()).slice(-10);
   const email = `e2e-${suffix}@example.kz`;
@@ -95,7 +98,7 @@ test("new supplier completes registration and receives a secure cabinet handoff"
   const continueButton = page.getByRole("button", { name: "Продолжить" });
   await expect(continueButton).toBeEnabled();
   await continueButton.click();
-  await expect(page.getByRole("heading", { name: "Проверьте почту" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Письмо сохранено локально" })).toBeVisible();
   await expect(page.getByText(email, { exact: false })).toBeVisible();
   await expectHealthyPage(page, errors);
 });

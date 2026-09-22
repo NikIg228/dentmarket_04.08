@@ -57,12 +57,32 @@ if (serve) {
     await request('/auth/handoff', { capability: 'SUPPLIER' }, 401, buyerSession.accessToken);
     for (const [entry, session, capability] of [[buyer,buyerSession,'BUYER'],[supplier,supplierSession,'SUPPLIER']]) {
       const handoff = await request('/auth/handoff', { capability }, 201, session.accessToken);
-      const exchanged = await request('/auth/handoff/exchange', { handoffCode: handoff.handoffCode });
+      const exchangeResponse = await fetch(apiUrl + '/auth/handoff/exchange', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ handoffCode: handoff.handoffCode }) });
+      assert.equal(exchangeResponse.status, 201);
+      const exchanged = await exchangeResponse.json();
       assert.equal(exchanged.organizationId, entry.organizationId); assert.equal(exchanged.capability, capability);
-      assert.equal(exchanged.sessionId, session.sessionId); assert.ok(exchanged.accessToken); assert.equal(exchanged.refreshToken, undefined);
+      assert.notEqual(exchanged.sessionId, session.sessionId); assert.ok(exchanged.accessToken); assert.equal(exchanged.refreshToken, undefined);
       await request('/auth/handoff/exchange', { handoffCode: handoff.handoffCode }, 401);
       const record = await db.idempotencyRecord.findUniqueOrThrow({ where: { scope_key: { scope: 'session-handoff', key: createHash('sha256').update(handoff.handoffCode).digest('hex') } } });
       assert.equal(record.responseCode, 410);
+      const cookieName = 'mp_refresh_' + capability.toLowerCase();
+      assert.ok(exchangeResponse.headers.getSetCookie().some(value => value.startsWith(cookieName + '=') && value.includes('HttpOnly')), 'Destination gets a role-specific HttpOnly refresh cookie');
+      const cookie = exchangeResponse.headers.getSetCookie().map(value => value.split(';')[0]).join('; ');
+      assert.ok(exchangeResponse.headers.getSetCookie().some(value => value.startsWith('mp_csrf_' + capability.toLowerCase() + '=') && value.includes('Path=/;')));
+      const refresh = (csrfToken, expectedSessionId, sentCookie = cookie) => fetch(apiUrl + '/auth/refresh', { method: 'POST', headers: { 'content-type': 'application/json', cookie: sentCookie, ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}) }, body: JSON.stringify({ workspace: capability, expectedSessionId }) });
+      assert.equal((await refresh(undefined, exchanged.sessionId)).status, 401, 'CSRF remains required');
+      assert.equal((await refresh(exchanged.csrfToken, session.sessionId)).status, 401, 'Another login cannot rotate this session');
+      const rotatedResponse = await refresh(exchanged.csrfToken, exchanged.sessionId);
+      assert.equal(rotatedResponse.status, 201);
+      const rotated = await rotatedResponse.json();
+      assert.equal(rotated.sessionId, exchanged.sessionId); assert.equal(rotated.activeOrganizationId, entry.organizationId);
+      await context(rotated, 200);
+      await request('/auth/sessions/' + exchanged.sessionId + '/revoke', { reason: 'audit_workspace_complete' }, 201, rotated.accessToken);
+      await context(rotated, 401);
+      assert.equal((await refresh(exchanged.csrfToken, exchanged.sessionId)).status, 401, 'Old cookie is consumed');
+      const rotatedCookie = rotatedResponse.headers.getSetCookie().map(value => value.split(';')[0]).join('; ');
+      assert.equal((await refresh(rotated.csrfToken, exchanged.sessionId, rotatedCookie)).status, 401, 'Revoked refresh is denied');
+      await context(session, 200); // The issuer's separate login is not this cabinet's session.
     }
     const membership = await db.organizationMembership.findUniqueOrThrow({ where: { userId_organizationId: { userId: buyer.userId, organizationId: buyer.organizationId } } });
     await db.organizationMembership.update({ where: { id: membership.id }, data: { status: 'BLOCKED' } });

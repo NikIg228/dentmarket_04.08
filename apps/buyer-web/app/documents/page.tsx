@@ -1,4 +1,6 @@
 "use client";
+import { useVerifiedSession, sessionApiContext, sessionStore, logoutSession } from "../workspace-session";
+
 
 import { Alert24Regular } from "@fluentui/react-icons/svg/alert";
 import { Cart24Regular } from "@fluentui/react-icons/svg/cart";
@@ -17,7 +19,7 @@ import {
   type SessionHandoffEnvelope,
 } from "@marketplace/api-client";
 import {
-  AppShell,
+  AppShell, DmButton, ErrorState, LoadingState,
   DocumentArchiveUpload,
   DocumentArchiveWorkspace,
   documentOrderOptions,
@@ -28,12 +30,11 @@ import {
   type NavigationItem,
 } from "@marketplace/ui";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { loginUrl } from "../public-links";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:4012/api";
 const SESSION_KEY = "dentmarket:buyer-session";
-const DEMO_BUYER_ID = "00000000-0000-4000-8000-000000000030";
-const DEMO_BUYER_USER_ID = "00000000-0000-4000-8000-000000000500";
 
 const navigation: NavigationItem[] = [
   { id: "catalog", label: "Каталог", icon: <Grid24Regular /> },
@@ -46,17 +47,9 @@ const navigation: NavigationItem[] = [
 
 const initialFilters: DocumentArchiveFilters = { q: "", category: "", status: "", accountingStatus: "", dateFrom: "", dateTo: "" };
 
-function readSession() {
-  if (typeof window === "undefined") return null;
-  const serialized = window.location.hash.startsWith("#session=")
-    ? decodeURIComponent(window.location.hash.slice("#session=".length))
-    : window.sessionStorage.getItem(SESSION_KEY);
-  return parseSessionHandoff(serialized, "BUYER");
-}
-
 export default function BuyerDocumentsPage() {
-  const [handoff, setHandoff] = useState<SessionHandoffEnvelope | null>(null);
-  const [sessionReady, setSessionReady] = useState(false);
+  const router = useRouter();
+  const { session: handoff, ready: sessionReady, error: sessionError } = useVerifiedSession();
   const [items, setItems] = useState<DocumentArchiveItem[]>([]);
   const [summary, setSummary] = useState<DocumentArchiveSummaryResponse | null>(null);
   const [filters, setFilters] = useState<DocumentArchiveFilters>(initialFilters);
@@ -66,31 +59,10 @@ export default function BuyerDocumentsPage() {
   const [busyDocumentId, setBusyDocumentId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const logout = useSessionLogout({ sessionKey: SESSION_KEY, sessionId: handoff?.sessionId, revoke: () => revokeWorkspaceSession(API_URL, handoff), redirectUrl: loginUrl });
+  const logout = useSessionLogout({ sessionKey: SESSION_KEY, sessionId: handoff?.sessionId, revoke: logoutSession, redirectUrl: loginUrl });
 
-  useEffect(() => {
-    void (async () => {
-      const next = readSession();
-      if (!next?.organizationId) { setSessionReady(true); return; }
-      let resolved = next;
-      if (next.handoffCode && !next.accessToken) {
-        const response = await fetch(`${API_URL}/auth/handoff/exchange`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ handoffCode: next.handoffCode }) });
-        if (response.ok) {
-          const session = await response.json() as { accessToken?: string; user?: { id: string; displayName: string }; organizationId?: string; capability?: string };
-          resolved = { ...next, ...session, actorId: session.user?.id, displayName: session.user?.displayName };
-        }
-      }
-      setHandoff(resolved);
-      window.sessionStorage.setItem(SESSION_KEY, JSON.stringify(resolved));
-      window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
-      setSessionReady(true);
-    })();
-  }, []);
-
-  const organizationId = handoff?.organizationId ?? DEMO_BUYER_ID;
-  const apiContext = useMemo<ApiContext>(() => handoff?.accessToken
-    ? { accessToken: handoff.accessToken }
-    : { actorId: handoff?.actorId ?? DEMO_BUYER_USER_ID, organizationId }, [handoff, organizationId]);
+  const organizationId = handoff?.organizationId ?? "";
+  const apiContext = sessionApiContext;
   const api = useMemo(() => new MarketplaceApiClient(API_URL, apiContext), [apiContext]);
   const loadOrderOptions = useCallback(async (query: string) => documentOrderOptions(await api.listBuyerOrders(organizationId), organizationId, query), [api, organizationId]);
   const loadAgreementOptions = useCallback(async (query: string) => {
@@ -126,7 +98,7 @@ export default function BuyerDocumentsPage() {
     }
   }, [api, appliedFilters, nextCursor, summary]);
 
-  useEffect(() => { if (sessionReady) void load(false); }, [sessionReady, api, appliedFilters]);
+  useEffect(() => { if (sessionReady && handoff) void load(false); }, [sessionReady, handoff, api, appliedFilters]);
 
   const download = async (document: DocumentArchiveItem) => {
     setBusyDocumentId(document.id);
@@ -160,7 +132,10 @@ export default function BuyerDocumentsPage() {
     } finally { setBusyDocumentId(null); }
   };
 
-  return <AppShell productName="DentMarket KZ" productMark="DM" workspaceLabel="Кабинет клиники" userName={handoff?.displayName ?? "Demo Dental Clinic"} userMeta={handoff?.organizationDisplayName ?? "Клиника"} navigation={navigation} activeNavigation="documents" contextLabel="Документолог" onNavigate={(id) => { if (id !== "documents") window.location.assign("/"); }} {...logout}>
+  if (!sessionReady) return <LoadingState label="Проверяем вход" />;
+  if (!handoff) return <ErrorState title="Войдите в кабинет" description={sessionError ?? "Документы доступны после входа."} action={<><DmButton as="a" href={loginUrl}>Войти</DmButton><DmButton onClick={() => void sessionStore.retry()}>Повторить проверку</DmButton></>} />;
+
+  return <AppShell productName="DentMarket KZ" productMark="DM" workspaceLabel="Кабинет клиники" userName={handoff?.displayName ?? "Участник организации"} userMeta={handoff?.organizationDisplayName ?? "Клиника"} navigation={navigation} activeNavigation="documents" contextLabel="Документолог" onNavigate={(id) => { if (id !== "documents") router.push("/"); }} {...logout}>
     <DocumentArchiveWorkspace
       roleLabel="клиника"
       organizationId={organizationId}

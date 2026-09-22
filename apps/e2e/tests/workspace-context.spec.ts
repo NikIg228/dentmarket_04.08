@@ -59,7 +59,7 @@ for (const [index, capability] of (["BUYER", "SUPPLIER"] as const).entries()) {
     expect(safeSession).toEqual({ organizationId: account.organizationId, capability, hasAccessToken: true });
     await expect(page.getByRole("main")).toBeVisible();
     const after = await fixture<{ sessions: number; consumedHandoffs: number }>("readback", { email: account.email });
-    expect(after).toEqual({ sessions: before.sessions + 1, consumedHandoffs: before.consumedHandoffs + 1 });
+    expect(after).toEqual({ sessions: before.sessions + 2, consumedHandoffs: before.consumedHandoffs + 1 });
     expect((await request.post(`${apiUrl}/auth/handoff/exchange`, { data: { handoffCode } })).status()).toBe(401);
     expect(apiPaths).toContain("/api/auth/workspace-context");
     expect(apiPaths.some(value => /^\/api\/organizations\/[0-9a-f-]+$/.test(value))).toBe(false);

@@ -1,4 +1,4 @@
-import { MarketplaceApiClient } from "@marketplace/api-client";
+import { MarketplaceApiClient, MarketplaceApiError } from "@marketplace/api-client";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -9,6 +9,7 @@ import { PublicHeader } from "../../public-header";
 import styles from "./page.module.css";
 import ProductOfferActions from "./product-offer-actions";
 import { formatCatalogMoney } from "../../catalog/catalog-view-model";
+import { safeCatalogReturn } from "../../catalog/marketplace-url";
 
 type CatalogProduct = (typeof catalog.products)[number];
 type PublicComparison = Awaited<
@@ -122,10 +123,14 @@ function fromComparison(comparison: PublicComparison): DetailProduct {
 const getProduct = cache(async (id: string): Promise<DetailProduct | null> => {
   try {
     const api = new MarketplaceApiClient(API_URL, {});
-    return fromComparison(await api.comparePublicOffers(id, { quantity: 1 }));
-  } catch {
-    const fallback = catalog.products.find((item) => item.id === id);
-    return fallback ? fromFallback(fallback) : null;
+    const live = fromComparison(await api.comparePublicOffers(id, { quantity: 1 }));
+    const reference = catalog.products.find((item) => item.id === id);
+    // Static descriptions/media may enrich a live result, never prices or availability.
+    return { ...live, sourceUrl: reference?.sourceUrl ?? null, description: reference?.description ?? live.description,
+      category: reference?.category ?? live.category, attributes: live.attributes.length ? live.attributes : reference?.attributes.map(([name, value]) => [name, value] as const) ?? [] };
+  } catch (cause) {
+    if (cause instanceof MarketplaceApiError && cause.status === 404) return null;
+    throw new Error("Не удалось загрузить актуальные предложения. Повторите попытку.");
   }
 });
 
@@ -146,12 +151,15 @@ export async function generateMetadata({
 
 export default async function ProductPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ returnTo?: string }>;
 }) {
   const { id } = await params;
   const product = await getProduct(decodeURIComponent(id));
   if (!product) notFound();
+  const returnTo = safeCatalogReturn((await searchParams).returnTo);
 
   const media = product.sourceUrl
     ? mediaCatalog.entries[
@@ -164,7 +172,7 @@ export default async function ProductPage({
     <div className={styles.page}>
       <PublicHeader active="catalog" baseHref="/catalog" />
       <main className={styles.shell}>
-        <Link className={styles.back} href="/catalog">
+        <Link className={styles.back} href={returnTo}>
           ← Вернуться в каталог
         </Link>
         <div className={styles.breadcrumbs}>

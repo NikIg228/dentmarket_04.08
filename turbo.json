@@ -5,7 +5,8 @@
     "build": { "dependsOn": ["^build"], "outputs": ["dist/**", ".next/**", "!.next/cache/**"] },
     "dev": { "cache": false, "persistent": true },
     "lint": { "dependsOn": ["^lint"] },
-    "test": { "dependsOn": ["^build"], "outputs": ["coverage/**"] },
-    "typecheck": { "dependsOn": ["^build"] }
+    "transit": { "dependsOn": ["^transit"] },
+    "test": { "dependsOn": ["^transit", "@marketplace/schemas#build"], "outputs": ["coverage/**"] },
+    "typecheck": { "dependsOn": ["^transit", "@marketplace/schemas#build"] }
   }
 }

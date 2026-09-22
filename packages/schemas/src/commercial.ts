@@ -48,6 +48,8 @@ export const signBuyerSupplierAgreementSchema = z.object({
 export const buyerSupplierAgreementDecisionSchema = z.object({ reason: z.string().trim().min(3).max(500) });
 
 export const refreshSessionSchema = z.object({
+  workspace: z.enum(["BUYER", "SUPPLIER"]).optional(),
+  expectedSessionId: z.uuid().optional(),
   refreshToken: z.string().min(32).max(512).optional(),
   csrfToken: z.string().min(24).max(256).optional(),
 });

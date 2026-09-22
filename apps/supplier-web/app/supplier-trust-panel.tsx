@@ -6,8 +6,6 @@ import { DmButton as Button, EmptyState, ErrorState, PageHeader, Section, Status
 import { useCallback, useEffect, useMemo, useState } from "react";
 import styles from "./supplier-trust-panel.module.css";
 
-const OPERATOR_ID = "00000000-0000-4000-8000-000000000002";
-const OPERATOR_ORG_ID = "00000000-0000-4000-8000-000000000001";
 type Indicator = { code: string; label: string; value: number; sampleSize: number };
 type Rating = { id?: string; status: string; score: string | null; confidence?: string; eventCount?: number; reviewCount?: number; computedAt?: string; version?: number; indicators: Indicator[]; factors: { strongest?: Array<{ label: string; value: number }>; weakest?: Array<{ label: string; value: number }> }; recommendations: Array<{ code: string; action: string }>; appeals?: Array<{ id: string; status: string; reason: string; createdAt: string }> };
 type Review = { id: string; overallRating: number; dimensions: Record<string, number>; comment: string | null; status: string; officialResponse: string | null; createdAt: string; anomalyFlags: string[] };
@@ -17,7 +15,7 @@ type Warehouse = { id: string; name: string; addressLine: string | null; geoStat
 const label: Record<string, string> = { MATCHING_ERROR: "Ошибка сопоставления товара", STALE_PRICE: "Устаревшая цена", UNRELIABLE_STOCK: "Недостоверный остаток", PACKAGING_ERROR: "Ошибка упаковки", INCOMPLETE_DOCUMENTS: "Неполные документы", DELIVERY_FAILURE: "Срыв доставки", SUSPICIOUS_PROMOTION: "Проверка акции", FAKE_REVIEW: "Проверка отзыва", UNVERIFIED_LOCATION: "Адрес не подтверждён", PAYMENT_DETAILS_CHANGE: "Изменение реквизитов" };
 
 export function SupplierTrustPanel({ supplierId, apiContext }: { supplierId: string; apiContext?: ApiContext }) {
-  const api = useMemo(() => new MarketplaceApiClient(process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:4012/api", apiContext ?? { actorId: OPERATOR_ID, organizationId: OPERATOR_ORG_ID }), [apiContext]);
+  const api = useMemo(() => new MarketplaceApiClient(process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:4012/api", apiContext ?? {}), [apiContext]);
   const [rating, setRating] = useState<Rating | null>(null);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [incidents, setIncidents] = useState<Incident[]>([]);

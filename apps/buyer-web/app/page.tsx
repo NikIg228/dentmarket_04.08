@@ -1,6 +1,10 @@
 "use client";
+import { useVerifiedSession, sessionApiContext, logoutSession } from "./workspace-session";
 
 import dynamic from "next/dynamic";
+import Link from "next/link";
+import { fetchLiveCatalog, loadCatalogWindow } from "./catalog/live-search";
+import { readMarketplaceCatalog, marketplaceCatalogUrl } from "./catalog/marketplace-url";
 
 import {
   Button,
@@ -90,8 +94,6 @@ const BuyerCart = dynamic(
   { loading: () => <LoadingState label="Загружаем корзину" /> },
 );
 
-const BUYER_ID = "00000000-0000-4000-8000-000000000030";
-const BUYER_USER_ID = "00000000-0000-4000-8000-000000000500";
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:4012/api";
 type SessionHandoff = SessionHandoffEnvelope;
 const SESSION_KEY = "dentmarket:buyer-session";
@@ -114,13 +116,6 @@ const ruCount = (count: number, one: string, few: string, many: string) => {
   return many;
 };
 
-function readSessionHandoff(): SessionHandoff | null {
-  if (typeof window === "undefined") return null;
-  const serialized = window.location.hash.startsWith("#session=")
-    ? decodeURIComponent(window.location.hash.slice("#session=".length))
-    : window.sessionStorage.getItem(SESSION_KEY);
-  return parseSessionHandoff(serialized, "BUYER");
-}
 
 const rejectedProductAsset = (value: string | null | undefined) =>
   /(logo|favicon|icon|sprite|avatar|cart|basket|loading|pixel|captcha|phone[-_]?ico|placeholder|no[-_]?image|default[-_]?image|\/(?:themes?|templates?|assets\/icons?|images?\/icons?)\/)/i.test(
@@ -155,49 +150,6 @@ const priceDifferencePercent = (product: SearchProduct) => {
   if (prices.length < 2 || prices[0] === prices.at(-1)) return 0;
   return Math.round((1 - prices[0] / prices.at(-1)!) * 100);
 };
-async function fetchFallbackCatalogSearch(
-  params: URLSearchParams,
-): Promise<SearchResult> {
-  const response = await fetch(`/catalog-fallback?${params.toString()}`, {
-    cache: "no-store",
-    signal: AbortSignal.timeout(3500),
-  });
-  if (!response.ok) throw new Error("Catalog fallback is unavailable");
-  const result = (await response.json()) as Partial<SearchResult>;
-  if (!Array.isArray(result.items) || typeof result.total !== "number") {
-    throw new Error("Catalog fallback returned an invalid response");
-  }
-  return result as SearchResult;
-}
-
-async function fetchPublicCatalogSearch(
-  query: string,
-  sort: string,
-  params: URLSearchParams,
-): Promise<SearchResult | null> {
-  if (typeof window !== "undefined") {
-    try {
-      const saved = JSON.parse(
-        window.localStorage.getItem("dentmarket:city") ?? "null",
-      ) as { id?: string } | null;
-      if (saved?.id) params.set("cityId", saved.id);
-    } catch {
-      /* legacy plain-text city selection */
-    }
-  }
-  const response = await fetch(
-    `/catalog-search?${params.toString()}`,
-    {
-      cache: "no-store",
-      signal: AbortSignal.timeout(3500),
-    },
-  );
-  if (!response.ok) return null;
-  const result = (await response.json()) as Partial<SearchResult>;
-  if (!Array.isArray(result.items) || typeof result.total !== "number")
-    return null;
-  return result as SearchResult;
-}
 type CompareOffer = {
   offerId: string;
   variantId: string;
@@ -326,58 +278,10 @@ export default function BuyerWorkspace({
   // component's first render deterministic prevents Safari from leaving the
   // server markup interactive-looking but without event handlers.
   const initialQuery = "";
-  const [handoff, setHandoff] = useState<SessionHandoff | null>(null);
-  const [handoffChecked, setHandoffChecked] = useState(false);
-  const buyerId = handoff?.organizationId ?? BUYER_ID;
-  const apiContext = useMemo<ApiContext>(
-    () =>
-      handoff?.accessToken
-        ? { accessToken: handoff.accessToken }
-        : handoff?.actorId && handoff.organizationId
-          ? { actorId: handoff.actorId, organizationId: handoff.organizationId }
-          : {},
-    [handoff],
-  );
-  const api = useMemo(
-    () => new MarketplaceApiClient(API_URL, apiContext),
-    [apiContext],
-  );
-  useEffect(() => {
-    void (async () => {
-      const next = readSessionHandoff();
-      if (!next) {
-        setHandoffChecked(true);
-        return;
-      }
-      let resolved = next;
-      if (next.handoffCode && !next.accessToken) {
-        const response = await fetch(`${API_URL}/auth/handoff/exchange`, {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ handoffCode: next.handoffCode }),
-        });
-        if (!response.ok) {
-          setHandoffChecked(true);
-          return;
-        }
-        const session = (await response.json()) as {
-          accessToken?: string;
-          user?: { id: string; displayName: string };
-          organizationId?: string;
-          capability?: string;
-        };
-        resolved = { ...next, ...session, actorId: session.user?.id };
-      }
-      setHandoff(resolved);
-      window.sessionStorage.setItem(SESSION_KEY, JSON.stringify(resolved));
-      window.history.replaceState(
-        null,
-        "",
-        `${window.location.pathname}${window.location.search}`,
-      );
-      setHandoffChecked(true);
-    })();
-  }, []);
+  const { session: handoff, ready: handoffChecked, error: sessionError } = useVerifiedSession();
+  const buyerId = handoff?.organizationId ?? "";
+  const apiContext = sessionApiContext;
+  const api = useMemo(() => new MarketplaceApiClient(API_URL, apiContext), [apiContext]);
   const [active, setActive] = useState("catalog");
   const [query, setQuery] = useState(initialQuery);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
@@ -388,6 +292,7 @@ export default function BuyerWorkspace({
   const [stockFilter, setStockFilter] = useState("all");
   const [brandFilter, setBrandFilter] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
+  const [categoryIdFilter, setCategoryIdFilter] = useState("");
   const [minPriceFilter, setMinPriceFilter] = useState("");
   const [maxPriceFilter, setMaxPriceFilter] = useState("");
   const [verifiedOnly, setVerifiedOnly] = useState(false);
@@ -395,7 +300,11 @@ export default function BuyerWorkspace({
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [search, setSearch] = useState<SearchResult | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const catalogUrlAppliedRef = useRef(false);
+  const [catalogUrlReady, setCatalogUrlReady] = useState(false);
+  const [catalogHistoryRevision, setCatalogHistoryRevision] = useState(0);
+  const catalogPath = useRef("/");
+  const restoredCount = useRef(CATALOG_PAGE_SIZE);
+  const searchRequest = useRef<AbortController | null>(null);
   const [comparison, setComparison] = useState<Comparison | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<SearchProduct | null>(
     null,
@@ -534,6 +443,7 @@ export default function BuyerWorkspace({
     stockFilter === "true" ? "stock" : "",
     brandFilter,
     categoryFilter,
+    categoryIdFilter,
     minPriceFilter,
     maxPriceFilter,
     verifiedOnly ? "verified" : "",
@@ -566,6 +476,7 @@ export default function BuyerWorkspace({
         limit: "24",
       });
       if (stockFilter !== "all") params.set("inStock", stockFilter);
+      if (categoryIdFilter) params.set("categoryId", categoryIdFilter);
       if (unitFilter) params.set("unit", unitFilter);
       if (packagingFilter) params.set("packaging", packagingFilter);
       if (deliveryFilter) params.set("deliveryMethod", deliveryFilter);
@@ -573,6 +484,7 @@ export default function BuyerWorkspace({
     },
     [
       buyerId,
+      categoryIdFilter,
       deliveryFilter,
       packagingFilter,
       query,
@@ -595,13 +507,15 @@ export default function BuyerWorkspace({
         limit: String(limit),
       });
       if (offset) params.set("offset", String(offset));
-      if (stockFilter === "true") params.set("inStock", "true");
+      if (stockFilter !== "all") params.set("inStock", stockFilter);
+      if (categoryIdFilter) params.set("categoryId", categoryIdFilter);
       if (unitFilter) params.set("unit", unitFilter);
       if (packagingFilter) params.set("packaging", packagingFilter);
       if (deliveryFilter) params.set("deliveryMethod", deliveryFilter);
       return params;
     },
     [
+      categoryIdFilter,
       deliveryFilter,
       packagingFilter,
       query,
@@ -611,63 +525,23 @@ export default function BuyerWorkspace({
     ],
   );
 
-  const loadSearch = useCallback(
-    async (
-      nextQuery = query,
-      nextSort = sort,
-      limit = CATALOG_PAGE_SIZE,
-    ) => {
-      if (!handoff) {
-        const publicParams = buildPublicSearchParams(
-          nextQuery,
-          nextSort,
-          limit,
-        );
-        try {
-          const live = await fetchPublicCatalogSearch(
-            nextQuery,
-            nextSort,
-            publicParams,
-          );
-          if (live) {
-            setSearch(live);
-            return;
-          }
-        } catch {
-          // The server-side snapshot is the deliberate fail-safe for an unavailable API.
-        }
-        setSearch(await fetchFallbackCatalogSearch(publicParams));
-        return;
-      }
-      const params = buildSearchParams(nextQuery, nextSort);
-      try {
-        setSearch(
-          await api.get<SearchResult>(
-            `${handoff ? "/marketplace" : "/catalog"}/search?${params}`,
-          ),
-        );
-      } catch (cause) {
-        setSearch(
-          await fetchFallbackCatalogSearch(
-            buildPublicSearchParams(nextQuery, nextSort, limit),
-          ),
-        );
-        if (handoff)
-          setToast(
-            "API временно недоступен — показываем полный резервный каталог",
-          );
-      }
-    },
-    [
-      api,
-      buildPublicSearchParams,
-      buildSearchParams,
-      handoff,
-      query,
-      sort,
-    ],
-  );
-
+  const loadSearch = useCallback(async (nextQuery = query, nextSort = sort, limit = CATALOG_PAGE_SIZE) => {
+    searchRequest.current?.abort();
+    const controller = new AbortController(); searchRequest.current = controller;
+    setLoading(true);
+    try {
+      const result = await loadCatalogWindow<SearchResult>(async (offset, pageSize) => {
+        const params = handoff ? buildSearchParams(nextQuery, nextSort) : buildPublicSearchParams(nextQuery, nextSort);
+        params.set("offset", String(offset)); params.set("limit", String(pageSize));
+        return handoff ? api.request<SearchResult>("/marketplace/search?" + params, { signal: controller.signal })
+          : fetchLiveCatalog<SearchResult>(params, controller.signal);
+      }, limit);
+      if (!controller.signal.aborted) { setSearch(result); setError(null); }
+    } catch (cause) {
+      if (!controller.signal.aborted) { setSearch(null); throw cause; }
+    } finally { if (!controller.signal.aborted) setLoading(false); }
+  }, [api, buildPublicSearchParams, buildSearchParams, handoff, query, sort]);
+  useEffect(() => () => searchRequest.current?.abort(), []);
   const requestCartValidation = useCallback(
     async (cart: Cart | null) => {
       if (!cart?.items.length) {
@@ -694,7 +568,7 @@ export default function BuyerWorkspace({
     setError(null);
     try {
       if (!handoff) {
-        await loadSearch(query, sort, CATALOG_PAGE_SIZE);
+        await loadSearch(query, sort, restoredCount.current);
         setCarts([]);
         setCartValidation(null);
         setOrders([]);
@@ -703,13 +577,13 @@ export default function BuyerWorkspace({
         return;
       }
       const [
-        searchResult,
+        _searchResult,
         cartResult,
         orderResult,
         documentResult,
         notificationResult,
       ] = await Promise.all([
-        api.get<SearchResult>(`/marketplace/search?${buildSearchParams()}`),
+        loadSearch(query, sort, restoredCount.current),
         api.get<Cart[]>(`/buyers/${buyerId}/carts`),
         api.get<SupplierOrder[]>(`/buyers/${buyerId}/orders`),
         api.get<DocumentRecord[]>(
@@ -719,7 +593,6 @@ export default function BuyerWorkspace({
           `/notifications/organizations/${buyerId}?limit=100`,
         ),
       ]);
-      setSearch(searchResult);
       setCarts(cartResult);
       await requestCartValidation(
         cartResult.find((cart) => cart.status === "ACTIVE") ?? null,
@@ -728,17 +601,7 @@ export default function BuyerWorkspace({
       setDocuments(documentResult);
       setNotifications(notificationResult);
     } catch (cause) {
-      if (handoff) {
-        try {
-          setSearch(
-            await fetchFallbackCatalogSearch(
-              buildPublicSearchParams(query, sort),
-            ),
-          );
-        } catch {
-          // Preserve the primary API error when both catalog sources fail.
-        }
-      }
+      setSearch(null);
       setError(errorMessage(cause));
     } finally {
       setLoading(false);
@@ -757,109 +620,60 @@ export default function BuyerWorkspace({
   ]);
 
   useEffect(() => {
-    if (
-      !handoffChecked ||
-      handoff ||
-      catalogUrlAppliedRef.current ||
-      typeof window === "undefined"
-    )
-      return;
-    catalogUrlAppliedRef.current = true;
-    const params = new URLSearchParams(window.location.search);
-    const urlQuery = params.get("q")?.trim() ?? "";
-    const parsedOffset = Number(params.get("offset") ?? "0");
-    const offset =
-      Number.isFinite(parsedOffset) && parsedOffset > 0 ? parsedOffset : 0;
-    if (!urlQuery && !offset) return;
-    setQuery(urlQuery);
-    void loadSearch(
-      urlQuery,
-      sort,
-      Math.max(CATALOG_PAGE_SIZE, offset + CATALOG_PAGE_SIZE),
-    );
-  }, [handoff, handoffChecked, loadSearch, sort]);
+    const restore = () => {
+    const state = readMarketplaceCatalog(new URLSearchParams(window.location.search));
+    catalogPath.current = window.location.pathname;
+    setCategoryIdFilter(state.categoryId ?? "");
+    setQuery(state.query); setSort(state.sort); setUnitFilter(state.unit); setPackagingFilter(state.packaging);
+    setDeliveryFilter(state.delivery); setStockFilter(state.stock); setBrandFilter(state.brand); setCategoryFilter(state.category);
+    setMinPriceFilter(state.minPrice); setMaxPriceFilter(state.maxPrice); setVerifiedOnly(state.verified); setOfficialOnly(state.official);
+    restoredCount.current = state.count; setCatalogUrlReady(true);
+    setCatalogHistoryRevision(value => value + 1);
+    };
+    restore();
+    window.addEventListener("popstate", restore);
+    return () => window.removeEventListener("popstate", restore);
+  }, []);
+
+  const catalogReturnUrl = marketplaceCatalogUrl({ query, sort, unit: unitFilter, packaging: packagingFilter,
+    delivery: deliveryFilter, stock: stockFilter, brand: brandFilter, category: categoryFilter, categoryId: categoryIdFilter,
+    minPrice: minPriceFilter, maxPrice: maxPriceFilter, verified: verifiedOnly, official: officialOnly,
+    count: search?.items.length ?? restoredCount.current }, catalogPath.current);
+  useEffect(() => {
+    if (catalogUrlReady && active === "catalog") window.history.replaceState(window.history.state, "", catalogReturnUrl);
+  }, [catalogUrlReady, active, catalogReturnUrl]);
 
   const loadMoreProducts = async () => {
-    const currentCount = search?.items.length ?? 0;
+    searchRequest.current?.abort();
+    const controller = new AbortController(); searchRequest.current = controller;
     setBusy("load-more");
     try {
-      if (!handoff) {
-        const publicParams = buildPublicSearchParams(
-          query,
-          sort,
-          CATALOG_PAGE_SIZE,
-          currentCount,
-        );
-        const live = await fetchPublicCatalogSearch(
-          query,
-          sort,
-          publicParams,
-        );
-        if (live) {
-          setSearch((previous) =>
-            previous
-              ? { ...live, items: [...previous.items, ...live.items] }
-              : live,
-          );
-          return;
-        }
-        setSearch(
-          await fetchFallbackCatalogSearch(
-            buildPublicSearchParams(
-              query,
-              sort,
-              currentCount + CATALOG_PAGE_SIZE,
-            ),
-          ),
-        );
-        return;
-      }
-      const params = buildSearchParams(query, sort);
-      params.set("offset", String(currentCount));
-      params.set("limit", String(CATALOG_PAGE_SIZE));
-      const next = await api.get<SearchResult>(`/marketplace/search?${params}`);
-      setSearch((previous) =>
-        previous
-          ? { ...next, items: [...previous.items, ...next.items] }
-          : next,
-      );
-    } catch {
-      try {
-        setSearch(
-          await fetchFallbackCatalogSearch(
-            buildPublicSearchParams(
-              query,
-              sort,
-              currentCount + CATALOG_PAGE_SIZE,
-            ),
-          ),
-        );
-        setToast("Показываем следующую порцию резервного каталога");
-      } catch (cause) {
-        setError(errorMessage(cause));
-      }
-    } finally {
-      setBusy(null);
-    }
+      const params = handoff ? buildSearchParams() : buildPublicSearchParams();
+      params.set("offset", String(search?.items.length ?? 0)); params.set("limit", String(CATALOG_PAGE_SIZE));
+      const next = handoff ? await api.request<SearchResult>("/marketplace/search?" + params, { signal: controller.signal }) : await fetchLiveCatalog<SearchResult>(params, controller.signal);
+      if (controller.signal.aborted) return;
+      setSearch(previous => previous ? { ...next, items: [...previous.items, ...next.items] } : next);
+      setError(null);
+    } catch (cause) { if (!controller.signal.aborted) setError(errorMessage(cause)); }
+    finally { setBusy(null); }
   };
-
   useEffect(() => {
     const onCityChanged = () => {
-      void loadSearch(query, sort);
+      void loadSearch(query, sort).catch(cause => setError(errorMessage(cause)));
     };
     window.addEventListener("dentmarket:city-changed", onCityChanged);
     return () =>
       window.removeEventListener("dentmarket:city-changed", onCityChanged);
   }, [loadSearch, query, sort]);
 
-  const logout = useSessionLogout({ sessionKey: SESSION_KEY, sessionId: handoff?.sessionId, revoke: () => revokeWorkspaceSession(API_URL, handoff), redirectUrl: LOGIN_URL });
+  const logout = useSessionLogout({ sessionKey: SESSION_KEY, sessionId: handoff?.sessionId, revoke: logoutSession, redirectUrl: LOGIN_URL });
 
   useEffect(() => {
-    if (handoffChecked) void refresh();
+    if (handoffChecked && catalogUrlReady) void refresh();
     // Refresh is the initial page bootstrap. Search and filter changes use
     // loadSearch directly and must not re-run the bootstrap with stale state.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [handoffChecked]);
+  }, [handoffChecked, catalogUrlReady, catalogHistoryRevision, handoff?.sessionId]);
   useEffect(() => {
     if (!toast) return;
     const timer = window.setTimeout(() => setToast(null), 3500);
@@ -1438,6 +1252,9 @@ export default function BuyerWorkspace({
                 aria-label="Выбранные фильтры"
               >
                 {[
+                  categoryIdFilter
+                    ? { key: "categoryId", label: "Категория из ссылки", clear: () => setCategoryIdFilter("") }
+                    : null,
                   categoryFilter
                     ? {
                         key: "category",
@@ -1529,7 +1346,7 @@ export default function BuyerWorkspace({
                   type="button"
                   onClick={() => {
                     setBrandFilter("");
-                    setCategoryFilter("");
+                    setCategoryFilter(""); setCategoryIdFilter("");
                     setMinPriceFilter("");
                     setMaxPriceFilter("");
                     setVerifiedOnly(false);
@@ -1654,7 +1471,7 @@ export default function BuyerWorkspace({
                 appearance="subtle"
                 onClick={() => {
                   setBrandFilter("");
-                  setCategoryFilter("");
+                  setCategoryFilter(""); setCategoryIdFilter("");
                   setMinPriceFilter("");
                   setMaxPriceFilter("");
                   setVerifiedOnly(false);
@@ -1744,9 +1561,9 @@ export default function BuyerWorkspace({
                   data-testid="product-card"
                   data-product-id={product.id}
                 >
-                  <a
+                  <Link prefetch={false}
                     className={styles.productCardSurface}
-                    href={`/products/${encodeURIComponent(product.id)}`}
+                    href={"/products/" + encodeURIComponent(product.id) + "?returnTo=" + encodeURIComponent(catalogReturnUrl)}
                     aria-label={`Открыть карточку ${product.name}`}
                   >
                     <div className={styles.productVisual}>
@@ -1871,7 +1688,7 @@ export default function BuyerWorkspace({
                         </small>
                       ) : null}
                     </div>
-                  </a>
+                  </Link>
                   <div className={styles.productActions}>
                     <Button
                       appearance="primary"
@@ -2053,7 +1870,7 @@ export default function BuyerWorkspace({
                 appearance="subtle"
                 onClick={() => {
                   setBrandFilter("");
-                  setCategoryFilter("");
+                  setCategoryFilter(""); setCategoryIdFilter("");
                   setMinPriceFilter("");
                   setMaxPriceFilter("");
                   setVerifiedOnly(false);

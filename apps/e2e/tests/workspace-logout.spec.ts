@@ -26,13 +26,18 @@ for (const app of apps) for (const width of [1440, 390]) {
     // Browser-only fixtures: all API requests below are mocked. These tests
     // prove UI behavior, not authorization, persistence, or session revocation.
     await page.addInitScript(({ key, role }) => {
-      sessionStorage.setItem(key, JSON.stringify({ sessionId: "ui-session", accessToken: "synthetic", organizationId: "ui-organization", capability: role }));
+      sessionStorage.setItem(key, JSON.stringify({ sessionId: "ui-session", accessToken: "synthetic", accessTokenExpiresAt: Date.now() + 900000, organizationId: "00000000-0000-4000-8000-000000000020", capability: role }));
     }, app);
     await loginDestination(page);
     let calls = 0;
     let mode: "network" | "unauthorized" | "pending" = "network";
     let release: (() => void) | undefined;
     await page.route("**/api/**", async route => {
+      if (route.request().url().endsWith("/auth/workspace-context")) return route.fulfill({ json: { organizationId: "00000000-0000-4000-8000-000000000020", organizationDisplayName: "Synthetic UI organization", capabilities: [app.role] } });
+      if (route.request().url().endsWith("/supplier-terms/current")) return route.fulfill({ json: {
+        organization: { id: "00000000-0000-4000-8000-000000000020", legalName: "Synthetic supplier", bin: "000000000000", version: 1, representativeName: "Test" },
+        bundle: { hash: "0".repeat(64), available: false, documents: [] }, acceptance: null, contractAccepted: false, admitted: false, legacyAgreementActive: false,
+      } });
       if (route.request().url().endsWith("/revoke")) {
         calls++;
         if (mode === "network") return route.abort("failed");
@@ -104,6 +109,7 @@ test.describe("real isolated JWT session logout", () => {
         await page.goto(`${app.url}/documents#session=${encodeURIComponent(JSON.stringify({ organizationId: handoff.organizationId, capability: app.role, handoffCode: handoff.handoffCode }))}`);
         // Normal server handoff exchange must have completed; no DB tokens or injected identity.
         await expect.poll(() => page.evaluate(key => Boolean(JSON.parse(sessionStorage.getItem(key) ?? "null")?.accessToken), app.key)).toBe(true);
+        const destination = await page.evaluate(key => JSON.parse(sessionStorage.getItem(key)!), app.key) as { accessToken: string; sessionId: string; csrfToken: string };
         const siblingPromise = page.waitForEvent("popup");
         await page.evaluate(() => { window.open("/documents", "_blank"); });
         const sibling = await siblingPromise;
@@ -121,9 +127,11 @@ test.describe("real isolated JWT session logout", () => {
           await tab.goto(`${app.url}/logout-storage-check`);
           expect(await tab.evaluate(key => sessionStorage.getItem(key), app.key)).toBeNull();
         }
-        expect((await client.get(`${apiUrl}/auth/sessions`, { headers: { authorization } })).status()).toBe(401);
-        expect((await client.post(`${apiUrl}/auth/refresh`, { headers: { "x-csrf-token": session.csrfToken }, data: {} })).status()).toBe(401);
-        expect((await client.post(`${apiUrl}/auth/sessions/${session.sessionId}/revoke`, { headers: { authorization }, data: { reason: "user_logout" } })).status()).toBe(401);
+        const destinationAuthorization = `Bearer ${destination.accessToken}`;
+        expect((await client.get(`${apiUrl}/auth/sessions`, { headers: { authorization: destinationAuthorization } })).status()).toBe(401);
+        expect((await page.context().request.post(`${apiUrl}/auth/refresh`, { headers: { "x-csrf-token": destination.csrfToken }, data: { workspace: app.role, expectedSessionId: destination.sessionId } })).status()).toBe(401);
+        expect((await client.post(`${apiUrl}/auth/sessions/${destination.sessionId}/revoke`, { headers: { authorization: destinationAuthorization }, data: { reason: "user_logout" } })).status()).toBe(401);
+        expect((await client.get(`${apiUrl}/auth/sessions`, { headers: { authorization } })).status()).toBe(200);
         await sibling.close();
       } finally {
         // Scoped API cleanup only; never delete/reseed audit records. A revoked

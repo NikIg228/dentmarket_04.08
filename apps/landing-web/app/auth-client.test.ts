@@ -29,7 +29,8 @@ describe("landing auth contract", () => {
     expect(pickCapability(["BUYER", "SUPPLIER"], undefined, "SUPPLIER")).toBe(
       "SUPPLIER",
     );
-    expect(pickCapability(["BUYER"], undefined, "SUPPLIER")).toBe("BUYER");
+    expect(pickCapability(["BUYER"], undefined, "SUPPLIER")).toBeUndefined();
+    expect(pickCapability(["BUYER", "SUPPLIER"], "BUYER", "SUPPLIER")).toBe("SUPPLIER");
   });
 
   it("creates a fragment-only handoff without putting the token in query params", () => {
@@ -61,7 +62,7 @@ describe("workspace context before handoff", () => {
   }
   it.each(["BUYER", "SUPPLIER"] as const)("opens the actual %s organization without an operator directory lookup", async capability => {
     const { assign, fetcher } = setup({ organizationId, organizationDisplayName: "Test organization", capabilities: [capability] });
-    await openWorkspace(session, "BUYER");
+    await openWorkspace(session, capability);
     expect(fetcher.mock.calls[0][0]).toMatch(/\/auth\/workspace-context$/);
     expect(fetcher.mock.calls[0][1]).toMatchObject({ headers: { authorization: "Bearer synthetic-bearer" }, cache: "no-store" });
     expect(fetcher.mock.calls[1][1]?.body).toBe(JSON.stringify({ capability }));

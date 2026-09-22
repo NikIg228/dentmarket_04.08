@@ -1,8 +1,9 @@
 "use client";
-import { authForgotAcceptedSchema } from "@marketplace/schemas";
+import { authForgotAcceptedSchema, type WorkspaceContext } from "@marketplace/schemas";
+import Link from "next/link";
 
 import Script from "next/script";
-import { DmButton, DmField, DmInput } from "@marketplace/ui";
+import { DmButton, DmField, DmInput, DmSelect } from "@marketplace/ui";
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { AuthBrand, AuthNotice, AuthRolePicker } from "../auth-components";
 import {
@@ -13,6 +14,7 @@ import {
   buyerAppUrl,
   feedbackFromError,
   openWorkspace,
+  availableWorkspaces,
 } from "../auth-client";
 
 declare global {
@@ -44,7 +46,7 @@ const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? "";
 const appleClientId = process.env.NEXT_PUBLIC_APPLE_CLIENT_ID ?? "";
 const appleRedirectUri = process.env.NEXT_PUBLIC_APPLE_REDIRECT_URI ?? "";
 
-type BusyAction = "email" | "forgot" | "demo" | "social" | null;
+type BusyAction = "email" | "forgot" | "workspace" | "social" | null;
 
 export default function LoginPage() {
   const [capability, setCapability] = useState<AuthCapability>("BUYER");
@@ -52,40 +54,33 @@ export default function LoginPage() {
   const [feedback, setFeedback] = useState<AuthFeedback | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [pendingSession, setPendingSession] = useState<AuthSession | null>(null);
+  const [choices, setChoices] = useState<WorkspaceContext[]>([]);
+  const [organizationId, setOrganizationId] = useState("");
   const googleButton = useRef<HTMLDivElement>(null);
   const busy = busyAction !== null;
   const hasGoogle = Boolean(googleClientId);
   const hasApple = Boolean(appleClientId && appleRedirectUri);
   const hasSocialLogin = hasGoogle || hasApple;
 
+  const continueSession = async (session: AuthSession) => {
+    const workspaces = await availableWorkspaces(session, capability);
+    if (workspaces.length === 1) return openWorkspace(session, capability, workspaces[0].organizationId);
+    setPendingSession(session); setChoices(workspaces); setOrganizationId(workspaces[0].organizationId);
+  };
+
   const exchange = async (provider: "GOOGLE" | "APPLE", idToken: string) => {
     setBusyAction("social");
     setFeedback(null);
     try {
-      await openWorkspace(
+      await continueSession(
         await authRequest<AuthSession>("/auth/social/exchange", {
           provider,
           idToken,
         }),
-        capability,
       );
     } catch (cause) {
       setFeedback(feedbackFromError(cause, "Вход не выполнен"));
-    } finally {
-      setBusyAction(null);
-    }
-  };
-
-  const demo = async () => {
-    setBusyAction("demo");
-    setFeedback(null);
-    try {
-      await openWorkspace(
-        await authRequest<AuthSession>("/auth/demo", { capability }),
-        capability,
-      );
-    } catch (cause) {
-      setFeedback(feedbackFromError(cause, "Не удалось открыть кабинет"));
     } finally {
       setBusyAction(null);
     }
@@ -96,9 +91,8 @@ export default function LoginPage() {
     setBusyAction("email");
     setFeedback(null);
     try {
-      await openWorkspace(
+      await continueSession(
         await authRequest<AuthSession>("/auth/login", { email, password }),
-        capability,
       );
     } catch (cause) {
       setFeedback(feedbackFromError(cause, "Вход не выполнен"));
@@ -198,7 +192,7 @@ export default function LoginPage() {
           <h2 id="login-title">Выберите кабинет</h2>
           <AuthRolePicker
             value={capability}
-            onChange={setCapability}
+            onChange={(value) => { setCapability(value); setPendingSession(null); setChoices([]); setFeedback(null); }}
             disabled={busy}
           />
           <form className="emailLoginForm" onSubmit={emailLogin}>
@@ -258,30 +252,28 @@ export default function LoginPage() {
               </div>
             </>
           ) : null}
-          <div className="divider">
-            <span>посмотреть без регистрации</span>
-          </div>
-          <DmButton
-            type="button"
-            appearance="primary"
-            className="demoLogin"
-            onClick={() => void demo()}
-            disabled={busy}
-          >
-            {busyAction === "demo"
-              ? "Открываем кабинет…"
-              : capability === "BUYER"
-                ? "Посмотреть магазин"
-                : "Посмотреть кабинет поставщика"}
-          </DmButton>
+          {pendingSession ? <div>
+            <DmField label="Организация">
+              <DmSelect value={organizationId} disabled={busy} onChange={(_, data) => setOrganizationId(data.value)}>
+                {choices.map(item => <option key={item.organizationId} value={item.organizationId}>{item.organizationDisplayName}</option>)}
+              </DmSelect>
+            </DmField>
+            <DmButton disabled={busy} onClick={async () => {
+              setBusyAction("workspace"); setFeedback(null);
+              try { await openWorkspace(pendingSession, capability, organizationId); }
+              catch (cause) { setFeedback(feedbackFromError(cause, "Не удалось открыть кабинет")); }
+              finally { setBusyAction(null); }
+            }}>Открыть выбранную организацию</DmButton>
+          </div> : null}
+          <a className="backLink" href={buyerAppUrl}>Посмотреть публичный каталог</a>
           {feedback ? <AuthNotice feedback={feedback} /> : null}
           <p className="loginSignup">
             Нет аккаунта?{" "}
-            <a
+            <Link
               href={`/register?role=${capability === "BUYER" ? "buyer" : "supplier"}`}
             >
               Зарегистрироваться
-            </a>
+            </Link>
           </p>
         </div>
       </section>

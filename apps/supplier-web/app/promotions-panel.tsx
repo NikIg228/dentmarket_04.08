@@ -6,12 +6,10 @@ import { DmButton as Button, DmField as Field, DmInput as Input, DmSelect as Sel
 import { useCallback, useEffect, useMemo, useState } from "react";
 import styles from "./promotions-panel.module.css";
 
-const OPERATOR_ID = "00000000-0000-4000-8000-000000000002";
-const OPERATOR_ORG_ID = "00000000-0000-4000-8000-000000000001";
 type Promotion = { id: string; name: string; description: string | null; kind: string; percentageBasisPoints: number | null; fixedAmountMinor: string | null; currency: string | null; status: string; startsAt: string; endsAt: string; redemptionCount: number; usageLimit: number | null; version: number };
 
 export function PromotionsPanel({ supplierId, apiContext }: { supplierId: string; apiContext?: ApiContext }) {
-  const api = useMemo(() => new MarketplaceApiClient(process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:4012/api", apiContext ?? { actorId: OPERATOR_ID, organizationId: OPERATOR_ORG_ID }), [apiContext]);
+  const api = useMemo(() => new MarketplaceApiClient(process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:4012/api", apiContext ?? {}), [apiContext]);
   const [items, setItems] = useState<Promotion[]>([]); const [loading, setLoading] = useState(true); const [busy, setBusy] = useState<string | null>(null); const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({ name: "", description: "", kind: "PERCENTAGE", value: "10", durationDays: "30", couponCode: "" });
   const query = `supplierOrganizationId=${encodeURIComponent(supplierId)}`;
