@@ -255,6 +255,13 @@ production prohibition of development headers сохраняется.
   доставленным внешним событием. Сохраняется явный trace результата.
 - [ ] CORE-06.4: operator path для guarded rollback conflict и проблемного
   заказа без прямых SQL-правок; не добавлять произвольный admin bypass.
+- [ ] CORE-06.5: внутренние диалоги по [Product §22.12](../product/DENTMARKET_PRODUCT_V2.md#2212-внутренние-диалоги-покупателя-и-поставщика--решение-владельца-22092026).
+  Статус 22.09.2026: requirements approved; implementation not started.
+  Проверить tenant/membership access, контекст конкретного supplier offer/order,
+  отсутствие дублей при повторном открытии/отправке, персональное прочтение,
+  resolve/reopen, доступ оператора через обращение. Сообщение не меняет
+  коммерческие состояния. Запись не разрешает реализацию, дополнительные
+  runtime-прогоны или смену очереди текущей задачи.
 
 Scope: operations, moderation, notifications, outbox, shared contracts.
 DoD: operator/non-operator unit + PostgreSQL, outbox/observability regressions,
