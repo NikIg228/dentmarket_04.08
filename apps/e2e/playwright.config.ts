@@ -34,6 +34,7 @@ export default defineConfig({
         JWT_SECRET: process.env.JWT_SECRET ?? e2eJwtSecret,
         // Local file delivery is confined to the explicitly isolated E2E API.
         AUTH_LOCAL_MAIL_ENABLED: "true",
+        AUTH_EMAIL_BASE_URL: "http://127.0.0.1:3003",
         DEPLOYMENT_PROFILE: "pilot",
         PROCESS_ROLE: "all",
         BACKGROUND_QUEUE_ENABLED: "false",

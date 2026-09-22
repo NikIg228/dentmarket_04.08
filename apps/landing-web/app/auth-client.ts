@@ -1,4 +1,5 @@
 import { workspaceContextSchema, workspaceChoicesSchema, type WorkspaceContext } from "@marketplace/schemas";
+import { productReturnPath } from "@marketplace/schemas/product-navigation";
 export type AuthCapability = "BUYER" | "SUPPLIER";
 
 export type AuthSession = {
@@ -103,12 +104,14 @@ export function workspaceHandoffUrl({
   displayName,
   organizationDisplayName,
   organizationId,
+  returnTo,
 }: {
   capability: AuthCapability;
   handoffCode: string;
   displayName: string;
   organizationDisplayName?: string;
   organizationId: string;
+  returnTo?: string;
 }) {
   const handoff = encodeURIComponent(
     JSON.stringify({
@@ -119,13 +122,16 @@ export function workspaceHandoffUrl({
       capability,
     }),
   );
-  return `${capability === "SUPPLIER" ? supplierAppUrl : buyerAppUrl}/#session=${handoff}`;
+  const base = capability === "SUPPLIER" ? supplierAppUrl : buyerAppUrl;
+  const path = capability === "BUYER" ? productReturnPath(returnTo) ?? "/" : "/";
+  return `${base.replace(/\/$/, "")}${path}#session=${handoff}`;
 }
 
 export async function openWorkspace(
   session: AuthSession,
   preferredCapability?: AuthCapability,
   selectedOrganizationId?: string,
+  returnTo?: string,
 ) {
   if (selectedOrganizationId && selectedOrganizationId !== session.activeOrganizationId) {
     if (!session.sessionId) throw new Error("Не удалось определить сессию. Войдите заново.");
@@ -196,6 +202,7 @@ export async function openWorkspace(
       organizationDisplayName:
         handoffPayload.organizationDisplayName ?? organizationDisplayName,
       organizationId,
+      returnTo,
     }),
   );
 }

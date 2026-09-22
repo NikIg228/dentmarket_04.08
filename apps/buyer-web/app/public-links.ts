@@ -1,3 +1,5 @@
+import { withProductReturn } from "@marketplace/schemas/product-navigation";
+
 const localLandingUrl = "http://127.0.0.1:3003";
 const localSupplierUrl = "http://127.0.0.1:3002";
 
@@ -15,6 +17,8 @@ export const supplierAppUrl =
 
 export const loginUrl =
   process.env.NEXT_PUBLIC_LOGIN_URL ?? `${landingAppUrl}/login`;
+
+export const productLoginUrl = (returnTo: string) => withProductReturn(loginUrl, returnTo);
 
 export const registrationUrl = (role: "buyer" | "supplier") =>
   `${landingAppUrl}/register?role=${role}`;

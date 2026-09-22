@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException, UnauthorizedException } from "@nestjs/common";
-import type { SocialExchangeInput, WorkspaceContext } from "@marketplace/schemas";
+import { withProductReturn, type AuthEmailRegistration, type SocialExchangeInput, type WorkspaceContext } from "@marketplace/schemas";
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { passwordHash, passwordMatches } from "./password-codec";
 import jwt from "jsonwebtoken";
@@ -100,14 +100,14 @@ export class AuthSessionsService {
     return { raw, expiresAt };
   }
 
-  async registerEmail(input: { email: string; displayName: string; password: string; registrationToken?: string }, metadata: RequestMetadata) {
+  async registerEmail(input: AuthEmailRegistration, metadata: RequestMetadata) {
     requireAuthMail(environment());
     const existing = await this.prisma.user.findUnique({ where: { email: input.email } });
     if (existing) throw new ConflictException("Аккаунт с таким email уже существует. Войдите или восстановите пароль.");
     const user = await this.prisma.user.create({ data: { email: input.email, displayName: input.displayName, passwordHash: passwordHash(input.password) } });
     try {
       const token = await this.issueEmailToken(user.id, "EMAIL_VERIFICATION", input.registrationToken ? { registrationToken: input.registrationToken } : undefined);
-      const link = `${environment().AUTH_EMAIL_BASE_URL}/verify-email?token=${encodeURIComponent(token.raw)}`;
+      const link = withProductReturn(`${environment().AUTH_EMAIL_BASE_URL}/verify-email?token=${encodeURIComponent(token.raw)}`, input.returnTo);
       const delivery = await this.email(user.email, "Подтвердите email в DentMarket", `Здравствуйте, ${user.displayName}!\n\nПодтвердите email по ссылке:\n${link}\n\nСсылка действует до ${token.expiresAt.toISOString()}.`);
       await this.prisma.securityEvent.create({ data: { type: "auth.email.registered", severity: "INFO", actorId: user.id, ipAddress: metadata.ipAddress, userAgent: metadata.userAgent } });
       return { ok: true as const, verificationRequired: true as const, email: user.email, delivery };

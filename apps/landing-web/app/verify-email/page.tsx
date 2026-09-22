@@ -3,6 +3,8 @@
 import { DmButton, LoadingState } from "@marketplace/ui";
 import { useEffect, useRef, useState } from "react";
 import { AuthBrand, AuthNotice } from "../auth-components";
+import { withProductReturn } from "@marketplace/schemas/product-navigation";
+import { useProductReturn } from "../use-product-return";
 import {
   type AuthFeedback,
   type AuthSession,
@@ -12,6 +14,7 @@ import {
 } from "../auth-client";
 
 export default function VerifyEmailPage() {
+  const returnTo = useProductReturn();
   const [checking, setChecking] = useState(true);
   const [feedback, setFeedback] = useState<AuthFeedback | null>(null);
   const started = useRef(false);
@@ -21,7 +24,7 @@ export default function VerifyEmailPage() {
     setChecking(true);
     setFeedback(null);
     try {
-      await openWorkspace(session);
+      await openWorkspace(session, undefined, undefined, returnTo);
     } catch (cause) {
       setFeedback(
         feedbackFromError(
@@ -89,7 +92,7 @@ export default function VerifyEmailPage() {
           </p>
         ) : null}
         {!checking ? (
-          <a className="authBackLink" href="/login">
+          <a className="authBackLink" href={withProductReturn("/login", returnTo)}>
             Перейти ко входу
           </a>
         ) : null}

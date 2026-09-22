@@ -1,5 +1,7 @@
 "use client";
 import { authRegistrationAcceptedSchema } from "@marketplace/schemas";
+import { withProductReturn } from "@marketplace/schemas/product-navigation";
+import { useProductReturn } from "../use-product-return";
 
 import {
   DmButton,
@@ -50,6 +52,7 @@ const initialForm: RegistrationForm = {
 };
 
 export default function RegisterPage() {
+  const returnTo = useProductReturn();
   const [capability, setCapability] = useState<AuthCapability>("BUYER");
   const [form, setForm] = useState(initialForm);
   const [registeredEmail, setRegisteredEmail] = useState<string | null>(null);
@@ -137,6 +140,7 @@ export default function RegisterPage() {
         displayName: form.ownerDisplayName,
         password: form.password,
         registrationToken: result.registrationToken,
+        returnTo,
       }));
       setDelivery(accepted.delivery);
       setRegisteredEmail(result.registration.email);
@@ -172,7 +176,7 @@ export default function RegisterPage() {
             <span>Ссылка ограничена по времени и используется один раз.</span>
           </div>
           <div className="registrationActions">
-            <a className="primary registrationPrimary" href="/login">
+            <a className="primary registrationPrimary" href={withProductReturn("/login", returnTo)}>
               Перейти ко входу
             </a>
             <DmButton

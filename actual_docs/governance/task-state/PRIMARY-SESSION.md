@@ -57,6 +57,95 @@
   сохранены; search hook не изменён. Diff6 scoped files, no secrets/DB changes,
   четыре чужих generated next-env исключены. Все обязательные local gates PASS;
   публикация и actual CI pending, вторую продуктовую фазу пока не начинать.
+- Published ca438b434bbf11dc68916f661862c02caf0952ca на main; fetch/fast-forward/
+  push и remote SHA PASS. CI35724167177 / Security35724167127 pending.
+- Stand restore1 PID26212: supplier / отвечает404 при существующем app/page,
+  stale generated .next/dev/server/app/page.js от14:57 при старте16:55;
+  остальные surfaces ready. Гипотеза — восстановленный generated dev cache.
+  Составная команда stop/delete-cache/restart отклонена automatic review
+  (только «blocked by policy», подробностей нет), ничего не выполнено.
+  Безопасный следующий вариант: после завершения собственного launcher сохранить
+  cache через переименование в той же .next, затем повторить restore без удаления.
+- Restore1 TIMEOUT5min; launcher самостоятельно остановил дерево, ports0.
+  Не удаляя файлы, exact verified .next/dev перенесён в .next/dev-escape-restore1;
+  safer command разрешена. Restore2 PID27372 запущен из canonical root;
+  log первой попытки сохранён в ignored escape-restore1.log. CI не перезапускался.
+- Restore2 PASS151284ms: owned PID27372, go_live/JWT/all, gateway/API/4web ready,
+  supplier HEAD/GET200. Hypothesis confirmed by same source/config + fresh cache.
+  Этот восстановленный пользовательский stand оставить работающим. Ничего не
+  удалялось, quarantine generated cache остаётся ignored. Security35724167127
+  и PostgreSQL106733719790 PASS; CI verify106733720057 пока IN_PROGRESS.
+- CI35724167177 SUCCESS (verify35 successful steps + PostgreSQL12),
+  Security35724167127 SUCCESS на exact ca438b4. Первая фаза закрыта, исходный
+  browser blocker устранён; source/remote/standing writer проверены перед фазой2.
+- Фаза2 ACTIVE: product login return через обычный вход и существующую
+  обязательную форму регистрации (имя, юридическое/отображаемое название,
+  БИН, email, согласия) и email verification. Сохраняется обратный путь в каталог.
+  Отдельная переработка состава анкеты/всех пяти navigation требований §22.1
+  не входит в этот узкий шаг. Общие требования остаются partially implemented.
+- Контракт: optional validated returnTo в email registration; only internal
+  product path, no arbitrary redirect/hash/auth data. Email link сохраняет intent
+  в новой вкладке; handoff сохраняет server membership/capability checks.
+  После авторизации никакого cart/order write; supplier не получает BUYER rights.
+  Миграции/рабочие данные не нужны. Ошибка входа/регистрации сохраняет intent.
+- Gates2: shared schema/helper/API/client regressions; root typecheck/test/build,
+  verify:core-contract (existing alias prerequisites reuse), verify:web включая
+  actual registration/login product return1280/390 на disposable audit DB,
+  no automatic cart writes/readback, scoped review/commit/push/actual CI.
+  Попытки каждого нового gate0/3, probe2min, command20min, suite45min;
+  не повторять phase1 gates без изменённых входов. Stand27372 stop/restart
+  разрешён ранее, точные PID/source/listeners сверить до остановки.
+- WIP2: pure product-navigation allowlist в schemas + optional registration
+  returnTo; ApiClient принимает shared input автоматически, serialization test
+  обновлён. Backend mail включает validated hint; landing сохраняет его через
+  login/register/email verification/handoff. Product header и guest cart CTA
+  используют один loginHref. Пока session не проверена, cart CTA disabled.
+- Добавлены schema negative redirect tests, API mail и landing capability tests;
+  regular E2E на двух ширинах: required registration validation, local email в
+  новой вкладке, real JWT handoff, wrong-password retry, reload, catalog back,
+  zero cart writes/DB cart count. Fixtures проверяют exact disposable DB и
+  LOCAL_FILE; cleanup только собственных mail и sessions.
+- Build2-phase attempt1 IN_PROGRESS. Стенд27372/дерево/listeners подтверждены и
+  остановлены; четыре generated dev cache сохранены в ignored outputs, без
+  удаления, types для исходных next-env сохранены. Ранее исправленный wrapper
+  завершает read-only Prisma preflight до сборки (исключён DLL lock).
+- Phase2 build1 PASS10/10,3m33.972s; API/schemas и четыре pilot web artifacts,
+  bundle budgets PASS. Next useSearchParams совместим с существующим dynamic
+  layout; новый серверный URL-параметр не требует хранения токенов в клиенте.
+  Исходные четыре next-env восстановлены; typecheck1/tests1 запущены на итоговом
+  source/test diff. ADR014 описывает контракт/границы, Product status обновится
+  только после evidence. Source после build не менялся, только docs.
+- Phase2 typecheck1 PASS12/12,55.299s; tests1 PASS11/11,56.152s (maxWorkers2).
+  Core-contract1 PASS:21 core operations,54 success schemas,78 components,
+  response/error validation + public catalog/comparison. Команда underlying
+  node scripts/verify-pilot-backend.mjs --contract-only после уже PASS schemas/API
+  build1 эквивалентна alias prerequisites, повторные сборки не выполнялись.
+  Own API4112 закрыт. Web1 IN_PROGRESS: все нужные порты свободны перед запуском,
+  pilot artifacts + isolated audit DB; две новые real product-return проверки
+  включены в regular suite, без отдельного opt-in и ослабления guards.
+- Phase2 web1:38PASS,1FAIL,38SKIP,1.8min. Desktop real registration/new-tab mail/
+  password/reload/no-cart PASS8.9s; mobile assertion ожидал /catalog, получил
+  корректный /products/... hint. Причина в новом тесте: page.url() сохранён до
+  завершения Next Link navigation из каталога. В приложении адрес сохранён верно.
+  Исправлен test readiness: waitForURL(/products/) + видимый product CTA перед
+  snapshot, waitForURL(/login) перед query assertion, без sleeps/retries/смены
+  assertions. Source/build/API/unit evidence неизменны. Web2 — только новый
+  файл на обоих viewport, остальные37PASS regular tests переиспользуются;
+  дополнительно typecheck2 для изменённого test, без повторной сборки/юнитов.
+- Phase2 typecheck2 PASS12/12,12.804s; web2 PASS2/2,35.5s: real registration,
+  email verification в новой вкладке, password retry, reload и no-cart на1280/390.
+  Остальные37 regular browser tests REUSED_PASS из web1;38 opt-in SKIP.
+  Итоговый source не менялся после build1/tests1/core-contract1. Исправлялся
+  только navigation readiness нового теста; первоначальный FAIL сохранён выше.
+- Review PASS: внутренний UUID product allowlist и catalog back validation,
+  server workspace/capability остаются источником полномочий; email hint не
+  содержит auth token и не разрешает внешний redirect. Cart CTA ждёт проверки
+  сессии, сам вход не инициирует покупку. Тестовые записи только в проверенной
+  disposable DB; cleanup собственных sessions/mail. Миграций/зависимостей нет.
+  Product§22.1 уточнён без приёмки всех пяти правил. Практики Backend Architect,
+  Frontend Developer, Code Reviewer и Git Workflow Master применены к контракту,
+  переходам, границам полномочий и составу публикации; инструкции прочитаны.
+  Commit/push/actual CI и восстановление stand пока pending.
 
 ## LOCAL-AUTH-CATALOG — согласованные 15 исправлений, 22.09.2026
 

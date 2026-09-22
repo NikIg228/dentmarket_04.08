@@ -19,6 +19,7 @@ type PublicHeaderProps = {
   onQueryChange?: (value: string) => void;
   onSearch?: (value?: string) => void;
   recentSearches?: string[];
+  loginHref?: string;
 };
 
 const searchSuggestions = [
@@ -38,7 +39,7 @@ const searchSuggestions = [
   "абатменты",
 ];
 
-export function PublicHeader({ active, baseHref = "/", query = "", searching = false, onQueryChange, onSearch, recentSearches = [] }: PublicHeaderProps) {
+export function PublicHeader({ active, baseHref = "/", query = "", searching = false, onQueryChange, onSearch, recentSearches = [], loginHref = loginUrl }: PublicHeaderProps) {
   const searchRef = useRef<HTMLFormElement>(null);
   const suggestionsId = useId();
   const [searchOpen, setSearchOpen] = useState(false);
@@ -150,7 +151,7 @@ export function PublicHeader({ active, baseHref = "/", query = "", searching = f
         </form>
       ) : null}
       <CityLocation />
-      <a className={styles.login} href={loginUrl}>
+      <a className={styles.login} href={loginHref}>
         Войти
       </a>
     </header>

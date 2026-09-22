@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { productReturnPath } from "./product-navigation.js";
 
 const moneyMinor = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
 const currency = z.string().trim().regex(/^[A-Z]{3}$/).default("KZT");
@@ -59,6 +60,7 @@ export const emailRegisterSchema = z.object({
   displayName: z.string().trim().min(2).max(160),
   password: z.string().min(12).max(128),
   registrationToken: z.string().min(32).max(512).optional(),
+  returnTo: z.string().max(4096).refine(value => productReturnPath(value) !== undefined, "Недопустимый адрес возврата к товару").optional(),
 });
 export const emailLoginSchema = z.object({ email: z.email().transform((value) => value.toLowerCase()), password: z.string().min(1).max(128) });
 export const emailTokenSchema = z.object({ token: z.string().min(32).max(512) });

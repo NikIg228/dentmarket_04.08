@@ -1324,3 +1324,4 @@ export * from "./local-auth.js";
 export * from "./workspace-context.js";
 export * from "./workspace-session.js";
 export * from "./supplier-terms.js";
+export * from "./product-navigation.js";

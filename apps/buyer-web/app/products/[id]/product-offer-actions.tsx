@@ -3,8 +3,6 @@
 import { Cart24Regular } from "@fluentui/react-icons/svg/cart";
 import {
   MarketplaceApiClient,
-  parseSessionHandoff,
-  type ApiContext,
 } from "@marketplace/api-client";
 import {
   DmButton,
@@ -14,7 +12,6 @@ import {
 } from "@marketplace/ui";
 import { useMemo, useRef, useState } from "react";
 import type { Cart } from "../../features/purchasing/types";
-import { loginUrl } from "../../public-links";
 import styles from "./page.module.css";
 import { formatCatalogMoney } from "../../catalog/catalog-view-model";
 import { useVerifiedSession, sessionApiContext } from "../../workspace-session";
@@ -39,7 +36,7 @@ function deliveryLabel(methods: string[] = []) {
   return "Условия уточняются";
 }
 
-export default function ProductOfferActions({ offers }: { offers: Offer[] }) {
+export default function ProductOfferActions({ offers, loginHref }: { offers: Offer[]; loginHref: string }) {
   const { session, ready } = useVerifiedSession();
   const [compareOpen, setCompareOpen] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
@@ -55,8 +52,9 @@ export default function ProductOfferActions({ offers }: { offers: Offer[] }) {
   );
 
   const addToCart = async (offer: Offer) => {
-    if (!ready || !session) {
-      window.location.assign(loginUrl);
+    if (!ready) return;
+    if (!session) {
+      window.location.assign(loginHref);
       return;
     }
     const api = new MarketplaceApiClient(apiUrl, sessionApiContext);
@@ -146,9 +144,9 @@ export default function ProductOfferActions({ offers }: { offers: Offer[] }) {
                       appearance="primary"
                       size="small"
                       onClick={() => void addToCart(offer)}
-                      disabled={busy !== null || !availableOffers.includes(offer)}
+                      disabled={!ready || busy !== null || !availableOffers.includes(offer)}
                     >
-                      {busy === offer.id ? "Добавляем…" : "В корзину"}
+                      {!ready ? "Проверяем вход…" : busy === offer.id ? "Добавляем…" : "В корзину"}
                     </DmButton>
                   </div>
                 </article>

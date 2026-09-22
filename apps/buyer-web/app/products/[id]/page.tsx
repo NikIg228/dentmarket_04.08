@@ -10,6 +10,7 @@ import styles from "./page.module.css";
 import ProductOfferActions from "./product-offer-actions";
 import { formatCatalogMoney } from "../../catalog/catalog-view-model";
 import { safeCatalogReturn } from "../../catalog/marketplace-url";
+import { productLoginUrl } from "../../public-links";
 
 type CatalogProduct = (typeof catalog.products)[number];
 type PublicComparison = Awaited<
@@ -160,6 +161,7 @@ export default async function ProductPage({
   const product = await getProduct(decodeURIComponent(id));
   if (!product) notFound();
   const returnTo = safeCatalogReturn((await searchParams).returnTo);
+  const loginHref = productLoginUrl(`/products/${encodeURIComponent(product.id)}?${new URLSearchParams({ returnTo })}`);
 
   const media = product.sourceUrl
     ? mediaCatalog.entries[
@@ -170,7 +172,7 @@ export default async function ProductPage({
 
   return (
     <div className={styles.page}>
-      <PublicHeader active="catalog" baseHref="/catalog" />
+      <PublicHeader active="catalog" baseHref="/catalog" loginHref={loginHref} />
       <main className={styles.shell}>
         <Link className={styles.back} href={returnTo}>
           ← Вернуться в каталог
@@ -226,7 +228,7 @@ export default async function ProductPage({
               </span>
             </div>
             <div className={styles.heroActions}>
-              <ProductOfferActions offers={product.offers} />
+            <ProductOfferActions offers={product.offers} loginHref={loginHref} />
               <span className={styles.trustNote}>
                 Заказ доступен после входа в кабинет клиники
               </span>

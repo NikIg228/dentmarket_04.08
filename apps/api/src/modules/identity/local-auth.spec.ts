@@ -44,6 +44,20 @@ it("missing mail config fails before registration or reset account lookup", asyn
   await expect(service.forgotPassword(user.email)).rejects.toThrow("Unconfigured");
   expect(db.user.findUnique).not.toHaveBeenCalled();
 });
+it("includes a validated product return in the verification email for a new tab", async () => {
+  config.AUTH_EMAIL_VERIFICATION_TTL_HOURS = 1;
+  db.user.findUnique.mockResolvedValue(null);
+  db.user.create = vi.fn(async () => user);
+  db.securityEvent = { create: vi.fn() };
+  const returnTo = "/products/00000000-0000-4000-8000-000000000001?returnTo=%2Fcatalog%3Fcount%3D48";
+  await service.registerEmail({ email: user.email, displayName: "Audit", password, returnTo }, {});
+  const message = vi.mocked(deliverAuthMail).mock.calls[0][1];
+  const link = new URL(message.text.match(/http:\/\/127\.0\.0\.1:3103\/[^\s]+/)![0]);
+  expect(link.pathname).toBe("/verify-email");
+  expect(link.searchParams.get("returnTo")).toBe(returnTo);
+  expect(link.searchParams.get("token")).toBeTruthy();
+  expect(db.authSession.create).not.toHaveBeenCalled();
+});
 it("reset ack is identical for known, unknown and delivery-failed account; failed token invalidated", async () => {
   const accepted = await service.forgotPassword(user.email);
   user = null; expect(await service.forgotPassword("unknown@example.invalid")).toEqual(accepted);

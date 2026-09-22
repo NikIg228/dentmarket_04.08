@@ -76,6 +76,21 @@ describe("workspace context before handoff", () => {
     await openWorkspace(session, "SUPPLIER");
     expect(fetcher.mock.calls[1][1]?.body).toBe('{"capability":"SUPPLIER"}');
   });
+  it.each(["BUYER", "SUPPLIER"] as const)("keeps product intent only within the verified buyer workspace: %s", async capability => {
+    const { assign, fetcher } = setup({ organizationId, organizationDisplayName: "Test", capabilities: [capability] });
+    const returnTo = "/products/00000000-0000-4000-8000-000000000001?returnTo=%2Fcatalog%3Fcount%3D48";
+    await openWorkspace(session, capability, undefined, returnTo);
+    const url = new URL(assign.mock.calls[0][0]);
+    expect(url.pathname + url.search).toBe(capability === "BUYER" ? returnTo : "/");
+    expect(url.hash).toMatch(/^#session=/);
+    expect(fetcher).toHaveBeenCalledTimes(2); // Context and handoff only; no cart or purchase.
+  });
+  it("ignores an external return hint without issuing a different capability", async () => {
+    const { assign } = setup({ organizationId, organizationDisplayName: "Test", capabilities: ["BUYER"] });
+    await openWorkspace(session, "BUYER", undefined, "https://outside.invalid");
+    expect(new URL(assign.mock.calls[0][0]).pathname).toBe("/");
+    expect(assign.mock.calls[0][0]).not.toContain("outside.invalid");
+  });
   it.each([
     { organizationId: "00000000-0000-4000-8000-000000000002", organizationDisplayName: "Foreign", capabilities: ["BUYER"] },
     { organizationId, organizationDisplayName: "Operator", capabilities: [] },
