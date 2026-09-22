@@ -77,6 +77,27 @@ async function createActiveAgreement(supplierOrganizationId: string) {
   agreementId = agreement.id;
 }
 
+async function createPublicationEvidence() {
+  // The preceding compliance smoke installs a rule requiring a verified licence
+  // and a registered, unexpired lot. This fixture must satisfy the real gate.
+  const now = new Date();
+  const balance = await prisma.inventoryBalance.findFirstOrThrow({ where: { offerId } });
+  await prisma.organizationCredential.create({ data: {
+    organizationId: supplier.organizationId, type: "WHOLESALE_LICENSE",
+    number: `FLOW-B3-3-${offerId}`, issuer: "Synthetic test regulator", status: "VERIFIED",
+    validFrom: new Date(now.getTime() - 86_400_000), validTo: new Date(now.getTime() + 365 * 86_400_000),
+    verifiedById: operator.userId, verifiedAt: now, metadata: { testOnly: true, flow: "B3.3" },
+  } });
+  await prisma.inventoryLot.create({ data: {
+    inventoryBalanceId: balance.id, supplierOrganizationId: supplier.organizationId,
+    warehouseId: balance.warehouseId, productVariantId: variantId, offerId,
+    lotNumber: `FLOW-B3-3-${offerId}`, status: "ACTIVE", originSource: "Synthetic rollback fixture",
+    registrationCertificate: `TEST-REG-${offerId}`, serialNumber: `TEST-SERIAL-${offerId}`,
+    expirationDate: new Date(now.getTime() + 365 * 86_400_000),
+    quantityOnHand: balance.quantityOnHand, quantityAvailable: balance.quantityAvailable,
+  } });
+}
+
 async function removeStoredAssets() {
   const assets = await prisma.uploadAsset.findMany({ where: { organizationId: supplier?.organizationId, purpose: "supplier-import" }, select: { id: true, storageKey: true } });
   await prisma.uploadAsset.deleteMany({ where: { id: { in: assets.map(({ id }) => id) } } });
@@ -146,7 +167,9 @@ test("supplier safely rolls back a published import batch without losing raw evi
   productId = approved.result!.product.id;
   variantId = approved.result!.variant.id;
   offerId = approved.result!.offer.id;
-  expect((await request.put(`${API_URL}/suppliers/${supplier.organizationId}/offers/${offerId}/publication`, { headers: identity(operator), data: { status: "PUBLISHED", marketplaceVisible: true, expectedVersion: approved.result!.offer.version, decisionReason: "Publish before rollback acceptance test" } })).status()).toBe(200);
+  await createPublicationEvidence();
+  const publication = await request.put(`${API_URL}/suppliers/${supplier.organizationId}/offers/${offerId}/publication`, { headers: identity(operator), data: { status: "PUBLISHED", marketplaceVisible: true, expectedVersion: approved.result!.offer.version, decisionReason: "Publish before rollback acceptance test" } });
+  expect(publication.status(), publication.ok() ? undefined : await publication.text()).toBe(200);
   expect((await json<{ items: Array<{ id: string }> }>(await request.get(`${API_URL}/catalog/search?q=${encodeURIComponent(uniqueName)}`))).items).toEqual(expect.arrayContaining([expect.objectContaining({ id: productId })]));
 
   const batchBefore = await prisma.importBatch.findUniqueOrThrow({ where: { id: batchId }, include: { rows: true } });

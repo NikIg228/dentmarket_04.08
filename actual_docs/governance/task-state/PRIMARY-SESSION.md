@@ -2,9 +2,58 @@
 
 Дата: 2026-09-21. Это карточка исполнения, не продуктовый backlog.
 
+## Flow B3.3 publication409 — продолжение владельца 22.09.2026
+
+- ACTIVE: явное «приступай» к получению причины409 и устранению подтверждённого
+  дефекта. Предыдущие6 автоматических попыток (два push runs × initial+2 retries)
+  сохранены; разрешено ограниченное продолжение с новой диагностикой.
+- Canonical root/main@402c173ec449c417bfaa7f5c6852b95431174c79, тот же primary.
+  Входной dirty: собственный итоговый checkpoint и4 generated next-env.d.ts
+  с dev root-params imports от уже работающих пользовательских Next dev servers.
+  Эти файлы/процессы сохранить; API watch также работает, shared dist не собирать.
+- Scope: точная причина offer/publication409 в flow-b3 rollback, минимальный fix,
+  regression, scoped review/commit/push + actual CI. Без новых продуктовых фаз,
+  рабочей БД, ослабления contract/compliance/version/tenant guards.
+- План: read-only сверка fixture/rules, один диагностический runtime на existing
+  audit DB, затем один focused recheck исправления без automatic retries.
+  При подтверждении новой причины перед повтором записать основание; не более
+  3 новых обоснованных запусков по этому разрешению. Диагностика15мин,
+  отдельная команда20мин, новый CI45мин. Общие suites только по изменению,
+  неизменные API/schema/build evidence переиспользовать по Workflow§4.2.
+- Роли прочитаны: Backend Architect, Code Reviewer, Git Workflow Master.
+  Гипотеза: extended compliance smoke сохраняет active rule, требующую лицензию/
+  партию; Flow B3.3 создаёт поставщика без них. Нужно тело409 и версии/check evidence.
+- Диагностика1: в audit DB только reference rules; публикация прошла200, далее
+  тест получил404 public buyer (локальный fixture отличается от CI). Следующий
+  запуск обоснован точной CI-предпосылкой: собственная временная compliance rule
+  с требованиями из verify-document-compliance и существующий audit public buyer.
+- Диагностика2: воспроизведено409, безопасное тело: CONFLICT / "Offer requires
+  compliance review before publication". Причина — неполный test fixture, не
+  отказ договорного допуска и не optimistic version. Временная rule удалена.
+- Минимальный fix только flow-b3-rollback.spec.ts: перед публикацией собственные
+  VERIFIED WHOLESALE_LICENSE и ACTIVE lot с registration certificate, origin,
+  serial, относительным будущим expiry. Все publication/rollback assertions и
+  product guards сохранены; на отказе выводится safe API error envelope.
+- Focused runtime3 PASS1/1 (2.1с): реальные HTTP/Prisma на audit DB со строгой
+  временной rule, публикация200, stale/reservation409, foreign403, rollback,
+  raw evidence, idempotency и cleanup. Rule/fixture удалены, owned API4614 закрыт.
+  Evidence outputs/flow-b3-409-20260922/{diagnostic-1.log,diagnostic-2.log,fixed-3.log}.
+- Оставшиеся gates: TS минимум (root typecheck/test, cache допустим), diff/review,
+  commit/push по standing разрешению, один automatic CI нового fix. API/source,
+  schemas, migrations, dependencies неизменны: их прежние PASS переиспользуются.
+  Локальные web build не запускать поверх работающего Next dev.
+- Итог локально: npm run typecheck PASS15/15 tasks (1m41.683s);
+  npm test -- -- --maxWorkers=2 PASS14/14, API330/330 (1m53.23s);
+  git diff --check PASS. Review: synthetic fixture удовлетворяет настоящему
+  compliance gate, прежние business assertions/authorization/rollback сохранены,
+  cleanup собственных records подтверждён проходом сценария. Runtime API/схемы
+  не менялись; broad PostgreSQL/build проверка не повторяется по Workflow§4.2.
+  Staging только flow-b3-rollback.spec.ts + этот checkpoint,4 next-env сохраняются.
+
 ## CORE-01 supplier common terms — решение владельца 22.09.2026
 
-- ACTIVE, writer primary 01a0c415-1c3c-73e3-a270-5ad591fa9ca7, generation2/idle.
+- BLOCKED по общей CI-приёмке; реализация и scoped local gates опубликованы.
+  Writer primary 01a0c415-1c3c-73e3-a270-5ad591fa9ca7, generation2/idle.
   Canonical root, main@f051a66599834032a0f95a7495b6945ec6f1f811; входной dirty
   только этот checkpoint (сохранён итог attempt5). Новых агентов/worktrees нет.
 - Последний запрос заменяет текущую продуктовую границу: общий договор продавца,
@@ -40,7 +89,7 @@
 - Checks: prisma generate PASS (после изменения composite unique — новый вход);
   prisma validate attempt1 FAIL missing DATABASE_URL; attempt2 static dummy URL
   PASS, без подключения. typecheck attempt1 FAIL только public legal page:
-  ApiClient constructor требовал context; исправлено {}. Следующий run — attempt2.
+  ApiClient constructor требовал context; исправлено {}, итог attempts2/3 ниже.
   npm test attempt1: API327/328 PASS, новые terms10/10 PASS; единственный FAIL —
   прежний PDF renderer timeout5000ms под параллельной нагрузкой. Не менять test/
   assertions/timeout; один повтор с maxWorkers2 обоснован contention. Другие
@@ -49,7 +98,7 @@
   способа получения local config из scripts/dev-local.mjs attempt2 PASS:
   existing dentmarket_audit_20260914/public, pg_trgm=true, новая terms table ещё
   отсутствует. Credentials не выводились. Рабочая БД не читалась/не менялась.
-  Upgrade/migration и runtime/browser ещё NOT_RUN; owned серверов нет.
+  На том этапе upgrade/runtime/browser ещё NOT_RUN; конечные результаты ниже.
 - Дополнительное поручение владельца передано боковой задачей
   01a0c7c5-c484-7db2-bd73-4e4480980508: docs-only внутренние диалоги. Внесены
   Product §22.12 + §22.1/22.2, Foundation CORE-06.5 [ ], UI §2.2. Статус только
@@ -77,9 +126,43 @@
 - Дополнительный normal DRAFT onboarding smoke PASS: новая регистрация не даёт
   акцепт/допуск, старый generation API410, draft acceptance409, operator-only403.
   Воспроизводит новый процесс без legacy callback, не ослабляет guards ЭЦП.
-- Evidence: outputs/supplier-terms-20260922/. HEAD прежний; commit/push NOT_RUN.
-  Следующий шаг: итог gates/review и отдельные scoped commits/обычный push,
-  затем фактический CI нового change set. Старый attempt5 не перезапускается.
+- Review scopes/tenant/contracts/immutable evidence, staged diff/secrets PASS.
+  Feature commit8bd8f9551e431353d9894a4f2203906544eb248c опубликован main;
+  docs-only conversations402c173ec449c417bfaa7f5c6852b95431174c79 отдельно
+  опубликован main. Оба обычных push и remote SHA подтверждены, перед каждым
+  fetch/fast-forward. Requirements readback отправлен поручившей боковой задаче.
+- Actual CI нового HEAD402c173: CI35699184543 и Security35699184589,
+  start07:21:22 UTC22.09; deadline08:06:22 UTC. Это новые automatic push runs
+  нового change set, старый attempt5 не перезапускается. GitHub connector
+  fetch_commit_workflow_runs фильтрует только pull_request и вернул пусто;
+  публичный read-only Actions API подтвердил оба in_progress. Pending не PASS.
+- Итог actual CI22.09: Security35699184589 PASS (dependencies + CodeQL),
+  postgres-integration106652878830 PASS (postgres, authority, backup/restore).
+  Verify106652878951: typecheck/test/build/schema/migrations/runtime/core/config/
+  security/outbox gates PASS. Extended API PASS: search-commerce, document
+  compliance (3/3 SENT), security, новый onboarding DRAFT fail-closed, trust-geo.
+- **Общий CI35699184543 FAIL** в Pilot browser verification: Flow B3.3 rollback
+  apps/e2e/tests/flow-b3-rollback.spec.ts:149, PUT offer/publication ожидал200,
+  получил409. Два других flow-b3 теста PASS; последующий общий verify:web NOT_RUN.
+  Playwright выполнил initial + retry1 + retry2 с одинаковым результатом.
+  Первый automatic push run35699146108 тоже завершён тем же FAIL (три попытки);
+  его Security35699146101 и PostgreSQL job PASS. Manual rerun не выполнялся.
+  Лимит AGENTS§7.1 исчерпан для этого блокера; новый прогон не разрешён автоматически.
+- Read-only triage: fixture создаёт ACTIVE legacy agreement с будущим endsAt;
+  новый agreement gate при отказе выдаёт403, не409. В publication остаются
+  конфликты expectedVersion и compliance review. Тело409 текущий assertion
+  не выводит, поэтому первопричина НЕ доказана и дефект бизнес-логики не заявлен.
+  Product guards и flow-b3 assertions не ослаблялись; сторонний scope не исправлялся.
+- Cleanup: extended API/worker marker07:34:22, Stop containers обоих CI jobs PASS,
+  все четыре automatic workflows terminal; локальные owned серверы остановлены.
+  Рабочая БД/production не изменялись, новая migration применена только к audit/CI.
+- Evidence: outputs/supplier-terms-20260922/{final-result.json,
+  ci-failure-excerpt.log,review.json,web-1.log,web-2.log,typecheck-3.log,tests-3.log}.
+  Remote main402c173 совпал, dirty только этот итоговый checkpoint; отдельный
+  evidence-only push не выполнялся при failed gate. Полный DoD не объявлен закрытым.
+  Следующий точный шаг после решения владельца: получить безопасное тело409
+  и версии offer/compliance в Flow B3.3 publication, затем ограниченный fix/recheck
+  по подтверждённой причине. Карта экранов и реализация сообщений не запускаются.
 
 ## CI API + worker — один разрешённый цикл №5, 21.09.2026
 
