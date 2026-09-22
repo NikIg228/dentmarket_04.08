@@ -166,8 +166,8 @@ jobs:
           path: |
             /tmp/marketplace-api.log
             /tmp/marketplace-worker.log
-            test-results/
-            playwright-report/
+            apps/e2e/test-results/
+            apps/e2e/playwright-report/
           if-no-files-found: ignore
           retention-days: 14
 

@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { listenForPopupDismiss } from "./use-popup-dismiss";
 
-function setup() {
+function setup(isOpen?: () => boolean) {
   const document = new EventTarget();
   const root = { ownerDocument: document } as unknown as HTMLElement;
   const dismiss = vi.fn();
-  const cleanup = listenForPopupDismiss(root, dismiss);
+  const cleanup = listenForPopupDismiss(root, dismiss, isOpen);
   const fire = (type: string, inside = false, key?: string, prevented = false) => {
     const event = new Event(type, { cancelable: true });
     Object.defineProperty(event, "composedPath", { value: () => inside ? [root, document] : [document] });
@@ -18,6 +18,26 @@ function setup() {
 }
 
 describe("floating panel dismissal", () => {
+  it("reads native open state at event time, including rapid reopen before toggle", () => {
+    let open = false;
+    const { fire, dismiss, cleanup } = setup(() => open);
+    fire("pointerdown");
+    fire("focusin");
+    expect(fire("keydown", true, "Escape").defaultPrevented).toBe(false);
+    expect(dismiss).not.toHaveBeenCalled();
+    open = true;
+    expect(fire("keydown", true, "Escape").defaultPrevented).toBe(true);
+    expect(dismiss).toHaveBeenCalledExactlyOnceWith("escape");
+    open = false;
+    fire("focusin");
+    open = true;
+    fire("pointerdown");
+    expect(dismiss).toHaveBeenLastCalledWith("outside");
+    cleanup();
+    fire("keydown", true, "Escape");
+    expect(dismiss).toHaveBeenCalledTimes(2);
+  });
+
   it.each(["pointerdown", "focusin"])("closes on outside %s without stealing focus", (type) => {
     const { fire, dismiss, cleanup } = setup();
     expect(fire(type).defaultPrevented).toBe(false);

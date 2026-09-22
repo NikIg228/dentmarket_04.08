@@ -145,6 +145,29 @@ for (const width of [1280, 390]) {
       await expect(list).toHaveCount(0);
     });
 
+    test("city handles Escape immediately after native opening, before toggle", async ({ page }) => {
+      await page.goto(buyerUrl);
+      const trigger = page.getByLabel("Выберите город", { exact: true });
+      // First interaction establishes hydration. The regression is reopening
+      // native details before its queued toggle can update React state.
+      await trigger.click();
+      await page.getByRole("button", { name: "Не сейчас" }).click();
+      await expect(page.getByRole("dialog", { name: "Выбор города" })).toBeHidden();
+      const result = await trigger.evaluate((summary) => {
+        if (!(summary instanceof HTMLElement)) throw new Error("Expected an HTML summary trigger");
+        const details = summary.parentElement as HTMLDetailsElement;
+        let toggleDelivered = false;
+        details.addEventListener("toggle", () => { toggleDelivered = true; }, { once: true });
+        summary.focus();
+        summary.click();
+        const opened = details.open;
+        summary.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+        return { opened, toggleDelivered, closed: !details.open };
+      });
+      expect(result).toEqual({ opened: true, toggleDelivered: false, closed: true });
+      await expect(trigger).toBeFocused();
+    });
+
     test("supplier Fluent menu keeps outside and Escape dismissal", async ({ page }) => {
       const workspace = await installPilotWorkspace(page, "SUPPLIER"); disposeWorkspace = workspace.dispose;
       await page.goto(supplierUrl);

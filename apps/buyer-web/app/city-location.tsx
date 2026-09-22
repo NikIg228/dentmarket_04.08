@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { usePopupDismiss } from "./use-popup-dismiss";
+import { useDetailsPopupDismiss } from "./use-popup-dismiss";
 import styles from "./city-location.module.css";
 
 const STORAGE_KEY = "dentmarket:city";
@@ -69,15 +69,13 @@ export function CityLocation() {
   const [candidate, setCandidate] = useState<string | null>(null);
   const [detecting, setDetecting] = useState(false);
   const detailsRef = useRef<HTMLDetailsElement>(null);
-  const [open, setOpen] = useState(false);
   const close = useCallback((reason: "outside" | "escape" | "selection") => {
     if (detailsRef.current) {
       detailsRef.current.open = false;
-      setOpen(false);
       if (reason !== "outside") detailsRef.current.querySelector("summary")?.focus();
     }
   }, []);
-  usePopupDismiss(detailsRef, open, close);
+  useDetailsPopupDismiss(detailsRef, close);
 
   useEffect(() => {
     const saved = window.localStorage.getItem(STORAGE_KEY);
@@ -140,7 +138,7 @@ export function CityLocation() {
     );
   };
   return (
-    <details ref={detailsRef} className={styles.wrap} onToggle={(event) => setOpen(event.currentTarget.open)}>
+    <details ref={detailsRef} className={styles.wrap}>
       <summary className={styles.current} aria-label="Выберите город">
         <span className={styles.pin}>⌖</span>
         <span>

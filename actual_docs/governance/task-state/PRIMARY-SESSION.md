@@ -2,9 +2,66 @@
 
 Дата: 2026-09-21. Это карточка исполнения, не продуктовый backlog.
 
+## PRODUCT-LOGIN-RETURN — продолжение по решению владельца, 22.09.2026
+
+- ACTIVE: явное «приступай» после предложения пути карточка → вход → обязательная
+  анкета клиники при необходимости → та же карточка. Сначала закрыть city Escape
+  в CI; прежние desktop3/3 и mobile flaky3 сохранены, новый план — доказать гонку
+  native details.toggle / React effect и исправить её без задержек в тесте.
+  Пользователь сообщил ручной PASS Escape; это отдельное evidence.
+- Snapshot: canonical root, main@1efc61341a34233c4bd7504edb7f979aff541577;
+  writer primary01a0c415-1c3c-73e3-a270-5ad591fa9ca7, generation2/idle.
+  Dirty: собственный checkpoint, четыре прежних next-env.d.ts сохраняются.
+- CI artifact10690820803 проверен: только API/worker logs, browser trace не
+  загружен (workflow смотрит root, Playwright запускается из apps/e2e).
+- Scope: минимальный dismissal fix/regression, затем сохранение разрешённого
+  product intent при login/onboarding. Без гостевой корзины, автопокупки,
+  редизайна меню, смены URL-схемы, рабочих DB-записей и расширения прав.
+- Gates первой фазы: детерминированное воспроизведение timing, regression,
+  root typecheck/test, buyer build, verify:web desktop/mobile, review/diff-check,
+  scoped commit/push и фактический CI. Неизменные API/DB gates reuse по §4.2.
+  Новые попытки по изменённому плану0/3; probe2мин, blocker15мин,
+  build/test20мин, suite45мин. Стенд owned PID27068 восстановить после builds.
+- Gates второй фазы уточнить после code-path audit; начать только после PASS
+  первой. Последний авторизованный результат — конкретный product return flow.
+- Timing probe1: FAIL reproduced на исходном коде — details.open=true,
+  toggleDelivered=false, Escape.defaultPrevented=false, после Escape открыт.
+  Исправление: native details listener устанавливается при mount и проверяет
+  details.open непосредственно при событии; search hook/guard/defaultPrevented
+  сохранены. Unit и desktop/mobile E2E проверяют немедленный Escape до toggle.
+  CI diagnostic paths исправлены на apps/e2e (workspace cwd), чтобы сохранять
+  реальный trace при отказе. Не добавлялись sleeps или weakened assertions.
+- Build1 запущен в pilot на disposable audit DB; owned дерево PID27068 и все
+  шесть listeners сверены/остановлены. Прежние next-env сохранены byte-for-byte
+  в ignored evidence перед сборкой. Практики Frontend Developer — native/React
+  lifecycle; Code Reviewer — focus/defaultPrevented/cleanup; Git Workflow Master
+  — отделение WIP и публикация после gates (прочитаны в предыдущем контексте).
+- Build1 FAIL1/3: Windows Prisma EPERM rename, приложение не компилировалось.
+  Причина — ignored run-audit wrapper держал Prisma engine DLL после disconnect.
+  Read-only DB preflight вынесен в завершающийся процесс; build2 запускается
+  с теми же source/profile, без DLL holder. Не отключались gates/permissions.
+- Build2 PASS10/10, 4m0.169s (5 cached). Четыре исходных next-env восстановлены.
+  Typecheck1 FAIL: новый E2E evaluate имеет HTMLElement|SVGElement, click нельзя
+  вызвать без narrowing. Добавлена runtime HTMLElement проверка; typecheck2
+  проверяет исправленный test. Source/artifacts приложения не изменились.
+- Typecheck2 PASS12/12,34.607s. Tests1 PASS11/11,1m25.507s через
+  npm test -- -- --maxWorkers=2 (тот же лимит ресурсов, что предыдущий PASS).
+  verify:web1 запущен на подготовленных pilot production artifacts и прежней
+  disposable dentmarket_audit_20260914; порты перед запуском свободны.
+- Web1 PASS37, SKIP38 (existing opt-in),2.6min; retry0. Исходный city flow и
+  новая детерминированная regression PASS1280/390, search/supplier dismissal,
+  заказы/регистрация/logout regular cases PASS. API/DB gates на исходном HEAD
+  REUSED_PASS: доменные источники/схемы/контракты неизменны; CI их проверит заново.
+- Review PASS: DOM open — единственный источник для native details; закрытая
+  панель не перехватывает Escape, defaultPrevented/outside/focus/cleanup
+  сохранены; search hook не изменён. Diff6 scoped files, no secrets/DB changes,
+  четыре чужих generated next-env исключены. Все обязательные local gates PASS;
+  публикация и actual CI pending, вторую продуктовую фазу пока не начинать.
+
 ## LOCAL-AUTH-CATALOG — согласованные 15 исправлений, 22.09.2026
 
-- ACTIVE: локальные gates/review/commit/push PASS; remote CI выполняется;
+- BLOCKED: локальные gates/review/commit/push PASS; CI2 FAIL на city Escape,
+  desktop3/3 попытки (встроенные initial+2 retries); не запускать снова;
   прежние3/3 неудачи сохранены. Единственный writer
   primary01a0c415-1c3c-73e3-a270-5ad591fa9ca7. Не передавать и не архивировать.
   Основание: владелец в боковой задаче01a0c7c5-c484-7db2-bd73-4e4480980508
@@ -268,6 +325,36 @@
   Review/diff-check PASS; source scope3 API files плюс checkpoint. Новые
   Product/UI navigation docs — отдельный docs commit с собственным review.
   Stand restart выполняется тем же canonical launcher; CI2 после публикации.
+- Опубликованы d6bdc4c (metrics authorizer separation/regressions) и1efc613
+  (только Product§22.1/UI§2.2 navigation requirements), ordinary push PASS.
+  Local HEAD/main и remote main равны1efc61341a34233c4bd7504edb7f979aff541577.
+  Новый canonical stand PID27068, go_live/JWT/all; readiness PASS80310мс,
+  API и все4frontend готовы. Это восстановленный пользовательский стенд;
+  оставить работающим. Browser fixture sessions cleaned; audit probe закрыт.
+  CI2 run35718101948 / Security35718101977 IN_PROGRESS на точном итоговом SHA.
+  Docs опубликованы, требования утверждены; новый navigation UX не реализован
+  этой docs-задачей. Полный DoD ожидает remote CI2, не объявлять pass заранее.
+- Итог CI2 на1efc613: Security35718101977 PASS (dependencies/CodeQL),
+  PostgreSQL job106714272064 PASS (integration/authority/backup-restore).
+  Verify job106714272232: typecheck/tests/build/observability/runtime/profile/
+  core-contract/production/rate-limit/extended API PASS; FlowB3 PASS3/3.
+  Browser:33PASS,1FAIL (city dismiss Escape1280px, initial+2 retries =3/3),
+  1FLAKY (city Escape390px, pass на третьей попытке),38 explicit opt-in SKIP.
+  Точный отказ dropdown-dismissal.spec.ts:114: после Escape dialog «Выбор города»
+  остаётся видимым. Это новый browser blocker, не повтор ошибки auth/metrics.
+  Готовность не объявляется PASS; третья CI попытка/новый browser run не начаты.
+- Диагностика read-only: CityLocation использует native details/onToggle→React
+  open и usePopupDismiss. Следующий единственный шаг после решения владельца:
+  сопоставить CI trace с моментом подписки Escape в usePopupDismiss и проверить
+  гипотезу гонки onToggle/effect; затем минимальный fix с regression. До этого
+  не менять городской UI, не расширять scope и не повторять suites.
+  Logs получены через GitHub job API; raw credentials не публиковались.
+- Финальный локальный статус: stand27068 ready HTTP200, API/4web готовы;
+  main/remote1efc61341a34233c4bd7504edb7f979aff541577. Правки реализации
+  cbb62e6+d6bdc4c и docs1efc613 опубликованы, полный DoD BLOCKED.
+  Текущий checkpoint остаётся локальной записью фактического результата;
+ 4 прежних generated next-env.d.ts сохранены. Не создавать evidence-only
+  push/новый CI, не передавать/архивировать и не запускать следующую фазу.
 
 ## Flow B3.3 publication409 — продолжение владельца 22.09.2026
 

@@ -8,14 +8,16 @@ type DismissReason = "outside" | "escape";
 export function listenForPopupDismiss(
   root: HTMLElement,
   dismiss: (reason: DismissReason) => void,
+  isOpen: () => boolean = () => true,
 ) {
   const document = root.ownerDocument;
   const outside = (event: Event) => {
-    if (!event.composedPath().includes(root)) dismiss("outside");
+    if (isOpen() && !event.composedPath().includes(root)) dismiss("outside");
   };
   const escape = (event: KeyboardEvent) => {
     if (
       event.key === "Escape" &&
+      isOpen() &&
       !event.defaultPrevented &&
       event.composedPath().includes(root)
     ) {
@@ -32,6 +34,18 @@ export function listenForPopupDismiss(
     document.removeEventListener("focusin", outside);
     document.removeEventListener("keydown", escape);
   };
+}
+
+/** Native details opens before its asynchronous toggle event reaches React. */
+export function useDetailsPopupDismiss(
+  root: RefObject<HTMLDetailsElement | null>,
+  dismiss: (reason: DismissReason) => void,
+) {
+  useEffect(() => {
+    const details = root.current;
+    if (!details) return;
+    return listenForPopupDismiss(details, dismiss, () => details.open);
+  }, [root, dismiss]);
 }
 
 export function usePopupDismiss(
