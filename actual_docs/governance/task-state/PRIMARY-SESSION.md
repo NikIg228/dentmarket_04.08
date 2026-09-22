@@ -4,7 +4,7 @@
 
 ## LOCAL-AUTH-CATALOG — согласованные 15 исправлений, 22.09.2026
 
-- ACTIVE: локальные gates PASS, review/publication/CI ещё не завершены;
+- ACTIVE: локальные gates/review/commit/push PASS; remote CI выполняется;
   прежние3/3 неудачи сохранены. Единственный writer
   primary01a0c415-1c3c-73e3-a270-5ad591fa9ca7. Не передавать и не архивировать.
   Основание: владелец в боковой задаче01a0c7c5-c484-7db2-bd73-4e4480980508
@@ -222,6 +222,52 @@
   JWT/backup/logs/harness не включаются в commit. origin/main=a4eaa0e, divergence0/0;
   push workflows просмотрены: CI/Security без release/deploy на main push.
   Далее один scoped commit и обычный push; CI до readback остаётся PENDING.
+- Publication22.09: commit cbb62e6918d2e35b61f82ac9b1d30d2c161d6973 в main,
+  ordinary push PASS; ls-remote main равен local SHA. Scoped manifest73 paths,
+  credential review PASS,4 прежних generated next-env.d.ts сохранены unstaged.
+  CI run35716083547 и Security35716083466 — push на точном SHA, IN_PROGRESS;
+  jobs verify/postgres-integration/dependencies/codeql. Remote budget45мин,
+  fresh readback в ignored ci-readback.json. До итогов не считать DoD закрытым,
+  не повторять локальные suites и не запускать новую фазу/передачу.
+- CI1 FAIL verify:observability; Security2jobs и PostgreSQL integration PASS,
+  root typecheck/test/build также PASS на Linux. Причина доказана job106707796665:
+  Authorized metrics returned401. Новый global JWT middleware проверяет служебный
+  METRICS_BEARER_TOKEN как пользовательский JWT; MetricsController уже имеет
+  отдельный constant-time authorizer. Исправление в том же auth scope: только
+  GET/HEAD точного /api/metrics передаёт token его controller после удаления
+  untrusted identity headers; остальным routes JWT остаётся обязателен.
+  Нужны regression (верный/неверный metrics token, no prefix bypass), TS/tests/API
+  build и live observability на audit DB; неизменные frontend/PG gates REUSED_PASS.
+  Новый CI после fix — попытка2/3. Own stand28124 останавливается только для
+  API build/checks и будет восстановлен; прошлое согласование остаётся действующим.
+- Metrics follow-up typecheck1 FAIL на повреждённом generated admin
+  .next/dev/types/validator.ts (оборван import, source не менялся). Next typegen
+  регенерировал route validator; удалена только повреждённая disposable dev
+  копия после успешной генерации, исходный next-env сохранён byte-for-byte.
+  Typecheck2 запускается с восстановленными generated inputs, tests/build/live
+  observability далее последовательно. Старые попытки не сбрасываются.
+- Получено явное поручение владельца из боковой read-only задачи01a0c7c5:
+  сохранить5 согласованных UX-правил в документах. Product§22.1 и UI§2.2
+  дополнены: guest catalog, intent return после auth/onboarding, active-session
+  deep links, server-derived single/multiple workspace selection, supplier
+  catalog roundtrip без buyer rights. Состав меню/шапки/профиля и допуск сохранены.
+  Статус requirements approved / full implementation pending, URL/app merge
+  не утверждены. Foundation/ADR не меняются: техническая очередь/архитектура
+  не затронуты. Это отдельный docs-only scope, TS/build/DB suites запускаются
+  по metrics fix, не по этой документации; docs требуют links/review/diff-check.
+- Metrics typecheck2 PASS12/12; tests1 FAIL: неизменённый buyer profile-ui test
+  превышает default5s при полной worker concurrency, тот же тест на CI1 PASS.
+  Новое основание tests2: ранее проверенный --maxWorkers=2 без изменения test
+  assertions/timeouts. Docs-only review/новая относительная ссылка+anchor PASS;
+  структура/история сохранены, git diff --check PASS.
+- Metrics fix локально PASS: typecheck2 (12/12), tests2 (--maxWorkers=2,
+  11/11 tasks, API348/348), API build1, observability unit/regression из npm test,
+  alerts catalog1, live integration1 на dentmarket_audit_20260914 (401 без token,
+  200 с scraper token, PostgreSQL gauges). Рабочая БД не использовалась.
+  Проверки auth/metrics route separation и соседних путей не ослаблены.
+  Review/diff-check PASS; source scope3 API files плюс checkpoint. Новые
+  Product/UI navigation docs — отдельный docs commit с собственным review.
+  Stand restart выполняется тем же canonical launcher; CI2 после публикации.
 
 ## Flow B3.3 publication409 — продолжение владельца 22.09.2026
 

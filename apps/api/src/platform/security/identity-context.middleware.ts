@@ -30,12 +30,15 @@ export function identityContextMiddleware(sessionVerifier?: SessionVerifier) {
   const config = environment();
   return (request: Request, _response: Response, next: NextFunction) => {
     const authorization = request.header("authorization");
-    if (config.AUTH_MODE === "development" && !authorization) return next();
+    const metricsRequest = ["GET", "HEAD"].includes(request.method) && /^\/api\/metrics\/?(?:\?|$)/.test(request.originalUrl);
+    if (config.AUTH_MODE === "development" && !authorization && !metricsRequest) return next();
     const requestedOrganizationId = request.header("x-organization-id");
     delete request.headers["x-user-id"];
     delete request.headers["x-organization-id"];
     delete request.headers["x-session-id"];
     delete request.headers["x-authentication-methods"];
+    // MetricsController validates its separate scraper token; it is not a user JWT.
+    if (metricsRequest) return next();
     if (!authorization?.startsWith("Bearer ")) return next();
     void (async () => {
       try {
