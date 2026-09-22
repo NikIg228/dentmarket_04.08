@@ -4,6 +4,34 @@
 
 ## PRODUCT-LOGIN-RETURN — продолжение по решению владельца, 22.09.2026
 
+- 22.09.2026, продолжение ACTIVE по явному «Окей, согласен, бро, давай»:
+  исправить только NEXT_PUBLIC_LANDING_APP_URL в job verify env. Canonical root,
+  main@4d5fc96, тот же primary generation2/idle; dirty собственный checkpoint и
+  четыре прежних next-env. Старые3/3 failures сохраняются, новая проверка только
+  после подтверждённого изменения build env, без rerun старого commit.
+  DoD: parse workflow + Turbo dry-run подтверждает env/cache key для web build,
+  diff/review, scoped commit/push, actual CI. Локальные source/typecheck/unit/API/
+  browser PASS переиспользуются: TS/контракты/данные не меняются. Стенд30968 не
+  останавливать. Gate budget: preflight2min, CI45min, максимум3 с обоснованием;
+  при повторении прежнего сбоя без новой гипотезы остановка. Новые фазы не входят.
+- CI env preflight1 PASS: YAML parse/unique keys, job-level URL3003 без step
+  override, Turbo dry-run всех4 web видит NEXT_PUBLIC_LANDING_APP_URL и меняет
+  task hash относительно прежнего env. Никакие builds/servers/DB не запускались.
+  Evidence outputs/product-login-return-20260922/ci-env-preflight.json.
+  Review Code Reviewer/Git Workflow Master: одна строка env + own checkpoint,
+  без ослабления asserts/retries, dependencies/deploy/auth изменений. Инструкции
+  ролей ранее прочитаны; staged/outgoing/diff-check перед публикацией обязательны.
+  TS/build/unit/API/browser локально REUSED_PASS4d5fc96; actual CI нового SHA pending.
+- Текущее состояние BLOCKED после публикации4d5fc96: локальные gates PASS,
+  CI FAIL только на новых product-return tests, по3/3 попытки1280/390.
+  Подтверждённый blocker — CI build не задаёт NEXT_PUBLIC_LANDING_APP_URL;
+  public-links production fallback ведёт на внешнюю страницу /login вместо
+  локальной3003. Trace artifact10695087210 подтверждает GET /login200 на
+  fallback origin; ни регистрация, ни передача credentials туда не выполнялись.
+  По AGENTS§7.1 новые attempts/fixes/publication не начинать; один следующий шаг:
+  задать NEXT_PUBLIC_LANDING_APP_URL=http://127.0.0.1:3003 в job verify env,
+  затем проверить пересобранный CI artifact в согласованном продолжении.
+  Сохранить достигнутые PASS и счётчики; весь аудит/локальный suite не повторять.
 - ACTIVE: явное «приступай» после предложения пути карточка → вход → обязательная
   анкета клиники при необходимости → та же карточка. Сначала закрыть city Escape
   в CI; прежние desktop3/3 и mobile flaky3 сохранены, новый план — доказать гонку
@@ -146,6 +174,29 @@
   Frontend Developer, Code Reviewer и Git Workflow Master применены к контракту,
   переходам, границам полномочий и составу публикации; инструкции прочитаны.
   Commit/push/actual CI и восстановление stand пока pending.
+- Phase2 опубликована:4d5fc96aa4eedc5bbae6062bf47a6306c18a68de, main;
+  scoped23 files, fetch/fast-forward/push/remote SHA PASS. Четыре прежних next-env
+  исключены и byte-for-byte сохранены. CI35728280567 / Security35728280543
+  IN_PROGRESS; это не PASS. Восстановление stand1 PID30968 из canonical root,
+  go_live/JWT/all, readiness observer session64905 ещё выполняется.
+- Stand restore1 PASS103894ms, PID30968: API, landing, marketplace, supplier,
+  admin и gateway готовы. Observer завершён0; процесс оставлен работающим.
+  После dev-start все четыре исходных next-env hashes совпали. Остался actual
+  CI exact4d5fc96; продуктовая запись и новые gates локально не запускаются.
+- Security35728280543 PASS (CodeQL/dependencies), PostgreSQL106747200197
+  PASS12 steps на4d5fc96. Main CI35728280567 прошёл30 steps, выполняет Pilot
+  browser verification; attempts1, без rerun. Ожидание CI не расширяет scope.
+- Итог CI35728280567 FAILURE: flow-b3 PASS, regular37PASS/38SKIP/2FAIL,
+  новые tests1280/390 каждый initial+retry1+retry2 FAIL на waitForURL /login
+  (60s, до ввода данных), остальные34 steps PASS. Read-only evidence:
+  job106747199845 + artifact10695087210, ZIP сохранён в ignored
+  outputs/product-login-return-20260922/ci-diagnostics.zip. Настоящий network
+  trace390 показывает внешний production fallback /login200; в CI отсутствует
+  NEXT_PUBLIC_LANDING_APP_URL, локальный PASS wrapper задаёт его явно.
+  Это подтверждённый дефект конфигурации тестовой сборки, не новый auth/DB дефект.
+  Runtime PID30968 остаётся работающим. Исходники опубликованы, приёмка не закрыта;
+  CI не перезапускался. Локальный checkpoint итогов — единственный own dirty файл,
+  четыре исходных next-env сохранены. Полная готовность/весь Product§22.1 не заявлены.
 
 ## LOCAL-AUTH-CATALOG — согласованные 15 исправлений, 22.09.2026
 
