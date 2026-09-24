@@ -3,7 +3,7 @@
 import { DmButton, LoadingState } from "@marketplace/ui";
 import { useEffect, useRef, useState } from "react";
 import { AuthBrand, AuthNotice } from "../auth-components";
-import { withProductReturn } from "@marketplace/schemas/product-navigation";
+import { withWorkspaceReturn } from "@marketplace/schemas/product-navigation";
 import { useProductReturn } from "../use-product-return";
 import {
   type AuthFeedback,
@@ -92,7 +92,7 @@ export default function VerifyEmailPage() {
           </p>
         ) : null}
         {!checking ? (
-          <a className="authBackLink" href={withProductReturn("/login", returnTo)}>
+          <a className="authBackLink" href={withWorkspaceReturn("/login", returnTo)}>
             Перейти ко входу
           </a>
         ) : null}

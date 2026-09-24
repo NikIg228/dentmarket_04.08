@@ -2,6 +2,248 @@
 
 Дата: 2026-09-21. Это карточка исполнения, не продуктовый backlog.
 
+## ORGANIZATION-READY — организация готова к работе, 22.09.2026
+
+- **24.09, финальный local review: READY_FOR_PUBLICATION; CI ожидается.**
+  Разрешённый владельцем isolated order-profile retry PASS2/2,435ms; исходный
+  timeout5000ms/assertions сохранены. Это PASS после transient failure, а не
+  новый полный зелёный root run. Остальные10 workspace suites и76 buyer tests
+  REUSED_PASS по manifest (до новых docs совпали все68 hashes). Runtime не менялся.
+  Review выявил только несовместимость нового fixture с PostgreSQL CI job:
+  там задан POSTGRES_TEST_DATABASE_URL без DATABASE_URL. Helper теперь использует
+  ту же precedence, что runner; подключённая test DB identity по-прежнему обязательна.
+  node --test scripts/lib/organization-profile-fixture.test.mjs PASS1, проверены
+  допустимый CI target и отказ другой БД до profile access. Локальный путь выбирает
+  тот же URL; runtime/API/artifacts и assertions PostgreSQL не менялись.
+  Code Reviewer и Git Workflow Master прочитаны/применены; проверены контракт,
+  tenant-before-data, CAS/replay/addresses, DRAFT/допуск, safe navigation, migration,
+  bundle budget и CI fixtures. Других блокирующих замечаний не обнаружено.
+  Публиковать только собственный scope; прежние3 handoff receipt и4 next-env
+  исключить. Fetch origin:0/0 относительно main, remote разрешённый.
+  Evidence: order-profile-owner-retry.log и ci-fixture-env.log в outputs этого этапа.
+  После push проверить точный SHA и фактические CI/Security, затем сохранить
+  operational receipt; до actual PASS не объявлять этап CLOSED.
+
+- Возобновление24.09: владелец явно поручил выполнить два пункта — отдельный
+  повтор упавшего теста и затем review/commit/push/actual CI. Один дополнительный
+  isolated retry разрешён; прежние три общих запуска и их ошибки не сбрасываются.
+  Сверены canonical main4cd87a5, dirty inputs по сохранённому manifest, registry
+  primary generation3/idle. Тестовые listeners отсутствуют; другие тяжёлые gates
+  во время повторного теста не запускаются. Timeout/assertions остаются исходными.
+  Бюджет изолированного повтора20min, CI45min; следующие продуктовые этапы не входят.
+
+- **Итог24.09: BLOCKED проверки; ожидается решение владельца, этап не закрыт.**
+  Primary01a0c957-1f23-7b70-9dc9-226afbb5c0b1 / generation3/idle сохранён.
+  Canonical main@4cd87a554793ea1fa7daffc483f473312d95d5e1, индекс пуст.
+  Продуктовый scope реализован: два адреса/контакты, API tenant/permission/CAS/
+  idempotency, completion/cart gate, supplier5-step и отдельный допуск, выбор
+  реальных кабинетов, cookie restore, safe return и supplier каталог↔кабинет.
+  Решение владельца: юридический + адрес доставки; возможно «совпадает».
+  Локальные изменения **не закоммичены и не отправлены**, CI NOT_RUN.
+- Последние доказательства (все outputs/organization-ready-20260924):
+  typecheck-review PASS12/12; API build-review PASS после shared-address split;
+  tests-review:API370/370 + остальные9 workspace suites PASS; buyer76/77 PASS,
+  один order-profile pilot timeout5000ms (file apps/buyer-web/app/features/
+  purchasing/order-profile.test.tsx:48), весь root result10/11 FAIL.
+  Это третий общий npm test:1 FAIL OpenAPI transform/PDF timeout;2 PASS11/11;
+  3 FAIL buyer timeout при одновременных web/typecheck. Причина перегрузки —
+  проверяемая гипотеза, не доказанный дефект продукта. Тест/timeout не изменялись.
+  Дополнительный isolated retry запрошен24.09 через async question, ответа нет.
+  Нельзя автоматически запускать четвёртый root/иной инструмент для обхода лимита.
+- Browser2 PASS42/42 regular,38 opt-in SKIP, без flaky; включает оба размера,
+  product registration/email-newtab/login return, multiple/revoked memberships,
+  supplier profile/warehouse/catalog/cookie newtab, все flow-a/b2/b3 и logout UI.
+  Supplier-terms1:API1 PASS/browser4 FAIL из-за старого bare-token fixture без
+  cookie refresh; trace workspace-context200→refresh401. Fixture переведён на
+  реальный handoff, read-only guards не менялись; supplier-terms2 PASS5/5 (JWT,
+  DRAFT,desktop,mobile,operator). API port4012 выбран после free-port preflight
+  для reuse web artifacts. Synthetic published texts только в owned harness.
+  Auth-contract1 PASS; authority1 PASS; workspace-authority1 PASS17 scenarios.
+  PostgreSQL3 PASS после последнего изменения shared Address, предыдущие попытки
+  сохранены ниже. Migration upgrade/validate, core-contract и runtime PASS см. ниже;
+  их значимые схемы/состав не менялись. Full web builds REUSED_PASS; buyer bundle
+  24files/raw1177389/gzip357618 в неизменных budgets. Docs diff-check PASS.
+- Cleanup: все owned suites завершены; listeners4012/3001/3002/3003/3010/3100/
+  3102/4112 отсутствовали. Sessions revoked/own mail cleanup по harness results;
+  synthetic DB rows сохранены. Рабочая БД, legal DRAFT, другие деревья не изменены.
+  Четыре прежних next-env byte-for-byte совпали с исходными escape snapshots.
+  Три governance receipt HANDOFF-G3 сохранены локально, отделить их hunks при
+  staging. Собственный scope — текущие apps/packages/scripts + Product§22.8,
+  эта карточка, верх PROJECT_HANDOFF и дополнение Acceptance Matrix.
+  Review применил прочитанные Backend Architect/Frontend Developer/UX Architect/
+  Code Reviewer/Git Workflow Master; Playwright — actual browser evidence.
+- **Один следующий шаг после явного разрешения:** без других тяжёлых процессов
+  `npm test --workspace=@marketplace/buyer-web -- --run app/features/purchasing/order-profile.test.tsx --maxWorkers=1`.
+  Сохранить реальный результат, не менять timeout. Остальные PASS переиспользовать
+  по source/artifact hashes (input-manifest.json фиксирует текущий dirty scope).
+  Затем закончить scope/secrets/staged review, отдельные разрешённые commit/push
+  и actual CI/Security. До этого статус не CLOSED, архивации/преемника нет.
+
+Ниже — история промежуточных состояний; актуален итог выше.
+
+- Актуальный checkpoint24.09,22:09 Asia/Qyzylorda: ACTIVE, тот же primary,
+  main4cd87a5; полный разрешённый этап продолжается. Runtime-split2 PASS.
+  Web1 FAIL:27PASS/12FAIL/38opt-inSKIP/3не запущены; причины установлены:
+  новый auth/current попадал под credential throttle20/min и возвращал пустое
+  тело вместо JSON null; Fluent required labels не совпадали с exact locators;
+  старым flow-b2/UI-only logout fixtures недоставало обязательного профиля.
+  Исправлены response.json(null), стандартная ограниченная API read policy только
+  для current (login/credential limits неизменны), locators и fixtures. API build
+  current-response PASS; focused current-session+warehouse11/11 PASS.
+  Web2 RUNNING: организация1280/390, multiple/revoked memberships, marketplace,
+  flow-a/b2/b3 PASS; оставшаяся часть ещё выполняется. Attempt budget не сброшен.
+  Review нашёл shared legacy Address: при разных юридическом/доставки теперь
+  создаётся отдельный адрес доставки; добавлен regression. Этот последний API
+  diff ещё требует build/test; web2 использует предыдущий artifact (same-address
+  legacy split им не сертифицирован). Root typecheck/tests запущены повторно
+  только из-за новых runtime/regression входов; результаты ещё неизвестны.
+  Operator fixture получил выбор свободного loopback API port для reuse уже
+  проверенных web artifacts без смены legal DRAFT в рабочем API. Следом —
+  отдельный supplier-terms browser/JWT gate, authority/auth checks и review.
+  Commit/push/CI NOT_RUN. Не считать этап закрытым по промежуточным PASS.
+  Evidence outputs/organization-ready-20260924; web2 process exec72551,
+  typecheck95768/tests13717. После завершения сверить owned cleanup.
+- 24.09 gate readback: buyer build2 PASS (24files/raw1177389/gzip357618, budgets
+  неизменны). API после успешного baseline build: alias retry1 EPERM; direct retry2
+  не стартовал compiler из-за неверного root node_modules CLI path. CLI проверен
+  в apps/api/node_modules; последний direct nest build PASS, файл api-build-final.log.
+  Эти два сбоя подготовки не скрывать; никакой очистки cache/DLL/перезапуска чужих
+  процессов не было. Prisma generation reused для неизменной схемы.
+  PostgreSQL attempt2 PASS (включая добавленные profileHTTP/replay/CAS/tenant,
+  старые rollback/concurrency/cart gates и cleanup). Core-contract1 PASS:26 verified
+  operations, новые profile/onboarding/current schemas присутствуют.
+  Финальный npm run typecheck PASS12/12 (typecheck-final.log). Buyer/supplier
+  next-env после build восстановлены byte-for-byte из исходных подтверждённых
+  snapshots; admin/landing не менялись. Никакой продуктовый WIP не откатывался.
+  Runtime-split1 FAIL environment: общий audit wrapper включал local-mail без
+  loopback API для runtime probe. Retry2 запускается со штатно отключёнными local
+  auth tools, сам gate/profile/guards не изменены. Verify:web1 RUNNING на approved
+  DB/pilot artifacts; preflight ports4012/3001/3002/3003/3010 свободны. Playwright
+  прочитан; применяются пользовательские project gates и требуемые regression specs.
+- Build/runtime checkpoint24.09: full pilot build attempt1 — schemas/API/client/UI/
+  landing/admin/supplier PASS, buyer compile PASS, bundle gate FAIL (25files,
+  raw1636159 >1500000, gzip451862 >450000). Причина: profile/session imports в root.
+  Исправление: lazy buyer session probe + authenticated profile gate + dynamic
+  currentSession schema; buyer build attempt2 RUNNING (exec5661). Budgets не менялись.
+  PostgreSQL attempt1 FAIL до API readiness: dist/src/main.js ещё не появился при
+  продолжающейся общей сборке (лог21:43:28, файл21:43:53). Доменного assertion нет,
+  fixtures cleanup штатный; не сбрасывать attempt. Повтор только после ready artifact.
+  API build обновлённых query-docs/warehouse replay: alias attempt2 FAIL EPERM Prisma
+  DLL при одновременной web build. Schema/client не менялись после успешной generation;
+  attempt3 — direct nest build с REUSED_PASS prisma generate, без повторной перезаписи
+  DLL. Это Workflow§4.2 reuse prerequisite, не обход разрешений. Новую generation
+  не запускать до завершения build workers. Source/runtime в новой папке не создавались.
+  Прочитан Git Workflow Master для atomic/scoped publication; правила checkout/main
+  владельца имеют приоритет над примерами branches/rebase/worktrees роли.
+- Проверки/прогресс24.09 (после записи ниже): supplier5-step UI/operator profile
+  review, warehouse replay и public catalog↔supplier ссылки реализованы. Safe
+  return allowlist расширен до существующих catalog/documents; product-return
+  сохранён. Новые unit regressions для профиля/current-session/terms/nav добавлены.
+  npm run db:generate PASS; schemas build PASS; typecheck attempt1 FAIL (обязательный
+  description DmFeedback), исправлено, attempt2 PASS12/12. npm test attempt1 FAIL
+  (Zod transform не представим в OpenAPI + единичный PDF timeout при нагрузке),
+  заменено штатным toLowerCase, attempt2 PASS11/11. Новые test/fixture edits после
+  typecheck требуют следующей проверки изменившихся входов; счётчики не сбрасывать.
+  Prisma validate PASS1. Upgrade existing disposable dentmarket_audit_20260914
+  PASS1:34 migration, добавлена только20260924090000_organization_profile;
+  before/after counts организаций/адресов/акцептов/carts/orders равны, profiles0.
+  Evidence: outputs/organization-ready-20260924/* (ignored), в том числе
+  migration-upgrade.json, typecheck-2.log, tests-2.log. Рабочая БД не тронута.
+  PostgreSQL gate дополнен real HTTP profile incomplete/tenant/replay/CAS race;
+  fixtures приводятся к обязательной анкете без отключения gates. Browser product
+  return дополнен заполнением анкеты (same-address, keyboard) до исходной карточки.
+  Ещё NOT_RUN: API/web builds, core-contract/postgres/runtime/auth/browser, review,
+  commit/push/CI. Next: собрать итоговый API/web pilot artifacts и пройти gates.
+- Checkpoint реализации 24.09.2026: ACTIVE, тот же primary и main@4cd87a5.
+  Владелец подтвердил состав адресов: юридический + адрес доставки; допускается
+  «совпадает с юридическим». Решение внесено в Product §22.8.
+  Реализовано, НО НЕ ПРОВЕРЕНО: общие schemas/profile/onboarding, additive Prisma
+  migration OrganizationProfile, tenant/permission/version/idempotency API анкеты,
+  prerequisites допуска, серверный запрет cart без анкеты, read-only auth/current,
+  восстановление cookie-сессии и выбор доступных кабинетов, общая форма и buyer gate.
+  Собственный dirty: соответствующие API/schema/client/UI paths и Product; прежние
+  3 governance receipt и4 next-env сохранены отдельно. Индекс не изменялся.
+  Supplier onboarding UI, operator review UI, склад replay и переходы каталог↔кабинет
+  ещё НЕ реализованы: последний большой apply_patch перед сжатием не применился,
+  это проверено чтением файлов. Дальше — эти связки, затем focused regressions.
+  Новые runtime/TS/build/DB/browser gates NOT_RUN, попытки0/3; Prisma migration
+  нигде не применялась, client ещё не generated. Commit/push NOT_RUN, этап не принят.
+  При проверке24.09 listeners4012/3000–3003/3080 отсутствовали; старые PID ниже
+  исторические, перед запуском заново проверять процесс/профиль. Процессы не трогали.
+  До gates: проверить profile prerequisites (непустой склад), direct-link allowlist,
+  auth/current negative cases, fixtures готовых test organizations и изменение
+  связанных Address без обхода version. Рабочую БД/юридические DRAFT не изменять.
+- Ниже — сохранённый контекст возобновления и история паузы22.09; утверждения
+  «новых продуктовых правок пока нет» относятся только к моменту возобновления.
+- ACTIVE 24.09.2026: владелец через Оркестратор явно поручил «продолжаем с момента
+  остановки». Повторно сверены canonical root/main4cd87a5, один checkout,
+  generation3/idle/primary; dirty по-прежнему только3 governance +4 прежних next-env.
+  Оркестратор подтвердил отсутствие другого Market writer и сам код не меняет.
+  История: пауза22.09 по просьбе «зафиксируй выполненные задачи, продолжим завтра»;
+  нового технического blocker не было, автоматический запуск не назначался.
+  Первоначальное разрешение: владелец через Оркестратор01a02859-08f3-7082-920d-49400f0fbb09
+  передал явное «Отлично, бро, приступаем»: законченный этап подключения
+  клиники/поставщика и бесшовного входа/переходов. Единственный writer — primary
+  01a0c957-1f23-7b70-9dc9-226afbb5c0b1, generation3/idle. Сверены canonical root,
+  единственный checkout, main@4cd87a554793ea1fa7daffc483f473312d95d5e1;
+  других активных Market writers в доступном списке задач нет.
+- Scope: Product §22.1, организационная часть §22.8, §9.7/ADR013, CORE-01/05.
+  Обязательная анкета клиники; сведения/склад/необходимые документы поставщика,
+  общий акцепт и отдельный операторский допуск; выбор только реально доступных
+  кабинетов, автоматический единственный, сохранение разрешённых прямых ссылок;
+  поставщик каталог↔кабинет без покупательских прав. Backend и необходимые UI
+  довести вместе. Сообщения, платежи/комиссии, live integrations, общий редизайн,
+  новые URL-архитектуры, массовый refactor и остальной backlog не входят.
+- Подтверждённые пробелы при целевом чтении: createRegistrationIntentSchema
+  не содержит контактов/адресов полной анкеты; Organization хранит основные
+  реквизиты и Address, но не текущий контракт её готовности. LoginPage сначала
+  требует AuthRolePicker и фильтрует workspaces по выбранной роли. Supplier
+  OnboardingProgress использует imports readiness с обязательным test_order
+  и создание технического profile(detailsPending), смешивая подключение
+  организации с готовностью ассортимента. Акцепт/допуск уже реализованы отдельно
+  в SupplierTermsService; их не переписывать и DRAFT не обходить.
+- Сохранён baseline PRODUCT-LOGIN-RETURN267be7f и docs4cd87a5 с их evidence.
+  Начальный dirty: три согласованных local governance receipt из HANDOFF-G3
+  (сохранять историю, отделить при публикации) и четыре прежних next-env.d.ts
+  (не stage/overwrite; snapshots уже проверены). Новых продуктовых правок пока нет.
+- Итог подготовки перед паузой: требования/ADR013/релевантные CORE-01/05,
+  регистрация, organization/address storage, supplier readiness/terms/admission
+  и LoginPage прочитаны; scope, доказанные пробелы, DoD и budgets записаны здесь.
+  Прочитаны практики Backend Architect, Frontend Developer, UX Architect и ранее
+  Code Reviewer: применены к контрактам, server authority и состояниям интерфейса.
+  Полный маршрут session restore ещё не дочитан: последний read-only вызов был
+  прерван сменой tool host, сохранённого результата нет; это не запуск gate.
+  Продуктовый код, схемы БД и рабочие данные не изменялись. Тесты/build/DB/browser
+  не запускались; новые попытки0/3. Стенд и четыре next-env не затронуты.
+  Записи этой задачи только в PRIMARY-SESSION и кратком входе PROJECT_HANDOFF;
+  финальные receipt HANDOFF-G3 в трёх governance-файлах остаются local WIP.
+  Commit/push нового этапа не выполнялись: DoD реализации ещё не достигнут.
+  Проверенный HEAD при паузе — main4cd87a554793ea1fa7daffc483f473312d95d5e1.
+- DoD: общие schemas/API/OpenAPI/client, серверные tenant/permission/completion
+  gates, формы и состояния; негативные cases no/multiple/foreign/revoked membership,
+  обход анкеты/допуска, публикация до разрешения, replay без дублей; product-return,
+  email-resume и прямые ссылки; desktop1280/mobile390 и keyboard.
+- Gates: focused regressions; npm run typecheck; npm test; builds изменённых
+  приложений; verify:core-contract; verify:postgres; verify:runtime-split при
+  изменении composition; targeted authority/auth/security для нового доступа;
+  verify:web на проверенной disposable test DB; review/diff-check; scoped
+  commit/push main и actual CI/Security. При schema change — migration,
+  prisma validate и upgrade-path только test DB. Точный запуск уточнить после
+  маршрута кода и чтения prerequisites, без дублирования alias builds.
+- Бюджет: новых gates0/3, probe2min, command20min, suite45min, blocker15min;
+  прежние attempts не сбрасываются. Повтор только после изменения входов или
+  новой доказуемой гипотезы. Runtime пользователя30968/31284/14696 сохранить;
+  остановка только при установленной необходимости и безопасном согласовании.
+  Рабочие данные/юридические DRAFT/секреты/hooks не менять. Тестовые fixtures —
+  только изолированная среда. Реальная готовность без утверждённых текстов не заявляется.
+- Следующий шаг: завершить целевой маршрут существующих organization/address,
+  admission и session contracts; определить минимальный общий контракт анкеты
+  и навигации, уточнив только отсутствующее обязательное бизнес-решение.
+  После возобновления сначала сверить Git/владение и этот checkpoint; не повторять
+  весь аудит и закрытые PRODUCT-LOGIN-RETURN/CI fixes. Затем дочитать session restore
+  и реализовывать согласованный этап целиком. Новую задачу/преемника не создавать.
+  Stop: весь DoD достигнут либо лимит конкретного blocker; ротация запрещена.
+
 ## HANDOFF-G3 — разрешённая governance-передача, 22.09.2026
 
 - PREPARING, source01a0c415-1c3c-73e3-a270-5ad591fa9ca7 / generation2,

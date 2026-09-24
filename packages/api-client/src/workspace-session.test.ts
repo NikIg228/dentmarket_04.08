@@ -31,9 +31,25 @@ describe("verified workspace session", () => {
   });
   it("never authenticates an actor-only development fixture", async () => {
     browser({ organizationId, capability: "SUPPLIER", actorId: userId });
-    const fetcher = vi.fn(); vi.stubGlobal("fetch", fetcher);
+    const fetcher = vi.fn().mockResolvedValue(Response.json(null)); vi.stubGlobal("fetch", fetcher);
     const store = createWorkspaceSession("/api", "SUPPLIER"); await store.start();
-    expect(store.getSnapshot()).toEqual({ ready: true, session: null, error: null }); expect(fetcher).not.toHaveBeenCalled();
+    expect(store.getSnapshot()).toEqual({ ready: true, session: null, error: null });
+    expect(fetcher.mock.calls.map(call => call[0])).toEqual(["/api/auth/current?workspace=SUPPLIER"]);
+  });
+  it("restores a fresh tab from its capability cookie, then verifies membership without rotating it", async () => {
+    browser();
+    const restored = { ...response, workspaces: [context] };
+    const fetcher = vi.fn().mockResolvedValueOnce(Response.json(restored)).mockResolvedValueOnce(Response.json(context));
+    vi.stubGlobal("fetch", fetcher);
+    const store = createWorkspaceSession("/api", "SUPPLIER"); await Promise.all([store.start(), store.start()]);
+    expect(fetcher.mock.calls.map(call => call[0])).toEqual(["/api/auth/current?workspace=SUPPLIER", "/api/auth/workspace-context"]);
+    expect(store.getSnapshot()).toMatchObject({ ready: true, error: null, session: { organizationId, sessionId, capability: "SUPPLIER" } });
+  });
+  it("never promotes a supplier cookie into a buyer session", async () => {
+    browser(); vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({ ...response, workspaces: [context] })));
+    const store = createWorkspaceSession("/api", "BUYER"); await store.start();
+    expect(store.getSnapshot().session).toBeNull();
+    expect(fetch).toHaveBeenCalledTimes(1);
   });
   it("denies a stored token whose organization no longer permits supplier access", async () => {
     const data = browser({ ...response, accessTokenExpiresAt: Date.now() + 900000 });

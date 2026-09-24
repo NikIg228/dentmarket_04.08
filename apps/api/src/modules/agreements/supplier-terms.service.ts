@@ -4,10 +4,12 @@ import { supplierLegalDocumentSchema, type AcceptSupplierTermsInput, type Review
 import { PrismaService } from "../../platform/prisma/prisma.service";
 import { PlatformAuthorityPolicy, type AuthorityActorContext } from "../access-control/platform-authority.policy";
 import { SupplierLegalDocuments } from "./supplier-legal-documents";
+import { assertOrganizationProfileComplete, supplierOrganizationPrerequisites } from "../organizations/organization-profile.service";
 
 @Injectable()
 export class SupplierTermsService {
   constructor(private readonly prisma: PrismaService, private readonly legal: SupplierLegalDocuments, private readonly authority: PlatformAuthorityPolicy) {}
+  documentsAvailable() { return this.legal.current().available; }
 
   private async supplier(context: AuthorityActorContext, permission: "document.view" | "document.sign", db: Prisma.TransactionClient = this.prisma) {
     const membership = await db.organizationMembership.findFirst({
@@ -67,6 +69,7 @@ export class SupplierTermsService {
       const result = await this.prisma.$transaction(async (tx) => {
         const { organization, user } = await this.supplier(context, "document.sign", tx);
         if (organization.version !== input.organizationVersion) throw new ConflictException("Реквизиты организации изменились. Обновите страницу");
+        await assertOrganizationProfileComplete(tx, organization.id);
         const acceptedAt = new Date();
         const acceptance = await tx.supplierTermsAcceptance.create({ data: {
           organizationId: organization.id, userId: user.id, bundleHash: bundle.hash,
@@ -107,6 +110,8 @@ export class SupplierTermsService {
         if (input.status === "APPROVED") {
           const bundle = this.legal.current();
           if (!input.organizationVerified || !input.representativeVerified || !bundle.available || record.bundleHash !== bundle.hash || record.organization.status !== "ACTIVE" || record.organizationVersion !== record.organization.version) throw new ConflictException("Проверьте организацию, полномочия и актуальную редакцию документов");
+          const prerequisites = await supplierOrganizationPrerequisites(tx, record.organizationId);
+          if (!prerequisites.profileComplete || !prerequisites.warehouseComplete || !prerequisites.credentialsComplete) throw new ConflictException("Для допуска необходимы заполненная анкета, склад с адресом и проверенные действующие документы организации");
         }
         const reviewedAt = new Date();
         const changed = await tx.supplierTermsAcceptance.updateMany({ where: { id, version: input.expectedVersion }, data: { admissionStatus: input.status, reviewedById: context.actorId, reviewedAt, reviewReason: input.reason, version: { increment: 1 } } });

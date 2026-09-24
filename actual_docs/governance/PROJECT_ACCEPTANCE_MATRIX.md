@@ -1,5 +1,18 @@
 # DentMarket KZ — матрица фактической готовности
 
+Операционное дополнение24.09.2026 — ORGANIZATION-READY, **локальные проверки пройдены**:
+анкета с юридическим адресом и адресом доставки, серверная готовность/допуск,
+выбор кабинета и переходы реализованы локально на main4cd87a5 + dirty scope.
+Typecheck12/12, API370 unit, regular browser42 и supplier-terms browser/JWT5 PASS.
+Buyer order-profile timeout5s закрыт разрешённым isolated retry2/2; остальные
+unit results REUSED_PASS по входам. PostgreSQL3, core-contract, runtime и
+auth/authority PASS; review и отдельный CI fixture environment regression PASS.
+Это локальная приёмка с сохранённой историей transient failure. Публикация/actual CI
+проверяются отдельно и не подразумеваются локальными PASS.
+Точные входы, история попыток, дополнительные gates и ожидаемое решение —
+[PRIMARY-SESSION / ORGANIZATION-READY](task-state/PRIMARY-SESSION.md).
+Это не приёмка всех CORE-01/05 и не production/юридическая готовность.
+
 Операционное дополнение2026-09-21: [устранение трёх CI-блокеров после консолидации](task-state/MARKET-CI-REMEDIATION-2026-09-21.md).
 Локальные dependency/outbound/PostgreSQL и release-equivalent gates проверены;
 remote CI отмечается отдельно в checkpoint. Это не закрывает CORE/POST-BE/

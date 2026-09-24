@@ -4,6 +4,7 @@ import { mkdir, rm } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { PrismaClient } from "@prisma/client";
+import { completeFixtureOrganization } from "./lib/organization-profile-fixture.mjs";
 
 const root = path.resolve(import.meta.dirname, "..");
 const apiDirectory = path.join(root, "apps", "api");
@@ -128,7 +129,7 @@ async function stopApi() {
   if (api.exitCode === null) api.kill("SIGKILL");
 }
 
-async function createBuyer(index) {
+async function createBuyer(index, complete = true) {
   const bin = `8${String(Date.now()).slice(-6)}${String(process.pid % 1000).padStart(3, "0")}${String(index).padStart(2, "0")}`;
   const user = await prisma.user.create({
     data: {
@@ -152,7 +153,7 @@ async function createBuyer(index) {
       name: "B0.4 buyer",
       isSystem: true,
       permissions: {
-        create: [{ permission: { connect: { code: "order.create" } } }],
+        create: ["order.create", "organization.view", "organization.members.manage"].map(code => ({ permission: { connect: { code } } })),
       },
     },
   });
@@ -170,6 +171,7 @@ async function createBuyer(index) {
   });
   fixture.userIds.push(user.id);
   fixture.buyerIds.push(organization.id);
+  if (complete) await completeFixtureOrganization(prisma, organization.id);
   return { userId: user.id, organizationId: organization.id };
 }
 
@@ -544,7 +546,7 @@ try {
     idempotencyBuyer,
     concurrencyBuyerA,
     concurrencyBuyerB,
-  ] = await Promise.all([1, 2, 3, 4, 5].map(createBuyer));
+  ] = await Promise.all([1, 2, 3, 4, 5].map(index => createBuyer(index)));
 
   api = spawn(process.execPath, [apiEntry], {
     cwd: apiDirectory,
@@ -555,6 +557,26 @@ try {
   api.stdout.on("data", rememberLog);
   api.stderr.on("data", rememberLog);
   await waitUntilReady();
+
+  const onboardingBuyer = await createBuyer(90, false);
+  const profileRoute = "/organizations/current/profile";
+  const incomplete = await expectStatus(profileRoute, { identity: onboardingBuyer }, 200);
+  assert(incomplete.complete === false && incomplete.canEdit === true, "New clinic requires its questionnaire");
+  await expectStatus(`/buyers/${onboardingBuyer.organizationId}/carts`, { method: "POST", identity: onboardingBuyer, body: { currency: "KZT" } }, 409);
+  const profileCity = await prisma.city.findFirstOrThrow({ orderBy: { id: "asc" } });
+  const profileInput = { expectedVersion: incomplete.version, idempotencyKey: `${runId}-profile`, contactName: "Synthetic owner", phone: "+77000000000", email: "profile@example.invalid", legalAddress: { cityId: profileCity.id, line1: "Synthetic legal street 1", postalCode: null }, deliveryAddress: { cityId: profileCity.id, line1: "Synthetic delivery street 2", postalCode: null } };
+  await expectStatus(profileRoute, { method: "POST", identity: onboardingBuyer, body: { ...profileInput, organizationId: foreignTenant.organizationId } }, 400);
+  await expectStatus(profileRoute, { identity: { ...onboardingBuyer, organizationId: foreignTenant.organizationId } }, 403);
+  const savedProfile = await expectStatus(profileRoute, { method: "POST", identity: onboardingBuyer, body: profileInput }, 201);
+  assert(savedProfile.complete && savedProfile.version === incomplete.version + 1, "Profile completion increments organization revision");
+  const replayedProfile = await expectStatus(profileRoute, { method: "POST", identity: onboardingBuyer, body: profileInput }, 201);
+  assert(replayedProfile.version === savedProfile.version, "Profile replay must not increment revision");
+  assert(await prisma.address.count({ where: { organizationId: onboardingBuyer.organizationId } }) === 2, "Replay must not duplicate either address");
+  assert(await prisma.outboxEvent.count({ where: { aggregateId: onboardingBuyer.organizationId, eventType: "OrganizationProfileUpdated" } }) === 1, "Profile and outbox are committed once");
+  const profileRace = await Promise.all(["A", "B"].map(suffix => request(profileRoute, { method: "POST", identity: onboardingBuyer, body: { ...profileInput, expectedVersion: savedProfile.version, idempotencyKey: `${runId}-race-${suffix}`, contactName: `Synthetic owner ${suffix}` } })));
+  assert(profileRace.map(value => value.status).sort().join(",") === "201,409", "Concurrent profile writes require one winner and one conflict");
+  await prisma.idempotencyRecord.deleteMany({ where: { scope: `organization-profile:${onboardingBuyer.organizationId}` } });
+  await prisma.outboxEvent.deleteMany({ where: { aggregateId: onboardingBuyer.organizationId, eventType: "OrganizationProfileUpdated" } });
 
   // The test fixture must satisfy, not bypass, the mandatory supplier agreement.
   const agreementCart = await expectStatus(

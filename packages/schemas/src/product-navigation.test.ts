@@ -1,9 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { productReturnPath, withProductReturn } from "./product-navigation";
+import { productReturnPath, withProductReturn, workspaceReturnPath, withWorkspaceReturn } from "./product-navigation";
 import { emailRegisterSchema } from "./commercial";
 
 const product = "/products/00000000-0000-4000-8000-000000000001";
 const target = `${product}?${new URLSearchParams({ returnTo: "/catalog?q=боры&sort=PRICE_ASC&count=48" })}`;
+describe("workspace return allowlist", () => {
+  it("retains documents for either verified capability and catalog only for buyers", () => {
+    for (const capability of ["BUYER", "SUPPLIER"] as const) expect(workspaceReturnPath("/documents", capability)).toBe("/documents");
+    expect(workspaceReturnPath("/catalog?count=48", "BUYER")).toBe("/catalog?count=48");
+    expect(workspaceReturnPath("/catalog?count=48", "SUPPLIER")).toBeUndefined();
+    expect(workspaceReturnPath(product, "SUPPLIER")).toBeUndefined();
+    expect(withWorkspaceReturn("/login", "/documents")).toBe("/login?returnTo=%2Fdocuments");
+  });
+  it.each(["//outside.invalid", "/admin", "/documents?organizationId=other", "/catalog?action=buy", "/catalog?session=token", "/catalog?q=a&q=b", "/catalog?q=%0a", "/%2e%2e/documents", "/documents#session=foo"])("rejects authority, action and unsafe paths: %s", value => expect(workspaceReturnPath(value)).toBeUndefined());
+});
 describe("product return intent", () => {
   it("preserves the product and catalog context without a purchase action", () => {
     expect(productReturnPath(target)).toBe(target);

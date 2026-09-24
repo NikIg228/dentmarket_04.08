@@ -1,6 +1,6 @@
 "use client";
 import { authRegistrationAcceptedSchema } from "@marketplace/schemas";
-import { withProductReturn } from "@marketplace/schemas/product-navigation";
+import { withWorkspaceReturn } from "@marketplace/schemas/product-navigation";
 import { useProductReturn } from "../use-product-return";
 
 import {
@@ -176,7 +176,7 @@ export default function RegisterPage() {
             <span>Ссылка ограничена по времени и используется один раз.</span>
           </div>
           <div className="registrationActions">
-            <a className="primary registrationPrimary" href={withProductReturn("/login", returnTo)}>
+            <a className="primary registrationPrimary" href={withWorkspaceReturn("/login", returnTo)}>
               Перейти ко входу
             </a>
             <DmButton

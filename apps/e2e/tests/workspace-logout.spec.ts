@@ -33,6 +33,10 @@ for (const app of apps) for (const width of [1440, 390]) {
     let mode: "network" | "unauthorized" | "pending" = "network";
     let release: (() => void) | undefined;
     await page.route("**/api/**", async route => {
+      if (route.request().url().endsWith("/organizations/current/profile")) return route.fulfill({ json: {
+        organizationId: "00000000-0000-4000-8000-000000000020", legalName: "Synthetic UI organization", displayName: "Synthetic UI organization", bin: "000000000000", version: 1, canEdit: true, complete: true,
+        profile: { contactName: "Synthetic Owner", phone: "+77000000000", email: "fixture@example.invalid", legalAddress: { cityId: "00000000-0000-4000-8000-000000000021", line1: "Synthetic address 1", postalCode: null }, deliveryAddress: { cityId: "00000000-0000-4000-8000-000000000021", line1: "Synthetic address 1", postalCode: null } },
+      } });
       if (route.request().url().endsWith("/auth/workspace-context")) return route.fulfill({ json: { organizationId: "00000000-0000-4000-8000-000000000020", organizationDisplayName: "Synthetic UI organization", capabilities: [app.role] } });
       if (route.request().url().endsWith("/supplier-terms/current")) return route.fulfill({ json: {
         organization: { id: "00000000-0000-4000-8000-000000000020", legalName: "Synthetic supplier", bin: "000000000000", version: 1, representativeName: "Test" },

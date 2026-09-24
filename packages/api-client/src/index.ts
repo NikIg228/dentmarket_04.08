@@ -6,6 +6,7 @@ export const frontendDeploymentProfile: DeploymentProfile =
 export const frontendFeatures = deploymentFeatures(frontendDeploymentProfile);
 
 import type {
+  OrganizationProfileResponse, SaveOrganizationProfileInput, OrganizationOnboarding,
   AcceptSupplierTermsInput, ReviewSupplierAdmissionInput, SupplierLegalBundle, SupplierTermsState, SupplierTermsAcceptance, SupplierAdmissionList,
   WorkspaceContext,
   AuthClientOptions, AuthRegistrationAccepted, AuthForgotAccepted, AuthEmailRegistration, LocalOperatorLogin, LocalOperatorSession,
@@ -136,6 +137,10 @@ export class MarketplaceApiError extends Error {
 export class MarketplaceApiClient {
   getSupplierLegalDocuments() { return this.get<SupplierLegalBundle>("/supplier-terms/documents"); }
   getSupplierTerms() { return this.get<SupplierTermsState>("/supplier-terms/current"); }
+  getOrganizationProfile() { return this.get<OrganizationProfileResponse>("/organizations/current/profile"); }
+  saveOrganizationProfile(input: SaveOrganizationProfileInput) { return this.post<OrganizationProfileResponse>("/organizations/current/profile", input); }
+  getOrganizationOnboarding() { return this.get<OrganizationOnboarding>("/organizations/current/onboarding"); }
+  getOperatorOrganizationOnboarding(id: string) { return this.get<OrganizationOnboarding>(`/organizations/${encodeURIComponent(id)}/onboarding`); }
   acceptSupplierTerms(input: AcceptSupplierTermsInput) { return this.post<SupplierTermsAcceptance>("/supplier-terms/acceptances", input); }
   getSupplierAdmissions() { return this.get<SupplierAdmissionList>("/supplier-terms/operator/acceptances"); }
   reviewSupplierAdmission(id: string, input: ReviewSupplierAdmissionInput) { return this.post<SupplierTermsAcceptance>(`/supplier-terms/operator/acceptances/${encodeURIComponent(id)}/review`, input); }

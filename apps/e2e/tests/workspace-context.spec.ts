@@ -41,7 +41,7 @@ for (const [index, capability] of (["BUYER", "SUPPLIER"] as const).entries()) {
     const apiPaths: string[] = [];
     page.on("request", req => { if (req.url().startsWith(apiUrl)) apiPaths.push(new URL(req.url()).pathname); });
     await page.goto("http://127.0.0.1:3103/login");
-    if (capability === "SUPPLIER") await page.getByRole("button", { name: /Поставщик/ }).tap();
+    // The only available workspace is selected from server membership after login.
     await page.getByLabel("Рабочий email").fill(account.email);
     await page.getByLabel("Пароль", { exact: false }).fill(account.password);
     const handoffResponse = page.waitForResponse(response => response.url() === `${apiUrl}/auth/handoff` && response.request().method() === "POST");

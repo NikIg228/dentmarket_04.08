@@ -1052,6 +1052,7 @@ model Organization {
   roles                             Role[]
   approvalPolicies                  ApprovalPolicy[]
   addresses                         Address[]
+  profile                           OrganizationProfile?
   supplierProfile                   SupplierProfile?
   buyerContractPrices               ContractPrice[]           @relation("ContractPriceBuyer")
   carts                             Cart[]                    @relation("CartBuyer")
@@ -1346,6 +1347,25 @@ model Address {
   country         Country               @relation(fields: [countryId], references: [id])
   region          Region                @relation(fields: [regionId], references: [id])
   city            City                  @relation(fields: [cityId], references: [id])
+  legalProfiles   OrganizationProfile[] @relation("OrganizationLegalAddress")
+  deliveryProfiles OrganizationProfile[] @relation("OrganizationDeliveryAddress")
+}
+
+model OrganizationProfile {
+  organizationId    String       @id @db.Uuid
+  contactName       String
+  phone             String
+  email             String
+  legalAddressId    String       @db.Uuid
+  deliveryAddressId String       @db.Uuid
+  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  legalAddress      Address      @relation("OrganizationLegalAddress", fields: [legalAddressId], references: [id])
+  deliveryAddress   Address      @relation("OrganizationDeliveryAddress", fields: [deliveryAddressId], references: [id])
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  @@index([legalAddressId])
+  @@index([deliveryAddressId])
 }
 
 model Industry {

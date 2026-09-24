@@ -77,6 +77,8 @@ test("operator verifies both organization and representative before admission", 
   await page.getByRole("button", { name: "Открыть очередь", exact: true }).click();
   const card = page.locator("article").filter({ has: page.getByRole("heading", { name: new RegExp(seller.name) }) });
   await card.getByRole("button", { name: "Проверить поставщика" }).click();
+  await expect(card.getByText("Юридический адрес", { exact: true })).toBeVisible();
+  await expect(card.getByText("Адрес доставки", { exact: true })).toBeVisible();
   await card.getByLabel("Основание решения", { exact: true }).fill("Тест: организация и полномочия проверены");
   const approve = card.getByRole("button", { name: "Допустить к работе" }); await expect(approve).toBeDisabled();
   await card.getByLabel("Организация и реквизиты проверены", { exact: true }).check(); await expect(approve).toBeDisabled();

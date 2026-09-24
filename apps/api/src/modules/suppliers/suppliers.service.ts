@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import type { CreateSupplierDataSourceInput, CreateSupplierProfileInput, CreateWarehouseInput } from "@marketplace/schemas";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../platform/prisma/prisma.service";
@@ -62,12 +62,26 @@ export class SuppliersService {
   async createWarehouse(supplierOrganizationId: string, input: CreateWarehouseInput, context: SupplierActorContext) {
     await this.access.assertCanManage(supplierOrganizationId, context);
     await this.access.requireProfile(supplierOrganizationId);
-    return this.prisma.$transaction(async (tx) => {
+    const where = { supplierOrganizationId_code: { supplierOrganizationId, code: input.code } };
+    const matches = (value: { status: string; name: string; cityId: string | null; addressLine: string | null; timezone: string }) => value.status === "ACTIVE" && value.name === input.name && value.cityId === (input.cityId ?? null) && value.addressLine === (input.addressLine ?? null) && value.timezone === input.timezone;
+    try { return await this.prisma.$transaction(async (tx) => {
+      const existing = await tx.warehouse.findUnique({ where });
+      if (existing) {
+        if (matches(existing)) return existing;
+        throw new ConflictException("Код склада уже используется. Укажите другой код");
+      }
       const warehouse = await tx.warehouse.create({ data: { supplierOrganizationId, code: input.code, name: input.name, cityId: input.cityId ?? null, addressLine: input.addressLine ?? null, timezone: input.timezone } });
       await tx.auditLog.create({ data: { ...context, action: "supplier.warehouse.created", entityType: "Warehouse", entityId: warehouse.id, after: warehouse } });
       await tx.outboxEvent.create({ data: { aggregateType: "Warehouse", aggregateId: warehouse.id, eventType: "WarehouseCreated", payload: { supplierOrganizationId, warehouseId: warehouse.id } } });
       return warehouse;
-    });
+    }); } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+        const existing = await this.prisma.warehouse.findUnique({ where });
+        if (existing && matches(existing)) return existing;
+        throw new ConflictException("Код склада уже используется. Укажите другой код");
+      }
+      throw error;
+    }
   }
 
   async dataSources(supplierOrganizationId: string, context: SupplierActorContext) {

@@ -64,6 +64,18 @@ export function createWorkspaceSession(apiUrl: string, capability: Capability) {
       const fromHash = window.location.hash.startsWith("#session=");
       const serialized = fromHash ? decodeURIComponent(window.location.hash.slice(9)) : window.sessionStorage.getItem(key);
       let session = parseSessionHandoff(serialized, capability);
+      if (!session && !fromHash) {
+        const response = await call(`/auth/current?workspace=${capability}`, { credentials: "include" });
+        if (!response.ok) throw new Error("Не удалось восстановить вход. Повторите проверку после восстановления сервера.");
+        const raw: unknown = await response.json();
+        if (raw === null) { publish(null); return; }
+        const { currentSessionSchema } = await import("@marketplace/schemas/workspace-session");
+        const result = currentSessionSchema.safeParse(raw);
+        const workspace = result.success ? result.data.workspaces.find(value => value.organizationId === result.data.activeOrganizationId && value.capabilities.includes(capability)) : undefined;
+        if (!result.success || !workspace) { invalidate(); return; }
+        session = { ...result.data, ...workspace, capability, actorId: result.data.user.id, displayName: result.data.user.displayName,
+          accessTokenExpiresAt: Date.now() + result.data.accessTokenExpiresIn * 1000 };
+      }
       if (!session) { publish(null); return; }
       const { workspaceContextSchema, workspaceSessionSchema } = await import("@marketplace/schemas/workspace-session");
       if (session.handoffCode) {

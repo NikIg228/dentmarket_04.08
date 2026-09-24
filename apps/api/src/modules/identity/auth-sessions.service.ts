@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException, UnauthorizedException } from "@nestjs/common";
-import { withProductReturn, type AuthEmailRegistration, type SocialExchangeInput, type WorkspaceContext } from "@marketplace/schemas";
+import { withWorkspaceReturn, type AuthEmailRegistration, type SocialExchangeInput, type WorkspaceContext } from "@marketplace/schemas";
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { passwordHash, passwordMatches } from "./password-codec";
 import jwt from "jsonwebtoken";
@@ -62,7 +62,25 @@ export class AuthSessionsService {
       orderBy: { acceptedAt: "asc" },
     });
     return memberships.map(({ organization }) => ({ organizationId: organization.id, organizationDisplayName: organization.displayName,
-      capabilities: organization.capabilities.map(item => item.capability).filter((value): value is "BUYER" | "SUPPLIER" => value === "BUYER" || value === "SUPPLIER") }));
+      capabilities: organization.capabilities.map(item => item.capability).filter((value): value is "BUYER" | "SUPPLIER" => value === "BUYER" || value === "SUPPLIER") })).filter(item => item.capabilities.length > 0);
+  }
+
+  async currentSession(refreshToken: string | undefined, csrfToken: string | undefined, workspace?: "BUYER" | "SUPPLIER") {
+    if (!refreshToken || !csrfToken || csrfToken.length < 24) return null;
+    const session = await this.prisma.authSession.findFirst({ where: { refreshTokenHash: hash(refreshToken), status: "ACTIVE", expiresAt: { gt: new Date() } },
+      include: { user: { select: { id: true, email: true, displayName: true, status: true } } } });
+    if (!session || session.user.status !== "ACTIVE" || !session.activeOrganizationId) return null;
+    const workspaces = await this.workspaceChoices(session.userId);
+    const active = workspaces.find(item => item.organizationId === session.activeOrganizationId);
+    // Losing membership never silently selects a different organization.
+    if (!active || (workspace && !active.capabilities.includes(workspace))) return null;
+    const { id, email, displayName } = session.user;
+    return { user: { id, email, displayName }, workspaces,
+      sessionId: session.id, activeOrganizationId: session.activeOrganizationId,
+      organizationIds: workspaces.map(item => item.organizationId), csrfToken,
+      accessToken: this.issueAccessToken(id, workspaces.map(item => item.organizationId), active.organizationId, session.authMethods, session.id),
+      accessTokenExpiresIn: environment().AUTH_ACCESS_TOKEN_TTL_SECONDS,
+      refreshTokenExpiresAt: session.expiresAt.toISOString() };
   }
 
   async workspaceContext(userId?: string, organizationId?: string): Promise<WorkspaceContext> {
@@ -107,7 +125,7 @@ export class AuthSessionsService {
     const user = await this.prisma.user.create({ data: { email: input.email, displayName: input.displayName, passwordHash: passwordHash(input.password) } });
     try {
       const token = await this.issueEmailToken(user.id, "EMAIL_VERIFICATION", input.registrationToken ? { registrationToken: input.registrationToken } : undefined);
-      const link = withProductReturn(`${environment().AUTH_EMAIL_BASE_URL}/verify-email?token=${encodeURIComponent(token.raw)}`, input.returnTo);
+      const link = withWorkspaceReturn(`${environment().AUTH_EMAIL_BASE_URL}/verify-email?token=${encodeURIComponent(token.raw)}`, input.returnTo);
       const delivery = await this.email(user.email, "Подтвердите email в DentMarket", `Здравствуйте, ${user.displayName}!\n\nПодтвердите email по ссылке:\n${link}\n\nСсылка действует до ${token.expiresAt.toISOString()}.`);
       await this.prisma.securityEvent.create({ data: { type: "auth.email.registered", severity: "INFO", actorId: user.id, ipAddress: metadata.ipAddress, userAgent: metadata.userAgent } });
       return { ok: true as const, verificationRequired: true as const, email: user.email, delivery };

@@ -16,6 +16,9 @@ function setup() {
   let stored: any = null;
   const membership = { organization, user: { id: context.actorId, displayName: "Тестовый представитель" } };
   const prisma = {
+    organizationProfile: { findUnique: vi.fn().mockResolvedValue({ contactName: "Test Person", phone: "+77000000000", email: "fixture@example.invalid", legalAddress: { organizationId: context.organizationId, cityId: "00000000-0000-4000-8000-000000000001", line1: "Test street 1", postalCode: null }, deliveryAddress: { organizationId: context.organizationId, cityId: "00000000-0000-4000-8000-000000000001", line1: "Test street 2", postalCode: null } }) },
+    warehouse: { findMany: vi.fn().mockResolvedValue([{ addressLine: "Test warehouse 1" }]) },
+    organizationCredential: { count: vi.fn().mockResolvedValue(1) },
     organizationMembership: { findFirst: vi.fn().mockResolvedValue(membership) },
     supplierTermsAcceptance: {
       findUnique: vi.fn(async () => stored), findUniqueOrThrow: vi.fn(async () => stored),
@@ -36,6 +39,20 @@ function setup() {
 const approval = { expectedVersion: 1, status: "APPROVED" as const, organizationVerified: true, representativeVerified: true, reason: "Организация и полномочия проверены" };
 
 describe("supplier common terms and independent admission", () => {
+  it("cannot accept terms before completing the organization profile", async () => {
+    const test = setup(); test.prisma.organizationProfile.findUnique.mockResolvedValue(null);
+    await expect(test.service.accept(input, context, evidence)).rejects.toThrow("анкету");
+    expect(test.prisma.supplierTermsAcceptance.create).not.toHaveBeenCalled();
+  });
+  it.each(["warehouse", "credentials", "profile"])("operator cannot bypass missing %s", async missing => {
+    const test = setup(); const receipt = await test.service.accept(input, context, evidence);
+    test.prisma.supplierTermsAcceptance.findUnique.mockImplementation(async () => ({ ...test.get(), organization }));
+    if (missing === "warehouse") test.prisma.warehouse.findMany.mockResolvedValue([{ addressLine: "    " }]);
+    if (missing === "credentials") test.prisma.organizationCredential.count.mockResolvedValue(0);
+    if (missing === "profile") test.prisma.organizationProfile.findUnique.mockResolvedValue(null);
+    await expect(test.service.review(receipt.id, approval, operator)).rejects.toMatchObject({ status: 409 });
+    expect(test.prisma.supplierTermsAcceptance.updateMany).not.toHaveBeenCalled();
+  });
   it("keeps production drafts empty and rejects accepting them", async () => {
     const test = setup(); test.legal.current.mockReturnValue(buildSupplierLegalBundle(supplierLegalDocuments));
     expect(test.legal.current().available).toBe(false);

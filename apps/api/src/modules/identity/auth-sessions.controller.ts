@@ -1,8 +1,8 @@
-import { BadRequestException, Body, Controller, Delete, Get, Header, Headers, Param, Post, Req, Res, UnauthorizedException } from "@nestjs/common";
-import { localOperatorLoginSchema, workspaceHandoffRequestSchema, workspaceExchangeRequestSchema } from "@marketplace/schemas";
+import { BadRequestException, Body, Controller, Delete, Get, Header, Headers, Param, Post, Query, Req, Res, UnauthorizedException } from "@nestjs/common";
+import { currentSessionQuerySchema, localOperatorLoginSchema, workspaceHandoffRequestSchema, workspaceExchangeRequestSchema } from "@marketplace/schemas";
 import { ApiCoreBody, ApiCoreProtected, ApiCoreResponse } from "../../platform/openapi/core-openapi";
 import { demoSessionSchema, emailForgotPasswordSchema, emailLoginSchema, emailRegisterSchema, emailResetPasswordSchema, emailTokenSchema, refreshSessionSchema, revokeSessionSchema, socialExchangeSchema, switchSessionOrganizationSchema, unlinkExternalIdentitySchema } from "@marketplace/schemas";
-import { ApiTags } from "@nestjs/swagger";
+import { ApiQuery, ApiTags } from "@nestjs/swagger";
 import type { Request, Response } from "express";
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import { environment } from "../../platform/config/environment";
@@ -72,6 +72,25 @@ export class AuthSessionsController {
   @ApiCoreResponse("ErrorResponse", 401) @ApiCoreResponse("ErrorResponse", 403) @ApiCoreResponse("ErrorResponse", 429)
   workspaceContext(@Headers("x-user-id") userId: string, @Headers("x-organization-id") organizationId: string) {
     return this.sessions.workspaceContext(userId, organizationId);
+  }
+
+  @Get("current") @Header("Cache-Control", "no-store")
+  // Session restoration is a read on normal page entry. Keep credential attempts
+  // on the stricter controller policy, and this read on the standard API policy.
+  @Throttle({
+    ip: { limit: () => environment().RATE_LIMIT_REQUESTS, ttl: () => environment().RATE_LIMIT_TTL_MS },
+    user: { limit: () => environment().RATE_LIMIT_REQUESTS * 2, ttl: () => environment().RATE_LIMIT_TTL_MS },
+    tenant: { limit: () => environment().RATE_LIMIT_REQUESTS * 5, ttl: () => environment().RATE_LIMIT_TTL_MS },
+  })
+  @ApiQuery({ name: "workspace", enum: ["BUYER", "SUPPLIER"], required: false, description: "Capability cookie to inspect; omission uses the sign-in cookie. Does not grant or switch membership." })
+  @ApiCoreResponse("CurrentSessionResponse", 200, "Read-only HttpOnly cookie session restoration; no cookie rotation or automatic organization switch.")
+  async current(@Query() query: unknown, @Req() request: Request, @Res() response: Response) {
+    const parsed = currentSessionQuerySchema.safeParse(query);
+    if (!parsed.success) throw new BadRequestException(parsed.error.flatten());
+    const cookie = cookies(request.header("cookie"));
+    const suffix = parsed.data.workspace ? `_${parsed.data.workspace.toLowerCase()}` : "";
+    // Nest's default null handling sends an empty body; the contract is JSON null.
+    return response.json(await this.sessions.currentSession(cookie[`mp_refresh${suffix}`], cookie[`mp_csrf${suffix}`], parsed.data.workspace));
   }
 
   @Get("workspaces") @Header("Cache-Control", "no-store") @ApiCoreProtected()

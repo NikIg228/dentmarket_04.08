@@ -9,16 +9,21 @@ import {setTimeout as delay} from 'node:timers/promises';
 import path from 'node:path';
 import {PrismaClient} from '@prisma/client';
 import {auditEnvironment, root} from './lib/registration-resume-fixture.mjs';
+import {completeFixtureOrganization} from './lib/organization-profile-fixture.mjs';
 
+// Reuse a verified web build by choosing its loopback API port; never reuse an
+// existing API because this harness owns the synthetic legal-document provider.
+const apiPort = Number(process.env.E2E_SUPPLIER_TERMS_API_PORT ?? 4112);
+assert.ok(Number.isInteger(apiPort) && apiPort >= 1024 && apiPort <= 65535);
 const env = auditEnvironment();
-Object.assign(env, {API_HOST:'127.0.0.1',API_PORT:'4112',JWT_REQUIRE_MFA:'false',CORS_ORIGINS:'http://127.0.0.1:3102,http://127.0.0.1:3100',LOCAL_STORAGE_PATH:path.join(root,'.tmp/supplier-terms-storage')});
+Object.assign(env, {API_HOST:'127.0.0.1',API_PORT:String(apiPort),JWT_REQUIRE_MFA:'false',CORS_ORIGINS:'http://127.0.0.1:3102,http://127.0.0.1:3100',LOCAL_STORAGE_PATH:path.join(root,'.tmp/supplier-terms-storage')});
 for (const key of Object.keys(process.env)) delete process.env[key];
 Object.assign(process.env,env);
 const db = new PrismaClient({datasourceUrl:env.DATABASE_URL});
 const [identity] = await db.$queryRaw`SELECT current_database() AS database, current_schema() AS schema, to_regclass('public."SupplierTermsAcceptance"') IS NOT NULL AS ready`;
 assert.deepEqual(identity,{database:'dentmarket_audit_20260914',schema:'public',ready:true});
 async function free(port) { const server=createServer(); await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(port,'127.0.0.1',resolve);});await new Promise(resolve=>server.close(resolve)); }
-for(const port of [4112,3102,3100]) await free(port);
+for(const port of [apiPort,3102,3100]) await free(port);
 const require=createRequire(import.meta.url);
 require('reflect-metadata');
 const {createMarketplaceApp}=require('../apps/api/dist/src/bootstrap.js');
@@ -32,7 +37,7 @@ let current=published; legal.current=()=>current;
 const accounts=new Map(), children=[], runId=`terms_${Date.now()}`, issued=[];
 let count=0,stopping=false;
 async function request(route,body,account,expected=200,headers={}) {
-  const response=await fetch('http://127.0.0.1:4112/api'+route,{method:body===undefined?'GET':'POST',headers:{'content-type':'application/json',...(account?{authorization:`Bearer ${account.session.accessToken}`} : {}),...headers},body:body===undefined?undefined:JSON.stringify(body)});
+  const response=await fetch(`http://127.0.0.1:${apiPort}/api`+route,{method:body===undefined?'GET':'POST',headers:{'content-type':'application/json',...(account?{authorization:`Bearer ${account.session.accessToken}`} : {}),...headers},body:body===undefined?undefined:JSON.stringify(body)});
   assert.equal(response.status,expected,`${route}: ${response.status}, expected ${expected}; body omitted`);
   return response.headers.get('content-type')?.includes('application/json')?response.json():response.text();
 }
@@ -41,6 +46,12 @@ async function account(key,capability='SUPPLIER') {
   const password=randomBytes(24).toString('base64url');
   const user=await db.user.create({data:{email:`${runId}_${++count}@example.invalid`,displayName:`Представитель ${key}`,emailVerifiedAt:new Date(),passwordHash:passwordHash(password)}});issued.push(user.id);
   const organization=await db.organization.create({data:{bin:`96${String(Date.now()).slice(-8)}${String(count).padStart(2,'0')}`,legalName:`Тест ${key} ${runId}`,displayName:`Тест ${key}`,capabilities:{create:{capability}},...(capability==='SUPPLIER'?{supplierProfile:{create:{}}}: {})}});
+  if(capability==='SUPPLIER') {
+    await completeFixtureOrganization(db,organization.id);
+    const city=await db.city.findFirstOrThrow({orderBy:{id:'asc'}});
+    await db.warehouse.create({data:{supplierOrganizationId:organization.id,code:'TEST',name:'Synthetic warehouse',cityId:city.id,addressLine:'Synthetic warehouse street 1',timezone:'Asia/Almaty'}});
+    await db.organizationCredential.create({data:{organizationId:organization.id,type:'REGISTRATION_CERTIFICATE',number:`synthetic-${runId}-${count}`,status:'VERIFIED',verifiedAt:new Date(),metadata:{fixture:true}}});
+  }
   const codes=capability==='MARKETPLACE_OPERATOR'?(await db.permission.findMany({select:{code:true}})).map(item=>item.code):['organization.view','document.view','document.sign','supplier.profile.manage'];
   const role=await db.role.create({data:{organizationId:organization.id,code:'terms_test',name:'Synthetic regression role',permissions:{create:codes.map(code=>({permission:{connect:{code}}}))}}});
   await db.organizationMembership.create({data:{organizationId:organization.id,userId:user.id,status:'ACTIVE',isPrimary:true,acceptedAt:new Date(),roles:{create:{roleId:role.id}}}});
@@ -91,7 +102,7 @@ async function stop() {
   await db.$disconnect();
 }
 try {
-  await app.listen(4112,'127.0.0.1');
+  await app.listen(apiPort,'127.0.0.1');
   for(const [name,port] of [['supplier',3102],['admin',3100]]) {
     const child=spawn(process.execPath,[path.join(root,'node_modules/next/dist/bin/next'),'start','--hostname','127.0.0.1','--port',String(port)],{cwd:path.join(root,`apps/${name}-web`),env:{...env,NODE_ENV:'production'},windowsHide:true,stdio:'ignore'});children.push(child);
     const deadline=Date.now()+60000;let ready=false;
@@ -102,7 +113,11 @@ try {
     let value;
     if(message.type==='api-tests')value=await apiTests();
     else if(message.type==='documents'){current=message.draft?buildSupplierLegalBundle(supplierLegalDocuments):published;value={available:current.available};}
-    else if(message.type==='setup'){const record=await account(message.key,message.operator?'MARKETPLACE_OPERATOR':'SUPPLIER');value={organizationId:record.organization.id,name:record.organization.legalName,session:message.operator?record.session:{...record.session,organizationId:record.organization.id,capability:'SUPPLIER',actorId:record.user.id,displayName:record.user.displayName}};}
+    else if(message.type==='setup'){
+      const record=await account(message.key,message.operator?'MARKETPLACE_OPERATOR':'SUPPLIER');
+      const session=message.operator?record.session:await request('/auth/handoff',{capability:'SUPPLIER'},record,201);
+      value={organizationId:record.organization.id,name:record.organization.legalName,session};
+    }
     else if(message.type==='accept'){value=await request('/supplier-terms/acceptances',acceptanceInput(),await account(message.key),201);}
     else if(message.type==='readback'){const record=accounts.get(message.key);value=await db.supplierTermsAcceptance.findMany({where:{organizationId:record.organization.id},select:{id:true,admissionStatus:true,bundleHash:true,representativeName:true}});}
     else throw Error('Unknown fixture action');

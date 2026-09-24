@@ -34,6 +34,7 @@ import {
 } from "./commerce-rules";
 import { MarketplaceAgreementsService } from "../agreements/marketplace-agreements.service";
 import { documentReferenceInclude, hasConsistentDocumentReferences, withoutReferenceRelations } from "../documents/document-reference-graph";
+import { assertOrganizationProfileComplete } from "../organizations/organization-profile.service";
 
 @Injectable()
 export class CommerceService {
@@ -374,6 +375,7 @@ export class CommerceService {
     context: SupplierActorContext,
   ) {
     await this.assertBuyerAccess(buyerOrganizationId, context);
+    await assertOrganizationProfileComplete(this.prisma, buyerOrganizationId);
     const existing = await this.prisma.cart.findFirst({
       where: { buyerOrganizationId, status: "ACTIVE" },
       include: { items: true, checkout: true },
@@ -423,6 +425,7 @@ export class CommerceService {
     const owner = await this.prisma.cart.findUnique({ where: { id: cartId }, select: { buyerOrganizationId: true } });
     if (!owner) throw new NotFoundException("Cart not found");
     await this.assertBuyerAccess(owner.buyerOrganizationId, context);
+    await assertOrganizationProfileComplete(this.prisma, owner.buyerOrganizationId);
     const cart = await this.prisma.cart.findUnique({
       where: { id: cartId },
       include: { items: { include: { offer: { include: { supplier: { include: { organization: true } }, productVariant: { include: { product: true } } } } } }, checkout: true },

@@ -37,7 +37,7 @@ import {
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { loginUrl } from "./public-links";
+import { loginUrl, publicCatalogUrl } from "./public-links";
 import { SupplierDashboard } from "./features/supplier-workspace/supplier-dashboard";
 import type {
   Balance,
@@ -584,6 +584,7 @@ export default function SupplierWorkspace() {
       actions={
         <>
           <span className={styles.switcher}>{supplier.name}</span>
+          <DmButton as="a" href={publicCatalogUrl}>Публичный каталог</DmButton>
           <Menu>
             <MenuTrigger disableButtonEnhancement>
               <DmButton appearance="subtle" icon={<MoreHorizontal24Regular />}>Ещё</DmButton>

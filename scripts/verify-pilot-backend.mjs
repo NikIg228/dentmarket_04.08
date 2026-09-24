@@ -4,6 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { PrismaClient } from "@prisma/client";
+import { completeFixtureOrganization } from "./lib/organization-profile-fixture.mjs";
 import * as coreSchemas from "../packages/schemas/dist/index.js";
 
 const root = path.resolve(import.meta.dirname, "..");
@@ -34,6 +35,7 @@ function assertSchema(schema, value, label) {
 
 function assertOpenApiContract(openApi) {
   const requiredComponents = [
+    "SaveOrganizationProfileRequest", "OrganizationProfileResponse", "OrganizationOnboardingResponse", "CurrentSessionResponse",
     "HealthResponse",
     "ReadinessResponse",
     "CatalogSearchResponse",
@@ -61,6 +63,11 @@ function assertOpenApiContract(openApi) {
   }
 
   const coreOperations = [
+    ["/api/auth/current", "get", "200", "CurrentSessionResponse"],
+    ["/api/organizations/current/profile", "get", "200", "OrganizationProfileResponse"],
+    ["/api/organizations/current/profile", "post", "201", "OrganizationProfileResponse", "SaveOrganizationProfileRequest"],
+    ["/api/organizations/current/onboarding", "get", "200", "OrganizationOnboardingResponse"],
+    ["/api/organizations/{id}/onboarding", "get", "200", "OrganizationOnboardingResponse"],
     ["/api/health", "get", "200", "HealthResponse"],
     ["/api/health/ready", "get", "200", "ReadinessResponse"],
     ["/api/catalog/cities", "get", "200", "PublicCityListResponse"],
@@ -539,6 +546,7 @@ try {
       await prisma.outboxEvent.delete({ where: { id: replayEvent.id } });
     }
 
+    await completeFixtureOrganization(prisma, buyer.id);
     const cart = await post(`/buyers/${buyer.id}/carts`, { currency: "KZT" });
     assertSchema(
       coreSchemas.cartResponseSchema,

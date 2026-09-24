@@ -94,6 +94,7 @@ export async function startLocalAuthFixture({ web = false, operator = true, webA
       : capability === 'SUPPLIER' ? ['organization.view','catalog.product.view','inventory.view','order.confirm','integration.view','import.manage','compliance.view','document.view','notification.view']
       : ['organization.view','security.event.view'];
     if (capability === 'SUPPLIER') await db.supplierProfile.create({ data: { organizationId: organization.id } });
+    if (capability === 'BUYER') await (await import('./organization-profile-fixture.mjs')).completeFixtureOrganization(db, organization.id);
     const role = await db.role.create({ data: { organizationId: organization.id, code: 'audit_local_auth', name: 'Audit workspace user', permissions: { create: permissions.map(code => ({ permission: { connect: { code } } })) } } });
     await db.organizationMembership.create({ data: { userId: user.id, organizationId: organization.id, status: 'ACTIVE', acceptedAt: new Date(), isPrimary: true, roles: { create: { roleId: role.id } } } });
     return { email, password, userId: user.id, organizationId: organization.id, verificationToken: token };

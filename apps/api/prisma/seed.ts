@@ -581,6 +581,8 @@ async function seed() {
     create: { id: fixedId(503), organizationId: demoBuyer.id, countryId: kazakhstan.id, regionId: pavlodar.regionId, cityId: pavlodar.id, line1: "Павлодар, ул. Академика Сатпаева, 48", district: "Центральный", latitude: geoByCityCode.PAVLODAR!.latitude, longitude: geoByCityCode.PAVLODAR!.longitude, geoStatus: "VERIFIED", geoMethod: "ORGANIZATION_DETAILS", geoEvidence: { source: "seed_pilot_details" }, geoVerifiedAt: new Date(), geoVerifiedById: operatorUser.id },
   });
   await prisma.organizationFeature.upsert({ where: { organizationId_featureKey: { organizationId: demoBuyer.id, featureKey: "trust.smart-commerce" } }, update: { enabled: true, source: "SEED_PILOT" }, create: { organizationId: demoBuyer.id, featureKey: "trust.smart-commerce", enabled: true, source: "SEED_PILOT" } });
+  // The legacy demo buyer is a synthetic fixture. Never overwrite an entered profile.
+  await prisma.organizationProfile.upsert({ where: { organizationId: demoBuyer.id }, update: {}, create: { organizationId: demoBuyer.id, contactName: "Demo clinic contact", phone: "+77000000000", email: "demo-clinic@example.invalid", legalAddressId: buyerAddress.id, deliveryAddressId: buyerAddress.id } });
 
   const metricCodes = ["availability_accuracy", "price_accuracy", "order_fulfillment", "confirmation_speed", "delivery_ontime", "document_quality", "communication_quality", "data_freshness", "dispute_resolution"] as const;
   for (let supplierIndex = 0; supplierIndex < paymentSuppliers.length; supplierIndex += 1) {

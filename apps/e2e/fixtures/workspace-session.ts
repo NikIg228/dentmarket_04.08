@@ -1,6 +1,7 @@
 import { createHash, createHmac, randomUUID } from "node:crypto";
 import { PrismaClient } from "@prisma/client";
 import type { Page } from "@playwright/test";
+import { completeFixtureOrganization } from "../../../scripts/lib/organization-profile-fixture.mjs";
 
 // Only the isolated browser fixture API uses this published test key.
 export const e2eJwtSecret = "isolated-e2e-jwt-key-never-use-outside-tests";
@@ -12,6 +13,7 @@ function assertTestDatabase() {
 export async function workspaceFixture(prisma: PrismaClient, capability: "BUYER" | "SUPPLIER", identity: { userId: string; organizationId: string; displayName: string }) {
   assertTestDatabase();
   const membership = await prisma.organizationMembership.findFirstOrThrow({ where: { userId: identity.userId, organizationId: identity.organizationId, status: "ACTIVE", organization: { capabilities: { some: { capability } } } } });
+  await completeFixtureOrganization(prisma, identity.organizationId);
   const id = randomUUID(), now = Math.floor(Date.now() / 1000);
   await prisma.authSession.create({ data: { id, userId: membership.userId, familyId: randomUUID(), refreshTokenHash: createHash("sha256").update(randomUUID()).digest("hex"), organizationIds: [identity.organizationId], activeOrganizationId: identity.organizationId, authMethods: ["password"], expiresAt: new Date(Date.now() + 3600000) } });
   const encode = (value: object) => Buffer.from(JSON.stringify(value)).toString("base64url");
@@ -26,7 +28,7 @@ export async function installPilotWorkspace(page: Page, capability: "BUYER" | "S
   const db = new PrismaClient();
   try {
     const org = await db.organization.findFirstOrThrow({ where: { bin: { startsWith: capability === "BUYER" ? "970" : "980" }, status: "ACTIVE", capabilities: { some: { capability } } }, orderBy: { bin: "asc" } });
-    const permissions = capability === "BUYER" ? ["order.create","document.view","notification.view","catalog.product.view"] : ["catalog.product.view","inventory.view","order.confirm","integration.view","import.manage","compliance.view","document.view","notification.view"];
+    const permissions = capability === "BUYER" ? ["organization.view","order.create","document.view","notification.view","catalog.product.view"] : ["organization.view","catalog.product.view","inventory.view","order.confirm","integration.view","import.manage","compliance.view","document.view","notification.view"];
     const key = randomUUID();
     const user = await db.user.create({ data: { email: `e2e-workspace-${key}@example.invalid`, displayName: "Browser fixture", status: "ACTIVE", emailVerifiedAt: new Date() } });
     const role = await db.role.create({ data: { organizationId: org.id, code: `e2e-${key}`, name: "Browser fixture", permissions: { create: permissions.map(code => ({ permission: { connect: { code } } })) } } });

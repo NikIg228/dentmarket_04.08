@@ -20,3 +20,12 @@ export const workspaceSessionSchema = workspaceRefreshResponseSchema.extend({
   organizationDisplayName: z.string().min(1),
 });
 export type WorkspaceSession = z.infer<typeof workspaceSessionSchema>;
+
+// Read-only restoration from an HttpOnly session cookie. No refresh rotation or
+// workspace creation; the server rechecks active membership before returning it.
+export const currentSessionSchema = workspaceRefreshResponseSchema.extend({
+  user: z.object({ id: z.uuid(), email: z.email(), displayName: z.string().min(1) }),
+  workspaces: workspaceChoicesSchema,
+});
+export type CurrentSession = z.infer<typeof currentSessionSchema>;
+export const currentSessionQuerySchema = z.object({ workspace: z.enum(["BUYER", "SUPPLIER"]).optional() }).strict();

@@ -27,3 +27,26 @@ export function withProductReturn(href: string, value: unknown): string {
   url.searchParams.set("returnTo", target);
   return href.startsWith("/") ? url.pathname + url.search + url.hash : url.href;
 }
+
+/** Only existing read-only pages. A return hint never selects an organization or executes an action. */
+export function workspaceReturnPath(value: unknown, capability?: "BUYER" | "SUPPLIER"): string | undefined {
+  if (typeof value !== "string" || value.length > 4096 || unsafeCharacters.test(value)) return;
+  if (value === "/documents" || value === "/") return value;
+  if (capability === "SUPPLIER") return;
+  const product = productReturnPath(value);
+  if (product) return product;
+  if (!/^\/(?:catalog)?(?:\?|$)/.test(value)) return;
+  const url = new URL(value, navigationOrigin);
+  const filters = new Set(["q", "sort", "unit", "packaging", "deliveryMethod", "inStock", "brand", "category", "categoryId", "minPrice", "maxPrice", "verified", "official", "count", "offset"]);
+  if (url.origin !== navigationOrigin || !["/", "/catalog"].includes(url.pathname)) return;
+  for (const [key, field] of url.searchParams) if (!filters.has(key) || url.searchParams.getAll(key).length !== 1 || field.length > 240 || unsafeCharacters.test(field)) return;
+  return url.pathname + url.search;
+}
+
+export function withWorkspaceReturn(href: string, value: unknown): string {
+  const target = workspaceReturnPath(value);
+  if (!target) return href;
+  const url = new URL(href, navigationOrigin);
+  url.searchParams.set("returnTo", target);
+  return href.startsWith("/") ? url.pathname + url.search + url.hash : url.href;
+}

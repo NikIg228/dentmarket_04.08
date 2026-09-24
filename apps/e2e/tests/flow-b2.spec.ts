@@ -1,4 +1,5 @@
 import { workspaceFixture } from "../fixtures/workspace-session";
+import { completeFixtureOrganization } from "../../../scripts/lib/organization-profile-fixture.mjs";
 import { randomUUID } from "node:crypto";
 import { unlink } from "node:fs/promises";
 import { resolve, sep } from "node:path";
@@ -198,6 +199,7 @@ async function createBuyerFixture(): Promise<ActorFixture> {
     });
   });
 
+  await completeFixtureOrganization(prisma, organizationId);
   return { organizationId, userId, roleId, displayName };
 }
 

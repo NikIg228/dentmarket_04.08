@@ -1,13 +1,13 @@
 "use client";
-import { authForgotAcceptedSchema, type WorkspaceContext } from "@marketplace/schemas";
+import { authForgotAcceptedSchema } from "@marketplace/schemas";
 import Link from "next/link";
-import { withProductReturn } from "@marketplace/schemas/product-navigation";
+import { withWorkspaceReturn } from "@marketplace/schemas/product-navigation";
 import { useProductReturn } from "../use-product-return";
 
 import Script from "next/script";
 import { DmButton, DmField, DmInput, DmSelect } from "@marketplace/ui";
 import { type FormEvent, useEffect, useRef, useState } from "react";
-import { AuthBrand, AuthNotice, AuthRolePicker } from "../auth-components";
+import { AuthBrand, AuthNotice } from "../auth-components";
 import {
   type AuthCapability,
   type AuthFeedback,
@@ -17,6 +17,7 @@ import {
   feedbackFromError,
   openWorkspace,
   availableWorkspaces,
+  workspaceOptions, resumeAuthSession, type WorkspaceChoice,
 } from "../auth-client";
 
 declare global {
@@ -52,14 +53,13 @@ type BusyAction = "email" | "forgot" | "workspace" | "social" | null;
 
 export default function LoginPage() {
   const returnTo = useProductReturn();
-  const [capability, setCapability] = useState<AuthCapability>("BUYER");
   const [busyAction, setBusyAction] = useState<BusyAction>(null);
   const [feedback, setFeedback] = useState<AuthFeedback | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [pendingSession, setPendingSession] = useState<AuthSession | null>(null);
-  const [choices, setChoices] = useState<WorkspaceContext[]>([]);
-  const [organizationId, setOrganizationId] = useState("");
+  const [choices, setChoices] = useState<WorkspaceChoice[]>([]);
+  const [choiceIndex, setChoiceIndex] = useState(0);
   const googleButton = useRef<HTMLDivElement>(null);
   const busy = busyAction !== null;
   const hasGoogle = Boolean(googleClientId);
@@ -67,10 +67,19 @@ export default function LoginPage() {
   const hasSocialLogin = hasGoogle || hasApple;
 
   const continueSession = async (session: AuthSession) => {
-    const workspaces = await availableWorkspaces(session, capability);
-    if (workspaces.length === 1) return openWorkspace(session, capability, workspaces[0].organizationId, returnTo);
-    setPendingSession(session); setChoices(workspaces); setOrganizationId(workspaces[0].organizationId);
+    const workspaces = workspaceOptions(await availableWorkspaces(session));
+    if (workspaces.length === 1) return openWorkspace(session, workspaces[0].capability, workspaces[0].organizationId, returnTo);
+    setPendingSession(session); setChoices(workspaces); setChoiceIndex(0);
   };
+
+  useEffect(() => {
+    let active = true;
+    setBusyAction("workspace");
+    void resumeAuthSession().then(session => { if (active && session) return continueSession(session); })
+      .catch(cause => { if (active) setFeedback(feedbackFromError(cause, "Не удалось восстановить вход")); })
+      .finally(() => { if (active) setBusyAction(null); });
+    return () => { active = false; };
+  }, [returnTo]);
 
   const exchange = async (provider: "GOOGLE" | "APPLE", idToken: string) => {
     setBusyAction("social");
@@ -192,12 +201,8 @@ export default function LoginPage() {
       <section className="loginPanel" aria-labelledby="login-title">
         <div className="loginCard">
           <p className="eyebrow">Вход</p>
-          <h2 id="login-title">Выберите кабинет</h2>
-          <AuthRolePicker
-            value={capability}
-            onChange={(value) => { setCapability(value); setPendingSession(null); setChoices([]); setFeedback(null); }}
-            disabled={busy}
-          />
+          <h2 id="login-title">Войдите в аккаунт</h2>
+          <p>Доступные организации и кабинеты определяются после входа.</p>
           <form className="emailLoginForm" onSubmit={emailLogin}>
             <DmField label="Рабочий email" required>
               <DmInput
@@ -256,14 +261,14 @@ export default function LoginPage() {
             </>
           ) : null}
           {pendingSession ? <div>
-            <DmField label="Организация">
-              <DmSelect value={organizationId} disabled={busy} onChange={(_, data) => setOrganizationId(data.value)}>
-                {choices.map(item => <option key={item.organizationId} value={item.organizationId}>{item.organizationDisplayName}</option>)}
+            <DmField label="Организация и кабинет">
+              <DmSelect value={String(choiceIndex)} disabled={busy} onChange={(_, data) => setChoiceIndex(Number(data.value))}>
+                {choices.map((item, index) => <option key={`${item.organizationId}:${item.capability}`} value={index}>{item.organizationDisplayName} · {item.capability === "BUYER" ? "Клиника" : "Поставщик"}</option>)}
               </DmSelect>
             </DmField>
             <DmButton disabled={busy} onClick={async () => {
               setBusyAction("workspace"); setFeedback(null);
-              try { await openWorkspace(pendingSession, capability, organizationId, returnTo); }
+              try { const choice = choices[choiceIndex]; if (choice) await openWorkspace(pendingSession, choice.capability, choice.organizationId, returnTo); }
               catch (cause) { setFeedback(feedbackFromError(cause, "Не удалось открыть кабинет")); }
               finally { setBusyAction(null); }
             }}>Открыть выбранную организацию</DmButton>
@@ -273,7 +278,7 @@ export default function LoginPage() {
           <p className="loginSignup">
             Нет аккаунта?{" "}
             <Link
-              href={withProductReturn(`/register?role=${capability === "BUYER" ? "buyer" : "supplier"}`, returnTo)}
+              href={withWorkspaceReturn("/register", returnTo)}
             >
               Зарегистрироваться
             </Link>

@@ -9,6 +9,8 @@ import { EdsSignatureVerificationService } from "./eds-signature-verification.se
 import { SupplierTermsController } from "./supplier-terms.controller";
 import { SupplierTermsService } from "./supplier-terms.service";
 import { SupplierLegalDocuments } from "./supplier-legal-documents";
+import { OrganizationsModule } from "../organizations/organizations.module";
+import { OrganizationOnboardingController } from "./organization-onboarding.controller";
 
-@Module({ imports: [DocumentsModule, BuyerSupplierAgreementsModule], controllers: [MarketplaceAgreementsController, SignatureCallbacksController, SupplierTermsController], providers: [MarketplaceAgreementsService, SignatureCallbacksService, EdsSignatureVerificationService, SupplierTermsService, SupplierLegalDocuments], exports: [MarketplaceAgreementsService, SupplierTermsService] })
+@Module({ imports: [DocumentsModule, BuyerSupplierAgreementsModule, OrganizationsModule], controllers: [MarketplaceAgreementsController, SignatureCallbacksController, SupplierTermsController, OrganizationOnboardingController], providers: [MarketplaceAgreementsService, SignatureCallbacksService, EdsSignatureVerificationService, SupplierTermsService, SupplierLegalDocuments], exports: [MarketplaceAgreementsService, SupplierTermsService] })
 export class MarketplaceAgreementsModule {}

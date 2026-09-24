@@ -31,6 +31,7 @@ import {
 } from "@marketplace/ui";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { withWorkspaceReturn } from "@marketplace/schemas/product-navigation";
 import { loginUrl } from "../public-links";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:4012/api";
@@ -133,7 +134,7 @@ export default function BuyerDocumentsPage() {
   };
 
   if (!sessionReady) return <LoadingState label="Проверяем вход" />;
-  if (!handoff) return <ErrorState title="Войдите в кабинет" description={sessionError ?? "Документы доступны после входа."} action={<><DmButton as="a" href={loginUrl}>Войти</DmButton><DmButton onClick={() => void sessionStore.retry()}>Повторить проверку</DmButton></>} />;
+  if (!handoff) return <ErrorState title="Войдите в кабинет" description={sessionError ?? "Документы доступны после входа."} action={<><DmButton as="a" href={withWorkspaceReturn(loginUrl, "/documents")}>Войти</DmButton><DmButton onClick={() => void sessionStore.retry()}>Повторить проверку</DmButton></>} />;
 
   return <AppShell productName="DentMarket KZ" productMark="DM" workspaceLabel="Кабинет клиники" userName={handoff?.displayName ?? "Участник организации"} userMeta={handoff?.organizationDisplayName ?? "Клиника"} navigation={navigation} activeNavigation="documents" contextLabel="Документолог" onNavigate={(id) => { if (id !== "documents") router.push("/"); }} {...logout}>
     <DocumentArchiveWorkspace

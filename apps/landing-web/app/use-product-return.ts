@@ -1,7 +1,7 @@
 "use client";
 import { useSearchParams } from "next/navigation";
-import { productReturnPath } from "@marketplace/schemas/product-navigation";
+import { workspaceReturnPath } from "@marketplace/schemas/product-navigation";
 
 export function useProductReturn() {
-  return productReturnPath(useSearchParams().get("returnTo"));
+  return workspaceReturnPath(useSearchParams().get("returnTo"));
 }

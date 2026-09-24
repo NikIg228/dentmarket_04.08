@@ -2,6 +2,7 @@
 
 export * from "./document-archive";
 export * from "./document-relations";
+export { OrganizationProfileForm } from "./organization-profile-form";
 export { useSessionLogout } from "./use-session-logout";
 
 import {

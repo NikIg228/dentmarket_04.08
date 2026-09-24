@@ -4,7 +4,8 @@ import Link from "next/link";
 import { Search24Regular } from "@fluentui/react-icons/svg/search";
 import { DmButton, DmInput } from "@marketplace/ui";
 import { useCallback, useId, useRef, useState, type FormEvent } from "react";
-import { loginUrl } from "./public-links";
+import { loginUrl, supplierAppUrl } from "./public-links";
+import { useSupplierCatalogSession } from "./supplier-catalog-session";
 import { CityLocation } from "./city-location";
 import { usePopupDismiss } from "./use-popup-dismiss";
 import styles from "./public-header.module.css";
@@ -40,6 +41,8 @@ const searchSuggestions = [
 ];
 
 export function PublicHeader({ active, baseHref = "/", query = "", searching = false, onQueryChange, onSearch, recentSearches = [], loginHref = loginUrl }: PublicHeaderProps) {
+  const supplierSession = useSupplierCatalogSession();
+  if (supplierSession && baseHref === "/") baseHref = "/catalog";
   const searchRef = useRef<HTMLFormElement>(null);
   const suggestionsId = useId();
   const [searchOpen, setSearchOpen] = useState(false);
@@ -151,8 +154,8 @@ export function PublicHeader({ active, baseHref = "/", query = "", searching = f
         </form>
       ) : null}
       <CityLocation />
-      <a className={styles.login} href={loginHref}>
-        Войти
+      <a className={styles.login} href={supplierSession ? supplierAppUrl : loginHref}>
+        {supplierSession ? "Кабинет поставщика" : "Войти"}
       </a>
     </header>
   );

@@ -1,5 +1,5 @@
-import { workspaceContextSchema, workspaceChoicesSchema, type WorkspaceContext } from "@marketplace/schemas";
-import { productReturnPath } from "@marketplace/schemas/product-navigation";
+import { currentSessionSchema, workspaceContextSchema, workspaceChoicesSchema, type WorkspaceContext } from "@marketplace/schemas";
+import { workspaceReturnPath } from "@marketplace/schemas/product-navigation";
 export type AuthCapability = "BUYER" | "SUPPLIER";
 
 export type AuthSession = {
@@ -123,7 +123,7 @@ export function workspaceHandoffUrl({
     }),
   );
   const base = capability === "SUPPLIER" ? supplierAppUrl : buyerAppUrl;
-  const path = capability === "BUYER" ? productReturnPath(returnTo) ?? "/" : "/";
+  const path = workspaceReturnPath(returnTo, capability) ?? "/";
   return `${base.replace(/\/$/, "")}${path}#session=${handoff}`;
 }
 
@@ -207,11 +207,27 @@ export async function openWorkspace(
   );
 }
 
-export async function availableWorkspaces(session: AuthSession, capability: AuthCapability): Promise<WorkspaceContext[]> {
+export async function availableWorkspaces(session: AuthSession, capability?: AuthCapability): Promise<WorkspaceContext[]> {
   if (!session.activeOrganizationId && !session.organizationId) throw new Error("У аккаунта нет активной организации");
   const response = await fetch(`${apiUrl}/auth/workspaces`, { headers: { authorization: `Bearer ${session.accessToken}` }, cache: "no-store", signal: AbortSignal.timeout(15_000) });
   if (!response.ok) throw new Error("Не удалось получить доступные организации. Повторите вход.");
-  const choices = workspaceChoicesSchema.parse(await response.json()).filter(item => item.capabilities.includes(capability));
+  const choices = workspaceChoicesSchema.parse(await response.json()).filter(item => item.capabilities.length && (!capability || item.capabilities.includes(capability)));
   if (!choices.length) throw new Error("У аккаунта нет доступа к выбранному кабинету. Выберите доступную роль.");
   return choices;
+}
+
+export type WorkspaceChoice = { organizationId: string; organizationDisplayName: string; capability: AuthCapability };
+export function workspaceOptions(contexts: WorkspaceContext[]): WorkspaceChoice[] {
+  return contexts.flatMap(item => item.capabilities.map(capability => ({ organizationId: item.organizationId, organizationDisplayName: item.organizationDisplayName, capability })));
+}
+
+let resuming: Promise<AuthSession | null> | undefined;
+export function resumeAuthSession() {
+  resuming ??= (async () => {
+    const response = await fetch(`${apiUrl}/auth/current`, { credentials: "include", cache: "no-store", signal: AbortSignal.timeout(15_000) });
+    if (!response.ok) throw new Error("Не удалось проверить текущий вход. Повторите попытку.");
+    const value: unknown = await response.json();
+    return value === null ? null : currentSessionSchema.parse(value);
+  })().finally(() => { resuming = undefined; });
+  return resuming;
 }
