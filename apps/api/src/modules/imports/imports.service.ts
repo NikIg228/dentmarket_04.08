@@ -26,6 +26,7 @@ import {
   isConfidentAutomaticMatch,
   normalizeCatalogText,
   rankVariants,
+  scoreVariant,
 } from "./matching";
 import { BackgroundQueueService } from "../../platform/jobs/background-queue.service";
 import { FileUploadPolicyService } from "../../platform/security/file-upload-policy.service";
@@ -493,7 +494,7 @@ export class ImportsService implements OnModuleInit {
             totalRows: rows.length,
             rows: {
               create: rows.map((rawData, index) => ({
-                rowNumber: index + 2,
+                rowNumber: parsedFile.rowNumbers?.[index] ?? index + 2,
                 rawData: rawData as Prisma.InputJsonValue,
               })),
             },
@@ -706,6 +707,7 @@ export class ImportsService implements OnModuleInit {
                       score: Number(memory.confidence),
                       reasons: [
                         "mapping_memory",
+                        ...scoreVariant(item, rememberedVariant).reasons,
                         ...(Array.isArray(memory.reasons)
                           ? memory.reasons.map(String)
                           : []),

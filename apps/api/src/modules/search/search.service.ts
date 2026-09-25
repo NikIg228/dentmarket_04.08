@@ -353,6 +353,7 @@ export class SearchService {
             (balance) =>
               (!input.cityId || balance.warehouse.cityId === input.cityId) &&
               balance.freshnessStatus === "FRESH" &&
+              (!balance.freshnessExpiresAt || balance.freshnessExpiresAt > now) &&
               Number(balance.quantityAvailable) > 0,
           );
           const delivery = offer.deliveryOptions.filter(
@@ -612,6 +613,7 @@ export class SearchService {
                     warehouseId: true,
                     quantityAvailable: true,
                     freshnessStatus: true,
+                    freshnessExpiresAt: true,
                     lastSuccessfulSyncAt: true,
                     warehouse: { select: { cityId: true } },
                   },
@@ -739,6 +741,7 @@ export class SearchService {
     promotions: PublicSearchPromotion[] = [],
   ) {
     const categoryIds = product.categories.map(({ categoryId }) => categoryId);
+    const now = new Date();
     const offers = product.variants.flatMap((variant) =>
       variant.supplierOffers
         .filter((offer) => {
@@ -845,9 +848,10 @@ export class SearchService {
                   quantityInBaseUnit: offer.baseUnitsPerSaleUnit.toString(),
                   unit: offer.saleUnit?.symbol ?? null,
                 },
-            available: offer.inventoryBalances.some(
+            available: Boolean(offer.prices[0] && offer.prices[0].amountMinor.gt(0) && offer.prices[0].currency === "KZT") && offer.inventoryBalances.some(
               (balance) =>
                 balance.freshnessStatus === "FRESH" &&
+                (!balance.freshnessExpiresAt || balance.freshnessExpiresAt > now) &&
                 Number(balance.quantityAvailable) > 0,
             ),
             freshness: offer.inventoryBalances.map(

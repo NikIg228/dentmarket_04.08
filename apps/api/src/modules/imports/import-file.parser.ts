@@ -5,13 +5,14 @@ import ExcelJS from "exceljs";
 import { assertSafeZipPackage } from "../../platform/security/zip-resource-policy";
 
 type RawRow = Record<string, string | number | boolean | null>;
-export type ImportParseResult = { rows: RawRow[]; metadata: Record<string, unknown>; requiresReview: boolean };
+export type ImportParseResult = { rows: RawRow[]; rowNumbers?: number[]; metadata: Record<string, unknown>; requiresReview: boolean };
 const MAX_IMPORT_ROWS = 5_000;
 const MAX_IMPORT_COLUMNS = 100;
 const MAX_PDF_TEXT_ITEMS_PER_PAGE = 20_000;
 const MAX_PDF_TEXT_CHARACTERS = 2_000_000;
 class CsvRowLimitExceeded extends Error {}
 class CsvColumnLimitExceeded extends Error {}
+class ExcelRowLimitExceeded extends Error {}
 
 function primitive(value: unknown): string | number | boolean | null {
   if (value === null || typeof value === "string" || typeof value === "number" || typeof value === "boolean") return value;
@@ -98,20 +99,27 @@ export class ImportFileParser {
         const headers = detected.headers;
         if (headers.length > MAX_IMPORT_COLUMNS) throw new Error("Column limit exceeded");
         const rows: RawRow[] = [];
-        for (let rowNumber = detected.row + 1; rowNumber <= Math.min(sheet.rowCount, detected.row + 5_000); rowNumber += 1) {
+        const rowNumbers: number[] = [];
+        sheet.eachRow((sheetRow, rowNumber) => {
+          if (rowNumber <= detected.row) return;
           const row: RawRow = {};
           let hasValue = false;
           for (let column = 1; column <= headers.length; column += 1) {
             const header = headers[column - 1];
             if (!header) continue;
-            const normalized = excelCell(sheet.getRow(rowNumber).getCell(column));
+            const normalized = excelCell(sheetRow.getCell(column));
             if (normalized !== null && normalized !== "") hasValue = true;
             row[header] = normalized;
           }
-          if (hasValue) rows.push(row);
-        }
-        return { rows, metadata: { method: "excel", sheet: sheet.name, headerRow: detected.row }, requiresReview: false };
-      } catch {
+          if (hasValue) {
+            if (rows.length >= MAX_IMPORT_ROWS) throw new ExcelRowLimitExceeded();
+            rows.push(row);
+            rowNumbers.push(rowNumber);
+          }
+        });
+        return { rows, rowNumbers, metadata: { method: "excel", sheet: sheet.name, headerRow: detected.row }, requiresReview: false };
+      } catch (error) {
+        if (error instanceof ExcelRowLimitExceeded) throw new BadRequestException("Excel file exceeds 5,000 data rows");
         throw new BadRequestException("Excel file could not be parsed");
       }
     }

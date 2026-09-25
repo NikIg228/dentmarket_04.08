@@ -1,3 +1,4 @@
+import { importFile } from "../fixtures/import-file";
 import { randomUUID } from "node:crypto";
 import { unlink } from "node:fs/promises";
 import { resolve, sep } from "node:path";
@@ -150,9 +151,10 @@ test.beforeEach(async () => {
 test.afterEach(cleanup);
 test.afterAll(async () => prisma.$disconnect());
 
-test("supplier safely rolls back a published import batch without losing raw evidence", async ({ request }: { request: APIRequestContext }) => {
+for (const fileType of ["CSV", "EXCEL"] as const) test(`supplier safely rolls back a published ${fileType} batch without losing raw evidence`, async ({ request }: { request: APIRequestContext }) => {
+  await prisma.supplierDataSource.update({ where: { id: sourceId }, data: { type: fileType } });
   const csv = `externalId,name,supplierSku,priceMinor,currency,quantityOnHand\nrow-b33,${uniqueName},B33-${uniqueName.split(" ")[1]},135000,KZT,4\n`;
-  const created = await json<{ id: string }>(await request.post(`${API_URL}/suppliers/${supplier.organizationId}/import-batches`, { headers: identity(supplier), data: { sourceId, fileName: "flow-b3-3.csv", fileType: "CSV", contentBase64: Buffer.from(csv).toString("base64"), columnMapping: { externalId: "externalId", name: "name", supplierSku: "supplierSku", priceMinor: "priceMinor", currency: "currency", quantityOnHand: "quantityOnHand" } } }));
+  const created = await json<{ id: string }>(await request.post(`${API_URL}/suppliers/${supplier.organizationId}/import-batches`, { headers: identity(supplier), data: { sourceId, fileName: fileType === "CSV" ? "flow-b3-3.csv" : "flow-b3-3.xlsx", fileType, contentBase64: (await importFile(fileType, csv.trim().split("\n").map(line => line.split(",")))).toString("base64"), columnMapping: { externalId: "externalId", name: "name", supplierSku: "supplierSku", priceMinor: "priceMinor", currency: "currency", quantityOnHand: "quantityOnHand" } } }));
   batchId = created.id;
   expect((await request.post(`${API_URL}/suppliers/${supplier.organizationId}/import-batches/${batchId}/process`, { headers: identity(supplier), data: {} })).status()).toBe(201);
   const candidate = await prisma.productCandidate.findFirstOrThrow({ where: { supplierOrganizationId: supplier.organizationId, proposedName: uniqueName } });

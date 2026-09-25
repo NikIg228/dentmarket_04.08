@@ -447,6 +447,12 @@ export class MarketplaceApiClient {
     );
   }
 
+  getSupplierImportBatch(supplierOrganizationId: string, batchId: string) {
+    return this.get<SupplierImportBatchResponse>(
+      `/suppliers/${supplierOrganizationId}/import-batches/${batchId}`,
+    );
+  }
+
   getSupplierImportDiagnostics(
     supplierOrganizationId: string,
     batchId: string,

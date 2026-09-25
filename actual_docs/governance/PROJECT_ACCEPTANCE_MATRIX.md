@@ -73,7 +73,7 @@ evidence не означает свежий pass текущего checkout ил�
 | CORE-01 | Владелец подтвердил обязательный договор площадка–поставщик до публикации; assertActive сохранён | Полнота versioned acceptance/ONE_TIME/FRAMEWORK contract и локальные tests; optional относится только к buyer–supplier framework |
 | CORE-02 | Payment intent требует provider и merchant account, mock capture существует | Отдельный manual/off-platform claim/review/settlement без фиктивного PSP; пока техническое предложение |
 | CORE-03 | Confirmation/dispatch проверены; logistics содержит delivery closure/POD code | Принятые API/PG сценарии получения, частичной доставки, отмены/expiry локального резерва, repeat purchase |
-| CORE-04 | CSV slice проверен; XLSX parser/matching/search/manual offers существуют | Полнота XLSX/manual journey, контрольная выборка search/matching, quality/media/freshness contracts |
+| CORE-04 | Local PASS25.09: CSV/XLSX preview/publication/rollback, manual API, search48/50, matching100/0 wrong, runtime freshness; [evidence](task-state/CORE-04-2026-09-25.md) | Push/CI ожидаются; demo-name duplicates9 групп, search2 misses, реальные прайсы/media rights не сертифицированы |
 | CORE-05 | Auth/session/role/security regressions существуют | Принятый внутренний onboarding/recovery/membership lifecycle без live email/social providers; rights новых endpoints |
 | CORE-06 | Outbox/DLQ/import review и shipment in-app работают в локальном baseline | Полный внутренний work-queue/correction path, уведомления новых transitions, явное поведение при отсутствующем adapter |
 | CORE-07 | Operational metrics и search analytics существуют | Единая схема минимальных продуктовых событий/расчётов, retry-safe counts и demo/live separation |

@@ -1,3 +1,4 @@
+import { importFile } from "../fixtures/import-file";
 import { randomUUID } from "node:crypto";
 import { unlink } from "node:fs/promises";
 import { resolve, sep } from "node:path";
@@ -129,9 +130,10 @@ test.beforeEach(async () => {
 test.afterEach(cleanup);
 test.afterAll(async () => prisma.$disconnect());
 
-test("operator approves imported product, publishes it once, and Buyer sees it", async ({ request, page }: { request: APIRequestContext; page: import("@playwright/test").Page }) => {
+for (const fileType of ["CSV", "EXCEL"] as const) test(`operator approves ${fileType} product, publishes it once, and Buyer sees it`, async ({ request, page }: { request: APIRequestContext; page: import("@playwright/test").Page }) => {
+  await prisma.supplierDataSource.update({ where: { id: sourceId }, data: { type: fileType } });
   const csv = `externalId,name,supplierSku,priceMinor,currency,quantityOnHand\nrow-b32,${uniqueName},B32-${uniqueName.split(" ")[1]},125000,KZT,3\n`;
-  const createResponse = await request.post(`${API_URL}/suppliers/${supplier.organizationId}/import-batches`, { headers: identity(supplier), data: { sourceId, fileName: "flow-b3-2.csv", fileType: "CSV", contentBase64: Buffer.from(csv).toString("base64"), columnMapping: { externalId: "externalId", name: "name", supplierSku: "supplierSku", priceMinor: "priceMinor", currency: "currency", quantityOnHand: "quantityOnHand" } } });
+  const createResponse = await request.post(`${API_URL}/suppliers/${supplier.organizationId}/import-batches`, { headers: identity(supplier), data: { sourceId, fileName: fileType === "CSV" ? "flow-b3-2.csv" : "flow-b3-2.xlsx", fileType, contentBase64: (await importFile(fileType, csv.trim().split("\n").map(line => line.split(",")))).toString("base64"), columnMapping: { externalId: "externalId", name: "name", supplierSku: "supplierSku", priceMinor: "priceMinor", currency: "currency", quantityOnHand: "quantityOnHand" } } });
   const batch = await json<{ id: string }>(createResponse);
   batchId = batch.id;
   expect((await request.post(`${API_URL}/suppliers/${supplier.organizationId}/import-batches/${batchId}/process`, { headers: identity(supplier), data: {} })).status()).toBe(201);
@@ -204,4 +206,17 @@ test("operator approves imported product, publishes it once, and Buyer sees it",
   await expect(page.getByTestId("product-card").filter({ hasText: uniqueName })).toBeVisible();
   const afterSearch = await json<{ total: number; items: Array<{ id: string; name: string }> }>(await request.get(`${API_URL}/catalog/search?q=${encodeURIComponent(uniqueName)}`));
   expect(afterSearch.items).toEqual(expect.arrayContaining([expect.objectContaining({ id: productId, name: uniqueName })]));
+  // Deliberately keep the search projection unchanged: runtime truth must win.
+  const availability = async () => {
+    const result = await json<{ items: Array<{ id: string; isAvailable: boolean }> }>(await request.get(`${API_URL}/catalog/search?q=${encodeURIComponent(uniqueName)}`));
+    return result.items.find(item => item.id === productId)?.isAvailable ?? false;
+  };
+  await prisma.inventoryBalance.updateMany({ where: { offerId }, data: { freshnessExpiresAt: new Date(0), freshnessStatus: "FRESH" } });
+  expect(await availability(), "expired stock must not be available even before a freshness worker runs").toBe(false);
+  await prisma.inventoryBalance.updateMany({ where: { offerId }, data: { freshnessExpiresAt: new Date(Date.now() + 3600000) } });
+  await prisma.offerPrice.updateMany({ where: { offerId }, data: { freshnessExpiresAt: new Date(0) } });
+  expect(await availability(), "an expired price must not leave an available offer").toBe(false);
+  await prisma.offerPrice.updateMany({ where: { offerId }, data: { freshnessExpiresAt: new Date(Date.now() + 3600000) } });
+  await prisma.supplierOffer.update({ where: { id: offerId }, data: { status: "BLOCKED" } });
+  expect(await availability(), "a blocked offer must not remain available through its projection").toBe(false);
 });

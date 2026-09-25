@@ -80,6 +80,9 @@ export function scoreVariant(
     score = 1;
     reasons.push("exact_gtin");
   }
+  if (item.gtin && variant.gtin && item.gtin !== variant.gtin) {
+    reasons.push("conflicting_gtin");
+  }
   if (
     item.supplierSku &&
     variant.sku &&
@@ -137,6 +140,10 @@ export function isConfidentAutomaticMatch(
 ) {
   const best = candidates[0];
   if (!best) return false;
+  if (best.reasons.includes("conflicting_gtin")) return false;
+  // Two supplied identifiers resolving to different variants require human review.
+  if (best.reasons.includes("exact_gtin") && candidates.some(candidate =>
+    candidate.variant.id !== best.variant.id && candidate.reasons.includes("exact_sku"))) return false;
   const runnerUp = candidates[1];
   if (best.reasons.includes("mapping_memory") && best.score >= 0.8) return true;
   if (

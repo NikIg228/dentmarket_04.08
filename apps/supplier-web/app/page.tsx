@@ -505,6 +505,9 @@ export default function SupplierWorkspace() {
       />
     ) : active === "integrations" ? (
       <SupplierIntegrations
+        api={api}
+        dataSources={dataSources}
+        onChanged={() => refresh(true)}
         authenticated={Boolean(handoff)}
         supplierId={supplierId}
         apiContext={apiContext}

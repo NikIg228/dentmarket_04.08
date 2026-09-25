@@ -2,6 +2,89 @@
 
 Дата: 2026-09-21. Это карточка исполнения, не продуктовый backlog.
 
+## CORE-04 — каталог и файловый импорт, 25.09.2026
+
+- READY_FOR_PUBLICATION. Владелец primary01a0c957-1f23-7b70-9dc9-226afbb5c0b1, generation3/idle.
+  Основание: «приступаем» после описания CORE-04: manual/Excel/CSV, preview,
+  matching/review/publication, повторная загрузка/rollback, качество каталога.
+  Canonical main@7f06914f87aa465a0e09f08e2bcdb7c34c0327f0. Прежние dirty:
+  registry/PROJECT_HANDOFF/PRIMARY-SESSION,4 next-env,flow-a; сохранить.
+  CORE-02 отложен целиком; CORE-03/эквайринг/СДЭК/ERP/crawling/OCR не входят.
+- Preflight: прочитаны Workflow/context, Product7/22.6, Foundation CORE-04,
+  Acceptance Matrix. Backend Architect, Frontend Developer, UX Architect,
+  Code Reviewer — применимые роли без делегирования. Один writer.
+- Найдено: XLSX parser молча ограничивает чтение5000 строк, тогда как CSV
+  отвергает превышение. createBatch назначает rowNumber=index+2 даже при
+  найденном заголовке ниже первой строки/пустых строках. UI supplier upload
+  в текущем route предлагает PDF; проверить доступность Excel/CSV пути.
+- План gates: typecheck, npm test, API/supplier build (buyer/admin при изменении
+  их входов), verify:core-contract, verify:postgres, Flow B3 и regular verify:web
+  для изменённого UI; desktop390/1440 и keyboard. Изолированная existing DB
+  dentmarket_audit_20260914, pilot, никакого reseed рабочей БД. Перед запуском
+  проверить DB identity/fixture readiness/listeners/source. Attempts0 для всех
+  gates; max3, команда20min/full45min/диагностика15min, CI45min.
+- Пользователю предложены критерии benchmark:50 запросов hit@5>=90%;100–200
+  строк,0 неверных automatch, ambiguity→review. Ответ ожидается; не считать
+  согласованной приёмкой качества до ответа. Независимые исправления продолжать.
+- DoD: целевые пробелы устранены и подтверждены gates, evidence по входам,
+  review/scoped commit/push/actual CI. Не закрывать CORE-04 по одним parser tests.
+  Следующий шаг: исправить потери строк/номеров и проверить полный XLSX journey.
+- Прогресс25.09: parser12/12 PASS, typecheck12/12 PASS. XLSX больше не
+  обрезается на5000; rowNumbers передаются в staging. Flow B3 API-test расширен
+  CSV/EXCEL (preamble/blank row/exact large money). Добавлены typed batch rows,
+  GET batch client/OpenAPI и отдельный spreadsheet-import panel (preview перед
+  process, source reuse, diagnostics/rollback). UI/HTTP изменения ещё не приняты.
+  npm test1 FAIL buyer order-profile timeout5000ms при concurrency2; test2
+  остановлен до suites: npm alias уже содержит concurrency2, дублировать флаг
+  нельзя. Попытка3 выполняет тот же turbo test напрямую с concurrency1;
+  prerequisites отсутствуют у alias, timeout/assertions неизменны. Логи outputs/
+  core04-20260925/unit-*.log. При FAIL3 остановить gate по лимиту.
+  Критерии benchmark НЕ утверждены: владелец попросил объяснить; объяснение
+  дано, следующий шаг по критериям — показать конкретную выборку. Read-only
+  existing catalog report:500 cards,50 with price/available, это demo fixture.
+- unit3 serial PASS11/11; полный build1 PASS10/10 (API и4web, bundle budgets).
+  E2E scoped typecheck PASS после добавления spreadsheet-import-ui.spec.ts.
+  PostgreSQL1 PASS на audit DB. Contract1 FAIL readiness45s во время build;
+  contract2 PASS после завершения нагрузки без изменения timeout/guards.
+  Underlying scripts использованы после полного build, prerequisite aliases
+  API/schemas уже выполнены. verify:web1 RUNNING, owned session44292.
+  Примеры quality-критериев сохранены в outputs/core04-20260925/
+  quality-sample-proposal.md и показаны владельцу; это пока предложение.
+  После build восстановить4 пользовательских next-env из проверенных старых
+  escape-*-next-env.txt snapshots; generated imports не включать в коммит.
+
+- verify:web1 завершён FAIL:44 passed,38 skipped,1 failed. Новые CSV/EXCEL
+  staging/reprocess, publication/rollback и UI preview390/1440 PASS. Сбой
+  organization-ready.spec.ts:85 — waitForURL timeout90000ms после выбора
+  BUYER; причина ещё не установлена, retry не выполнялся. Полный gate не PASS.
+  Следующий технический шаг: разобрать trace этого сбоя до решения о retry.
+  Пользователь просит подробнее объяснить benchmark; пороги пока предложение.
+- Продолжение25.09 по «окей, что дальше?» + «приступай»: критерии50 search
+  hit@5>=90%,100–200 import0 wrong automatch согласованы после объяснения.
+  web2 isolated organization-ready PASS1/1 без смены guards/timeouts: на первом
+  screenshot был429 ThrottlerException при выборе организации, не зависание.
+  4 пользовательских next-env восстановлены из escape snapshots.
+- Matching sample1 FAIL: конфликт GTIN и SKU мог автоматически выбрать товар.
+  Исправлены conflicting_gtin/cross-candidate conflicts; сохранённая mapping
+  memory также проверяет GTIN. Sample2 PASS100 rows:50 auto/50 review/0 wrong;
+  matching11 unit PASS. Это synthetic families, не реальные прайсы.
+  После новых backend входов serial root unit PASS11/11(10 cached), typecheck
+  PASS12/12, API build2 PASS. E2E typecheck3 PASS после новых tests.
+  XLSX publication/rollback parameterized; manual create/price/history/tenant
+  test добавлен. Search50 labels frozen до запуска (31 name+19SKU).
+  Следующий gate: только изменённые FlowB3+quality+UI, отдельный output-dir
+  для сохранения скриншотов. Ранее44 web PASS переиспользуются по входам.
+- FINAL local25.09: CORE-04.1–4 проверены, detail CORE-04-2026-09-25.md.
+  Search48/50 (96%); matching100 rows0 wrong auto. Runtime expiry price/stock
+  и BLOCKED проверены без обновления projection. Final typecheck12/12,
+  unit11/11, API+supplier build, contract, PostgreSQL, browser5/5 PASS;
+  manual/rollback/reprocess PASS ранее по неизменным inputs. UI screenshots
+ 1440/390 прочитаны. Предыдущие error attempts сохранены выше.
+  web-core04-1 collection FAIL import.meta/CJS; corrected path, second10/10
+  PASS; third artifact3/3 PASS. После новых freshness/UI входов5/5 PASS.
+  Report catalog500/675variants/500offers,9 duplicate-name groups,0 price/unit
+  errors; demo/media-rights limitations записаны. Никакой catalog cleanup.
+  Следующий шаг: scoped stage/review, commit/push main, exact-SHA CI.
 ## ORGANIZATION-READY — организация готова к работе, 22.09.2026
 
 - **24.09, финальный local review: READY_FOR_PUBLICATION; CI ожидается.**

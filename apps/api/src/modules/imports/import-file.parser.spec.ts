@@ -74,6 +74,37 @@ describe("ImportFileParser", () => {
       }),
     ).rejects.toThrow("Excel file could not be parsed");
   });
+
+  it("preserves Excel source row numbers across a preamble and empty rows", async () => {
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet("Прайс");
+    sheet.addRows([["Прайс"], [], ["Артикул", "Наименование", "Цена"], ["001", "Материал", 100], [], ["002", "Другой материал", 200]]);
+    const result = await new ImportFileParser().parseWithDiagnostics({
+      sourceId: "00000000-0000-4000-8000-000000000022", fileName: "price.xlsx", fileType: "EXCEL",
+      contentBase64: Buffer.from(await workbook.xlsx.writeBuffer()).toString("base64"),
+      columnMapping: { externalId: "Артикул", name: "Наименование", priceMinor: "Цена" },
+    });
+    expect(result.rowNumbers).toEqual([4, 6]);
+    expect(result.rows.map(row => row.Артикул)).toEqual(["001", "002"]);
+  });
+
+  it.each([5000, 5001])("never silently truncates a %i-row Excel price list", async (count) => {
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet("Прайс");
+    sheet.addRow(["Артикул", "Наименование"]);
+    for (let index = 0; index < count; index++) sheet.addRow([`SKU-${index}`, `Товар ${index}`]);
+    const result = new ImportFileParser().parseWithDiagnostics({
+      sourceId: "00000000-0000-4000-8000-000000000022", fileName: "large.xlsx", fileType: "EXCEL",
+      contentBase64: Buffer.from(await workbook.xlsx.writeBuffer()).toString("base64"),
+      columnMapping: { externalId: "Артикул", name: "Наименование" },
+    });
+    if (count > 5000) await expect(result).rejects.toThrow("Excel file exceeds 5,000 data rows");
+    else {
+      const parsed = await result;
+      expect(parsed.rows).toHaveLength(count);
+      expect(parsed.rows.at(-1)?.Артикул).toBe("SKU-4999");
+    }
+  });
 });
 
 describe("PDF supplier price parsing", () => {

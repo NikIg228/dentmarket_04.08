@@ -203,17 +203,20 @@ core contract и существующие Flow B2 regressions при измен�
 
 ### CORE-04 — полнота локального каталога и файлового импорта
 
+Local PASS25.09.2026; [evidence и ограничения](../governance/task-state/CORE-04-2026-09-25.md).
+Публикация/CI отслеживаются отдельно; demo не означает live readiness.
+
 CSV staging/review/publication/rollback уже baseline; новый parser не нужен
 без доказанного недостатка. XLSX предусмотрен продуктом, но его полный путь
 нельзя объявлять завершённым по наличию parser unit tests.
 
-- [ ] CORE-04.1: проверить manual offer create/update и XLSX через тот же
+- [x] CORE-04.1: проверить manual offer create/update и XLSX через тот же
   preview → validation → matching → review → publication → rollback contract.
-- [ ] CORE-04.2: контрольные 50 поисковых запросов, 100–200 размеченных import
+- [x] CORE-04.2: контрольные 50 поисковых запросов, 100–200 размеченных import
   строк; явно согласовать search/matching thresholds до отметки готовности.
-- [ ] CORE-04.3: проверить canonical/variant/pack/UOM/media/source/freshness
+- [x] CORE-04.3: проверить canonical/variant/pack/UOM/media/source/freshness
   contract для frontend; stale/blocked/no-offer честно недоступны к покупке.
-- [ ] CORE-04.4: внутренний quality report по набору 500 demo-карточек/500
+- [x] CORE-04.4: внутренний quality report по набору 500 demo-карточек/500
   offers: counts, дубли, цена/остаток/единицы, происхождение изображений,
   различие 50 buyable products и полного fixture. Не считать demo data live.
 

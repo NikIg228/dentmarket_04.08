@@ -38,6 +38,11 @@ describe("supplier matching", () => {
     ).toEqual([]);
   });
 
+  it("does not let remembered mapping override a changed GTIN", () => {
+    const scored = scoreVariant({ name: "Supplier label", normalizedName: "supplier label", gtin: "9999999999999", supplierSku: variant.sku }, variant);
+    expect(isConfidentAutomaticMatch([{ variant, score: 1, reasons: ["mapping_memory", ...scored.reasons] }])).toBe(false);
+  });
+
   it("matches an official catalog alias without moderation", () => {
     const aliasedVariant = {
       ...variant,

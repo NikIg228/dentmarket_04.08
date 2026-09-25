@@ -45,6 +45,9 @@ export class ImportsController {
   }
 
   @Get("import-batches/:batchId")
+  @ApiUuidParam("supplierOrganizationId", "Supplier organization identifier")
+  @ApiUuidParam("batchId", "Supplier import batch identifier")
+  @ApiCoreResponse("SupplierImportBatchResponse")
   @RequirePermissions("import.manage")
   batch(@Param("supplierOrganizationId") supplierOrganizationId: string, @Param("batchId") batchId: string, @Headers("x-user-id") actorId: string, @Headers("x-organization-id") organizationId: string) {
     return this.imports.batch(supplierOrganizationId, batchId, this.context(actorId, organizationId));

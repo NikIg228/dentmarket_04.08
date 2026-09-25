@@ -8,6 +8,7 @@ import {
   type APIResponse,
 } from "@playwright/test";
 import { PrismaClient } from "@prisma/client";
+import ExcelJS from "exceljs";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:4012/api";
 const databaseUrl =
@@ -18,7 +19,7 @@ process.env.DATABASE_URL = databaseUrl;
 
 const prisma = new PrismaClient();
 const localStorageRoot = resolve(process.cwd(), "../..", ".local-storage");
-const permissionCodes = ["import.manage", "matching.manage"];
+const permissionCodes = ["import.manage", "matching.manage", "catalog.offer.edit", "pricing.manage"];
 const exactPriceMinor = "9007199254740993";
 
 type ActorFixture = {
@@ -198,6 +199,8 @@ async function cleanupFixtures() {
     await prisma.importBatch.deleteMany({ where: { id: { in: batchIds } } });
   }
   if (organizationIds.length) {
+    const ownedOffers = await prisma.supplierOffer.findMany({ where: { supplierOrganizationId: { in: organizationIds } }, select: { id: true } });
+    await prisma.outboxEvent.deleteMany({ where: { aggregateType: "SupplierOffer", aggregateId: { in: ownedOffers.map(offer => offer.id) } } });
     await prisma.auditLog.deleteMany({
       where: { organizationId: { in: organizationIds } },
     });
@@ -303,11 +306,29 @@ test.afterAll(async () => {
   await prisma.$disconnect();
 });
 
-test("supplier CSV is staged, validated, matched, and reprocessed idempotently", async ({
+test("manual offer creation and price updates preserve tenant boundaries and history", async ({ request }) => {
+  const url = `${API_URL}/suppliers/${supplier.organizationId}/offers`;
+  const offer = await responseJson<{ id: string; status: string }>(await request.post(url, {
+    headers: identity(supplier), data: { productVariantId: variantId, supplierSku: "MANUAL-TEST" },
+  }));
+  expect(offer.status).toBe("DRAFT");
+  expect((await request.post(url, { headers: identity(supplier), data: { productVariantId: variantId } })).status()).toBe(409);
+  expect((await request.put(`${url}/${offer.id}/price`, { headers: identity(foreignSupplier), data: { amountMinor: 1, currency: "KZT" } })).status()).toBe(403);
+  for (const amountMinor of [125000, 130000]) {
+    expect((await request.put(`${url}/${offer.id}/price`, { headers: identity(supplier), data: { amountMinor, currency: "KZT", source: "MANUAL" } })).ok()).toBe(true);
+  }
+  const persisted = await prisma.supplierOffer.findUniqueOrThrow({ where: { id: offer.id }, include: { publication: true, prices: true } });
+  expect(persisted.publication?.marketplaceVisible).toBe(false);
+  expect(persisted.prices.filter(price => price.status === "ACTIVE").map(price => price.amountMinor.toString())).toEqual(["130000"]);
+  expect(await prisma.offerPriceHistory.count({ where: { offerId: offer.id } })).toBe(2);
+});
+
+for (const fileType of ["CSV", "EXCEL"] as const) test(`supplier ${fileType} is staged, validated, matched, and reprocessed idempotently`, async ({
   request,
 }: {
   request: APIRequestContext;
 }) => {
+  await prisma.supplierDataSource.update({ where: { id: sourceId }, data: { type: fileType } });
   const suffix = randomUUID().replaceAll("-", "").slice(0, 12);
   const exactExternalId = `b3-exact-${suffix}`;
   const pendingExternalId = `b3-pending-${suffix}`;
@@ -363,7 +384,14 @@ test("supplier CSV is staged, validated, matched, and reprocessed idempotently",
   const csv = `\uFEFF${headers.join(",")}\n${rows
     .map((row) => row.map(csvCell).join(","))
     .join("\n")}\n`;
-  const checksum = createHash("sha256").update(Buffer.from(csv)).digest("hex");
+  let bytes = Buffer.from(csv);
+  if (fileType === "EXCEL") {
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet("Прайс");
+    sheet.addRows([["Прайс поставщика"], [], headers, rows[0], [], ...rows.slice(1)]);
+    bytes = Buffer.from(await workbook.xlsx.writeBuffer());
+  }
+  const checksum = createHash("sha256").update(bytes).digest("hex");
 
   const createdResponse = await request.post(
     `${API_URL}/suppliers/${supplier.organizationId}/import-batches`,
@@ -371,9 +399,9 @@ test("supplier CSV is staged, validated, matched, and reprocessed idempotently",
       headers: identity(supplier),
       data: {
         sourceId,
-        fileName: `flow-b3-${suffix}.csv`,
-        fileType: "CSV",
-        contentBase64: Buffer.from(csv).toString("base64"),
+        fileName: `flow-b3-${suffix}.${fileType === "CSV" ? "csv" : "xlsx"}`,
+        fileType,
+        contentBase64: bytes.toString("base64"),
         columnMapping: {
           externalId: "externalId",
           name: "name",
@@ -408,6 +436,7 @@ test("supplier CSV is staged, validated, matched, and reprocessed idempotently",
     "RAW",
     "RAW",
   ]);
+  expect(staged.rows.map(({ rowNumber }) => rowNumber)).toEqual(fileType === "EXCEL" ? [4, 6, 7, 8] : [2, 3, 4, 5]);
   expect(staged.rows[0]?.rawData).toMatchObject({
     externalId: exactExternalId,
     priceMinor: exactPriceMinor,
@@ -426,7 +455,7 @@ test("supplier CSV is staged, validated, matched, and reprocessed idempotently",
   expect(asset).toMatchObject({
     status: "CLEAN",
     checksumSha256: checksum,
-    detectedMime: "text/csv",
+    detectedMime: fileType === "CSV" ? "text/csv" : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   });
 
   const foreignResponse = await request.get(

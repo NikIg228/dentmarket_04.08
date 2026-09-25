@@ -2,7 +2,8 @@ import { Box24Regular } from "@fluentui/react-icons/svg/box";
 import { CloudArrowUp24Regular } from "@fluentui/react-icons/svg/cloud-arrow-up";
 import { DataTrending24Regular } from "@fluentui/react-icons/svg/data-trending";
 import { PlugConnected24Regular } from "@fluentui/react-icons/svg/plug-connected";
-import type { ApiContext } from "@marketplace/api-client";
+import type { ApiContext, MarketplaceApiClient } from "@marketplace/api-client";
+import { SpreadsheetImport } from "./spreadsheet-import";
 import {
   DmButton,
   DmField,
@@ -19,6 +20,7 @@ import type {
   ExternalCatalogItem,
   ImportBatch,
   Integration,
+  SupplierDataSource,
 } from "./types";
 import {
   integrationModeLabel,
@@ -27,6 +29,9 @@ import {
 } from "./view-model";
 
 export function SupplierIntegrations({
+  api,
+  dataSources,
+  onChanged,
   authenticated,
   supplierId,
   apiContext,
@@ -40,6 +45,9 @@ export function SupplierIntegrations({
   onProcessBatch,
   onConfirmMatch,
 }: {
+  api: MarketplaceApiClient;
+  dataSources: SupplierDataSource[];
+  onChanged: () => Promise<void>;
   authenticated: boolean;
   supplierId: string;
   apiContext: ApiContext;
@@ -66,6 +74,7 @@ export function SupplierIntegrations({
       {authenticated ? (
         <ConnectorOnboarding supplierId={supplierId} apiContext={apiContext} />
       ) : null}
+      <SpreadsheetImport key={supplierId} api={api} supplierId={supplierId} sources={dataSources} onChanged={onChanged} />
       <Section
         title="Загрузить прайс или каталог"
         description="Мы сохраним исходный файл, распознаем строки и попросим подтвердить валюту перед публикацией."
